@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-text: #fefdfc;
+    --color-background: #24221e;
+    --color-primary: #f0e3ca;
+    --color-secondary: #ff7218;
+    --color-accent: #ffa43c;
+  }
+  html {
+    font-family: 'Raleway', sans-serif;
+  }
+}
