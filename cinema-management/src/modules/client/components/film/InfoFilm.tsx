@@ -60,7 +60,7 @@ const InfoFilm = ({ movieDetail }: MovieDetailProps) => {
   const ratingValue = parseFloat(movieDetail.ratings) / 2; // Giả sử ratings là thang điểm 10, và Rating component là thang 5
 
   return (
-    <div className='flex flex-col justify-start items-center md:items-start md:flex-row mx-auto mt-10 gap-5 md:max-w-8/12 px-5'>
+    <div className='flex flex-col justify-start items-center md:items-start md:flex-row mx-auto mt-10 gap-5 md:max-w-8/12 px-5 backdrop-blur-md bg-black/60 rounded-2xl p-8'>
         <img className='w-[300px] md:w-[350px] object-cover rounded-2xl' src={movieDetail.image} alt={movieDetail.nameVn} />
         <div className='px-2 md:pl-5 flex-1'>
             <h2 className='text-3xl md:text-4xl font-semibold mb-4'>{movieDetail.nameVn}</h2>

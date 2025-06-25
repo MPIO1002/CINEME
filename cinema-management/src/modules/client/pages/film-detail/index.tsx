@@ -4,6 +4,7 @@ import ActorMovie from '../../components/film/ActorMovie';
 import BookingMovie from '../../components/film/BookingMovie';
 import InfoFilm from '../../components/film/InfoFilm';
 import TrailerMovie from '../../components/film/TrailerMovie';
+import { useParams } from 'react-router-dom';
 
 interface Actor {
   id: string;
@@ -36,20 +37,15 @@ interface MovieDetail {
   listActor: Actor[];
 }
 
-// Assuming idMovie is passed as a prop or from URL params
-// For this example, let's assume it's a prop
-interface IndexProps {
-  idMovie?: string; // Make it optional if it can be undefined initially
-}
-
-function Index({ idMovie = "760b3b4e-01b6-4071-a954-dd0b5cab66f7" }: IndexProps) {
+function Index() {
     const [movieDetail, setMovieDetail] = useState<MovieDetail | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const { movieId } = useParams();
     useEffect(() => {
-        // Ensure idMovie is available before fetching
-        if (!idMovie) {
+        // Ensure movieId is available before fetching
+        if (!movieId) {
             setIsLoading(false);
             setError("Movie ID is missing.");
             return;
@@ -59,7 +55,7 @@ function Index({ idMovie = "760b3b4e-01b6-4071-a954-dd0b5cab66f7" }: IndexProps)
             setIsLoading(true);
             setError(null);
             try {
-                const response = await axios.get(`http://localhost:8080/api/v1/movies/${idMovie}/detail`);
+                const response = await axios.get(`http://localhost:8080/api/v1/movies/${movieId}/detail`);
                 // Check statusCode from the response data
                 if (response.data && response.data.statusCode === 200) {
                     setMovieDetail(response.data.data);
@@ -76,7 +72,7 @@ function Index({ idMovie = "760b3b4e-01b6-4071-a954-dd0b5cab66f7" }: IndexProps)
             }
         };
         fetchMovieDetail();
-    }, [idMovie]); // Add idMovie as a dependency
+    }, [movieId]); // Add movieId as a dependency
     
   if (isLoading) {
     return (
@@ -103,8 +99,12 @@ function Index({ idMovie = "760b3b4e-01b6-4071-a954-dd0b5cab66f7" }: IndexProps)
   }
   
   return (
-    <div className='bg-[var(--color-background)] w-full h-auto text-[var(--color-text)]'>
-        <h1 className='text-3xl font-bold text-center pt-10'>{movieDetail.nameVn}</h1>
+    <div className='bg-[var(--color-background)] w-full h-auto text-[var(--color-text)] pt-10' style={{
+        backgroundImage: "url('/background.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }}>
         {/* Nội dung phim */}
         <InfoFilm movieDetail={movieDetail}/>
 

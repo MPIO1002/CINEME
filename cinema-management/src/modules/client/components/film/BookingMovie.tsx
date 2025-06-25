@@ -97,7 +97,7 @@ const BookingMovie = ({ movieName = "Phim Đang Chọn" }: BookingMovieProps) =>
   return (
     // Sử dụng Fragment để bao bọc component và dialog
     <>
-        <div id='booking' className='md:max-w-8/12 mx-auto p-4 md:p-6 flex flex-col mt-10 rounded-lg shadow-lg bg-[var(--color-card-background,var(--color-background-secondary))]'>
+        <div id='booking' className='md:max-w-8/12 mx-auto md:p-6 flex flex-col mt-10 shadow-lg backdrop-blur-md bg-black/40 rounded-2xl p-8'>
             <div className='w-full'>
                 <h1 className='text-2xl sm:text-3xl font-bold text-[var(--color-text-primary)] mb-4 text-center md:text-left'>Lịch chiếu {movieName}</h1>
                 
@@ -113,8 +113,8 @@ const BookingMovie = ({ movieName = "Phim Đang Chọn" }: BookingMovieProps) =>
                 </div>
 
                 <h2 className='text-xl sm:text-2xl font-semibold text-[var(--color-text-secondary)] mb-3 mt-6'>Chọn ngày</h2>
-                <div className='w-full px-2 sm:px-0'>
-                    <Carousel opts={{ align: "start", loop: false }} className="w-full cursor-grab">
+                <div className='w-full flex flex-col items-center px-2 sm:px-0'>
+                    <Carousel opts={{ align: "start", loop: false }} className="md:w-11/12 w-full cursor-grab">
                         <CarouselContent className="-ml-2">
                             {Array.from({ length: 14 }).map((_, idx) => {
                                 const dateIterator = new Date();
