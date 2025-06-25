@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @layer base {
   :root {
@@ -9,6 +10,6 @@
     --color-accent: #ffa43c;
   }
   html {
-    font-family: 'Raleway', sans-serif;
+    font-family: 'Josenfin Sans', sans-serif;
   }
 }
