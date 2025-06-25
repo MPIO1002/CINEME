@@ -63,13 +63,13 @@ const Nav = ({
       }}
     >
       {/* Logo, tên rạp và slogan */}
-      <div className="flex items-center gap-3">
+      <a href="/" className="flex items-center gap-3">
         <img src="/logo_cinema_new.PNG" alt="Cinemê Logo" className="w-10 h-10 object-contain" />
         <div>
           <span className="font-bold text-xl leading-tight block">Cinemê</span>
           <span className="text-xs opacity-80 block">{TEXT[lang].slogan}</span>
         </div>
-      </div>
+      </a>
       {/* Menu giữa */}
       <ul className="flex gap-8 font-medium text-base">
         <li className="hover:text-[var(--color-secondary)] cursor-pointer transition">{TEXT[lang].phim}</li>
