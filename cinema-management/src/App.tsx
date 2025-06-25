@@ -1,11 +1,10 @@
-import './App.css'
-import FilmDetail from './modules/client/pages/film-detail/index'
+import './App.css';
+import Routers from './modules/client/routers';
+
 function App() {
   return (
-    <>
-    <FilmDetail />
-    </>
-  )
+    <Routers />
+  );
 }
 
-export default App
+export default App;

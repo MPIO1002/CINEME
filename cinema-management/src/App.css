@@ -8,8 +8,19 @@
     --color-primary: #f0e3ca;
     --color-secondary: #ff7218;
     --color-accent: #ffa43c;
+    --custom-100: oklab(91.7% 0.005 0.036);
+    --custom-200: oklab(70.9% 0.137 0.138);
+    --custom-300: oklab(25.3% 0.001 0.008);
+    --custom-400: oklab(25.3% 0.001 0.008);
   }
   html {
-    font-family: 'Josenfin Sans', sans-serif;
+    font-family: 'Josefin Sans', sans-serif;
   }
+}
+
+.backdrop-trapezoid {
+    background: rgba(0,0,0,0.5);
+    padding: 3px;
+    padding-left: 15px;
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 20% 100%);
 }
