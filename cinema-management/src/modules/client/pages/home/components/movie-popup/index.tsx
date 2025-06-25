@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTicket } from "@fortawesome/free-solid-svg-icons";
+import { API_BASE_URL } from "../../../../../../components/api-config";
 
 if (typeof window !== "undefined" && !document.getElementById("scale-up-center-keyframes")) {
     const style = document.createElement("style");
@@ -34,7 +35,7 @@ const MoviePopup: React.FC<MoviePopupProps> = ({ movieId, lang, onShowTrailer })
     const [detail, setDetail] = useState<MovieDetail | null>(null);
 
     useEffect(() => {
-        fetch(`http://localhost:8080/api/v1/movies/${movieId}/detail`)
+        fetch(`${API_BASE_URL}/movies/${movieId}/detail`)
             .then(res => res.json())
             .then(data => {
                 if (data.statusCode === 200 && data.data) {

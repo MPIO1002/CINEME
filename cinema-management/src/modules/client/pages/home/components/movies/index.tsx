@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import MoviePopup from "../movie-popup";
+import { API_BASE_URL } from "../../../../../../components/api-config";
 
 type Movie = {
     id: string;
@@ -21,7 +22,7 @@ const MovieList: React.FC<{ lang: "vi" | "en" }> = ({ lang }) => {
     const [isPopupHovered, setIsPopupHovered] = useState(false);
 
     useEffect(() => {
-        fetch("http://localhost:8080/api/v1/movies")
+        fetch(`${API_BASE_URL}/movies`)
             .then((res) => res.json())
             .then((data) => {
                 if (data.statusCode === 200 && Array.isArray(data.data)) {
