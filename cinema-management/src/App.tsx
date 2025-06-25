@@ -1,11 +1,10 @@
-import './App.css'
+import './App.css';
+import Routers from './modules/client/routers';
 
 function App() {
   return (
-    <>
-
-    </>
-  )
+    <Routers />
+  );
 }
 
-export default App
+export default App;
