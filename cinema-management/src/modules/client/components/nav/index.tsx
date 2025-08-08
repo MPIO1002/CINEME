@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUser, faGear, faChevronDown } from "@fortawesome/free-solid-svg-icons";
+import Login from "../dialogs/Login";
 
 const LANGUAGES = [
   { code: "vi", label: "VIE", flag: "/VN.webp" },
@@ -32,6 +33,7 @@ const Nav = ({
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [openLogin, setOpenLogin] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -54,6 +56,13 @@ const Nav = ({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
+  const handleOpenLogin = () => {
+    setOpenLogin(true);
+  }
+
+  const handleOnClose = () => {
+    setOpenLogin(false);
+  }
   return (
     <nav
       className={`w-full flex items-center justify-between fixed top-0 left-0 z-30 px-6 py-3 transition-colors duration-300 ${scrolled ? "bg-[var(--color-background)] bg-opacity-95" : "bg-transparent"
@@ -118,13 +127,17 @@ const Nav = ({
             </ul>
           )}
         </div>
-        <button aria-label="User" className="hover:text-[var(--color-accent)] transition">
+        <button aria-label="User" className="hover:text-[var(--color-accent)] transition" onClick={handleOpenLogin}>
           <FontAwesomeIcon icon={faUser} className="w-6 h-6" />
         </button>
         <button aria-label="Settings" className="hover:text-[var(--color-accent)] transition">
           <FontAwesomeIcon icon={faGear} className="w-6 h-6" />
         </button>
       </div>
+        {/* Login Dialog */}
+        {openLogin && (
+            <Login onClose={handleOnClose}/>
+        )}
     </nav>
   );
 };
