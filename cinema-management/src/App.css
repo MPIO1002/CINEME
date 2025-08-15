@@ -13,14 +13,43 @@
     --custom-300: oklab(25.3% 0.001 0.008);
     --custom-400: oklab(25.3% 0.001 0.008);
   }
+
   html {
     font-family: 'Josefin Sans', sans-serif;
   }
 }
 
 .backdrop-trapezoid {
-    background: rgba(0,0,0,0.5);
-    padding: 3px;
-    padding-left: 15px;
-    clip-path: polygon(0 0, 100% 0, 100% 100%, 20% 100%);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 3px;
+  padding-left: 15px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 20% 100%);
+}
+
+@keyframes scroll-left {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes scroll-right {
+  0% {
+    transform: translateX(-50%);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.animate-scroll-left {
+  animation: scroll-left 15s linear infinite;
+}
+
+.animate-scroll-right {
+  animation: scroll-right 15s linear infinite;
 }

@@ -56,7 +56,7 @@ const Nav = ({
 
   return (
     <nav
-      className={`w-full flex items-center justify-between fixed top-0 left-0 z-30 px-6 py-3 transition-colors duration-300 ${scrolled ? "bg-[var(--color-background)] bg-opacity-95" : "bg-transparent"
+      className={`w-full flex items-center justify-between fixed top-0 left-0 z-90 px-6 py-3 transition-colors duration-300 ${scrolled ? "bg-[var(--color-background)] bg-opacity-95" : "bg-transparent"
         }`}
       style={{
         color: "var(--color-text)",

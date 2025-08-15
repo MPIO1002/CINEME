@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import MoviePopup from "../movie-popup";
 import { API_BASE_URL } from "../../../../../../components/api-config";
+import ProgressBar from "../../../../components/progress-bar";
 
 type Movie = {
     id: string;
@@ -65,7 +66,34 @@ const MovieList: React.FC<{ lang: "vi" | "en" }> = ({ lang }) => {
 
     return (
         <div className="w-full min-h-screen flex justify-center items-start p-10">
-            <div className="backdrop-blur-md bg-black/50 rounded-2xl p-8">
+            <div className="rounded-2xl p-8">
+                {/* Movie Category Tabs */}
+                <div className="mb-8">
+                    <div className="flex items-center gap-8" style={{ borderBottom: '1px solid var(--color-primary)' }}>
+                        <div className="flex items-center gap-8 pb-3">
+                            <span className="text-2xl font-bold" style={{ color: 'var(--color-text)' }}>PHIM</span>
+                            <span className="text-xl font-semibold pb-1" style={{ 
+                                color: 'var(--color-secondary)', 
+                                borderBottom: '2px solid var(--color-secondary)' 
+                            }}>
+                                Đang chiếu
+                            </span>
+                        </div>
+                        <button 
+                            className="text-xl font-medium transition-colors pb-3 hover:opacity-80"
+                            style={{ color: 'var(--color-primary)' }}
+                        >
+                            Sắp chiếu
+                        </button>
+                        <button 
+                            className="text-xl font-medium transition-colors pb-3 hover:opacity-80"
+                            style={{ color: 'var(--color-primary)' }}
+                        >
+                            Phim IMAX
+                        </button>
+                    </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 justify-items-start">
                     {movies.map((movie) => (
                         <div
