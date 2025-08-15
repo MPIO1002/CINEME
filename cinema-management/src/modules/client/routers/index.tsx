@@ -4,7 +4,6 @@ import Layout from "../layout";
 import Home from "../pages/home";
 import FilmDetail from "../pages/film-detail";
 import BookingPage from "../pages/booking";
-import Payment from "../pages/payment";
 import PaymentResult from "../pages/payment-result";
 const Routers = () => {
   const [lang, setLang] = useState<"vi" | "en">("vi");
@@ -16,9 +15,7 @@ const Routers = () => {
           <Route path="/" element={<Home lang={lang} />} />
           <Route path="/film/:id" element={<FilmDetail />} />
           <Route path="/booking/:id" element={<BookingPage />} />
-          <Route path="/payment" element={<Payment />} />
           <Route path="/payment-result" element={<PaymentResult />} />
-          <Route path="/payment-result/VnPayReturn" element={<PaymentResult />} />
         </Routes>
       </Layout>
     </BrowserRouter>
