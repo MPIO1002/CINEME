@@ -13,6 +13,7 @@ import {
     Zap
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
+import { roomApiService } from '../../../services/roomApi';
 import type { Seat } from './SeatLayoutDesigner';
 import SeatLayoutDesigner from './SeatLayoutDesigner';
 
@@ -78,32 +79,99 @@ const RoomModal: React.FC<RoomModalProps> = ({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showSeatDesigner, setShowSeatDesigner] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [loadingSeatData, setLoadingSeatData] = useState(false);
 
   useEffect(() => {
-    if (room) {
-      setForm(room);
-    } else if (mode === "add") {
-      setForm({
-        name: "",
-        type: "2D",
-        location: "",
-        totalSeats: 100,
-        vipSeats: 20,
-        regularSeats: 80,
-        coupleSeats: 0,
-        status: "ACTIVE",
-        screenSize: "15m x 8m",
-        screenResolution: "4K",
-        audioSystem: "Dolby Digital",
-        hasAirCondition: true,
-        hasEmergencyExit: true,
-        hasDolbyAtmos: false,
-        has4K: true,
-        description: "",
-        seatLayout: [],
-      });
+    const loadRoomData = async () => {
+      if (room) {
+        // console.log('RoomModal: Loading room data for:', room.name, 'ID:', room.id);
+        // Set form data first with room data
+        setForm(room);
+        
+        // Always load seat data from API when room has an ID (for both edit and view modes)
+        if (room.id && (mode === "edit" || mode === "view")) {
+        //   console.log('RoomModal: Starting to load seat data for room ID:', room.id);
+          setLoadingSeatData(true);
+          try {
+            // console.log('Loading seat data for room:', room.id);
+            const seats = await roomApiService.getRoomSeats(room.id);
+            // console.log('RoomModal: Received seat data:', seats);
+            
+            if (seats && seats.length > 0) {
+              // Map API seat data to component format
+              const mappedSeats = seats.map(seat => {
+                // Map API seatType to component type
+                const getTypeFromAPI = (apiType: string): 'regular' | 'vip' | 'couple' | 'disabled' | 'blocked' => {
+                  switch (apiType.toUpperCase()) {
+                    case 'VIP': return 'vip';
+                    case 'COUPLE': return 'couple';
+                    case 'DISABLED': return 'disabled';
+                    case 'STANDARD': 
+                    default: return 'regular';
+                  }
+                };
+                
+                return {
+                  id: seat.id || `${seat.row}-${seat.column}`,
+                  row: parseInt(seat.row || '1'),
+                  column: seat.column || 1,
+                  type: getTypeFromAPI(seat.seatType || 'STANDARD'),
+                  label: seat.seatNumber,
+                  isAvailable: true
+                };
+              });
+
+            //   console.log('RoomModal: Mapped seats:', mappedSeats);
+
+              // Calculate seat counts from actual data
+              const vipCount = mappedSeats.filter(s => s.type === 'vip').length;
+              const regularCount = mappedSeats.filter(s => s.type === 'regular').length;
+              const coupleCount = mappedSeats.filter(s => s.type === 'couple').length;
+
+              setForm(prev => ({
+                ...prev,
+                seatLayout: mappedSeats,
+                totalSeats: mappedSeats.length,
+                vipSeats: vipCount,
+                regularSeats: regularCount,
+                coupleSeats: coupleCount
+              }));
+            }
+          } catch (error) {
+            console.error('Error loading seat data:', error);
+            // Keep original room data if seat loading fails
+          }
+          setLoadingSeatData(false);
+        }
+      } else if (mode === "add") {
+        // Reset form for new room
+        setForm({
+          name: "",
+          type: "2D",
+          location: "",
+          totalSeats: 100,
+          vipSeats: 20,
+          regularSeats: 80,
+          coupleSeats: 0,
+          status: "ACTIVE",
+          screenSize: "15m x 8m",
+          screenResolution: "4K",
+          audioSystem: "Dolby Digital",
+          hasAirCondition: true,
+          hasEmergencyExit: true,
+          hasDolbyAtmos: false,
+          has4K: true,
+          description: "",
+          seatLayout: [],
+        });
+      }
+      setErrors({});
+    };
+    
+    if (open) {
+      loadRoomData();
     }
-    setErrors({});
   }, [room, mode, open]);
 
   if (!open) return null;
@@ -155,9 +223,16 @@ const RoomModal: React.FC<RoomModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (validateForm() && onSubmit) {
-      onSubmit(form);
+      setLoading(true);
+      try {
+        onSubmit(form);
+      } catch (error) {
+        console.error('Error submitting form:', error);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -232,6 +307,114 @@ const RoomModal: React.FC<RoomModalProps> = ({
       case "edit": return "text-blue-600";
       case "view": return "text-purple-600";
     }
+  };
+
+  // Helper function to parse seat number (e.g., "A1" -> {row: "A", column: 1})
+  const parseSeatNumber = (seatNumber: string) => {
+    const match = seatNumber.match(/^([A-Z]+)(\d+)$/);
+    if (match) {
+      return {
+        rowLetter: match[1],
+        columnNumber: parseInt(match[2])
+      };
+    }
+    return { rowLetter: 'A', columnNumber: 1 };
+  };
+
+  // Function to render seat layout from API data
+  const renderSeatLayoutFromAPI = () => {
+    if (!form.seatLayout || form.seatLayout.length === 0) return null;
+
+    // Group seats by row
+    const seatsByRow: { [key: string]: Seat[] } = {};
+    let maxColumn = 0;
+
+    form.seatLayout.forEach(seat => {
+      const parsed = parseSeatNumber(seat.label);
+      const rowKey = parsed.rowLetter;
+      
+      if (!seatsByRow[rowKey]) {
+        seatsByRow[rowKey] = [];
+      }
+      
+      seatsByRow[rowKey].push({
+        ...seat,
+        row: parsed.columnNumber, // Store column number for sorting
+        column: parsed.columnNumber
+      });
+      
+      maxColumn = Math.max(maxColumn, parsed.columnNumber);
+    });
+
+    // Sort rows alphabetically and seats within each row by column
+    const sortedRows = Object.keys(seatsByRow).sort();
+    
+    return (
+      <div className="space-y-1 max-w-4xl mx-auto overflow-x-auto md:*:justify-center *:justify-start">
+        {sortedRows.map((rowLetter) => {
+          const rowSeats = seatsByRow[rowLetter].sort((a, b) => (a.column || 0) - (b.column || 0));
+          
+          return (
+            <div key={rowLetter} className="flex items-center justify-center space-x-1">
+              {/* Row label */}
+              <div className="w-6 text-xs font-semibold text-gray-600 text-center">
+                {rowLetter}
+              </div>
+              
+              {/* Seats in this row */}
+              <div className="flex space-x-1">
+                {Array.from({ length: maxColumn }, (_, colIndex) => {
+                  const columnNumber = colIndex + 1;
+                  const seat = rowSeats.find(s => s.column === columnNumber);
+                  
+                  if (seat) {
+                    const getSeatStyle = () => {
+                      switch (seat.type) {
+                        case 'vip': return 'bg-yellow-300 border-yellow-400 text-yellow-800';
+                        case 'couple': return 'bg-pink-300 border-pink-400 text-pink-800';
+                        case 'disabled': return 'bg-blue-300 border-blue-400 text-blue-800';
+                        default: return 'bg-gray-300 border-gray-400 text-gray-800';
+                      }
+                    };
+
+                    const getSeatIcon = () => {
+                      switch (seat.type) {
+                        case 'vip': return '👑';
+                        case 'couple': return '❤️';
+                        case 'disabled': return '♿';
+                        default: return '💺';
+                      }
+                    };
+
+                    return (
+                      <div
+                        key={`${rowLetter}${columnNumber}`}
+                        className={`w-7 h-7 rounded border-2 text-xs flex items-center justify-center font-semibold ${getSeatStyle()}`}
+                        title={`${seat.label} - ${seat.type.toUpperCase()}`}
+                      >
+                        {getSeatIcon()}
+                      </div>
+                    );
+                  } else {
+                    // Empty space for missing seats
+                    return (
+                      <div key={`${rowLetter}${columnNumber}`} className="w-7 h-7">
+                        {/* Empty space */}
+                      </div>
+                    );
+                  }
+                })}
+              </div>
+              
+              {/* Row label (right side) */}
+              <div className="w-6 text-xs font-semibold text-gray-600 text-center">
+                {rowLetter}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   const formatRevenue = (revenue: number) => {
@@ -412,7 +595,17 @@ const RoomModal: React.FC<RoomModalProps> = ({
                   </label>
                   {isView ? (
                     <div className="w-full border rounded-lg px-4 py-3 bg-white border-slate-200 text-slate-600">
-                      {form.totalSeats} ghế
+                      {loadingSeatData ? (
+                        <span className="flex items-center">
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Đang tải dữ liệu ghế...
+                        </span>
+                      ) : (
+                        `${form.totalSeats} ghế`
+                      )}
                     </div>
                   ) : (
                     <input
@@ -420,9 +613,12 @@ const RoomModal: React.FC<RoomModalProps> = ({
                       name="totalSeats"
                       value={form.totalSeats}
                       onChange={handleChange}
+                      disabled={loadingSeatData}
                       min="1"
                       className={`w-full px-3 py-3 border rounded-lg transition-all duration-200 ${
-                        errors.totalSeats
+                        loadingSeatData
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : errors.totalSeats
                           ? 'border-red-300 focus:border-red-500'
                           : 'border-slate-300 focus:border-blue-500'
                       }`}
@@ -543,12 +739,37 @@ const RoomModal: React.FC<RoomModalProps> = ({
                     <div className="text-sm text-slate-600 mb-2">
                       Đã thiết kế: {form.seatLayout.length} ghế
                     </div>
-                    <div className="text-xs text-gray-500 flex justify-center space-x-4">
-                      <span>💺 Thường: {form.seatLayout.filter(s => s.type === 'regular').length}</span>
-                      <span>👑 VIP: {form.seatLayout.filter(s => s.type === 'vip').length}</span>
-                      <span>❤️ Đôi: {form.seatLayout.filter(s => s.type === 'couple').length}</span>
-                      <span>♿ Khuyết tật: {form.seatLayout.filter(s => s.type === 'disabled').length}</span>
+                    {/* Render actual seat layout from API data */}
+                    {renderSeatLayoutFromAPI()}
+                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                      <div className="text-xs font-semibold text-gray-700 mb-2">Chú thích:</div>
+                      <div className="flex justify-center flex-wrap gap-4 text-xs">
+                        <div className="flex items-center space-x-1">
+                          <div className="w-5 h-5 bg-gray-300 border-gray-400 border-2 rounded flex items-center justify-center">💺</div>
+                          <span>Thường ({form.seatLayout.filter(s => s.type === 'regular').length})</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <div className="w-5 h-5 bg-yellow-300 border-yellow-400 border-2 rounded flex items-center justify-center">👑</div>
+                          <span>VIP ({form.seatLayout.filter(s => s.type === 'vip').length})</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <div className="w-5 h-5 bg-pink-300 border-pink-400 border-2 rounded flex items-center justify-center">❤️</div>
+                          <span>Đôi ({form.seatLayout.filter(s => s.type === 'couple').length})</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <div className="w-5 h-5 bg-blue-300 border-blue-400 border-2 rounded flex items-center justify-center">♿</div>
+                          <span>Khuyết tật ({form.seatLayout.filter(s => s.type === 'disabled').length})</span>
+                        </div>
+                      </div>
                     </div>
+                  </div>
+                ) : loadingSeatData ? (
+                  <div className="text-center py-8">
+                    <svg className="animate-spin h-8 w-8 text-gray-400 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <div className="text-sm text-gray-500">Đang tải dữ liệu ghế...</div>
                   </div>
                 ) : (
                   <div className="text-center">
@@ -839,13 +1060,26 @@ const RoomModal: React.FC<RoomModalProps> = ({
                 <button
                   type="button"
                   onClick={handleSubmit}
+                  disabled={loading}
                   className={`flex-1 px-6 py-3 text-white rounded-lg font-semibold transition-colors duration-200 ${
-                    isAdd 
+                    loading
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : isAdd 
                       ? 'bg-green-600 hover:bg-green-700' 
                       : 'bg-blue-600 hover:bg-blue-700'
                   }`}
                 >
-                  {isAdd ? "Thêm phòng chiếu" : "Lưu thay đổi"}
+                  {loading ? (
+                    <span className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Đang xử lý...
+                    </span>
+                  ) : (
+                    isAdd ? "Thêm phòng chiếu" : "Lưu thay đổi"
+                  )}
                 </button>
               </div>
             )}
@@ -857,7 +1091,7 @@ const RoomModal: React.FC<RoomModalProps> = ({
       <SeatLayoutDesigner
         open={showSeatDesigner}
         roomName={form.name || "Phòng chiếu"}
-        initialSeats={form.seatLayout || []}
+        initialSeats={loadingSeatData ? [] : (form.seatLayout || [])}
         onSave={handleSeatLayoutSave}
         onClose={() => setShowSeatDesigner(false)}
       />

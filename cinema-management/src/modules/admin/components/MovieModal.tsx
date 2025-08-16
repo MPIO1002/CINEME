@@ -1,26 +1,17 @@
-import { Calendar, CheckCircle, Clock, Edit3, Eye, FileText, Film, Image, Plus, Star, User, X } from "lucide-react";
+import { Calendar, CheckCircle, Clock, Edit3, Eye, FileText, Film, Image, Plus, Star, User, UserPlus, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
+import { actorApiService, type Actor } from '../../../services/actorApi';
+import { movieApiService, type Movie, type MovieDetail } from '../../../services/movieApi';
+import ActorModal from './ActorModal';
 
-interface Movie {
-  id?: string;
-  nameVn: string;
-  nameEn: string;
-  director: string;
-  countryId: string;
-  formatId: string;
-  releaseDate: string;
-  endDate: string;
-  briefVn: string;
-  briefEn: string;
-  image: string | File | ""; // API returns string, but form accepts File or empty
-  trailer: string | File | ""; // API returns string, but form accepts File or empty
-  time: number;
-  limitageId: string;
-  languageId: string;
-  ratings?: string;
-  status: string;
-  sortorder?: number;
-}
+import CheckBoxIcon from '@mui/icons-material/CheckBox';
+import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
+import Autocomplete from '@mui/material/Autocomplete';
+import Checkbox from '@mui/material/Checkbox';
+import TextField from '@mui/material/TextField';
+
+const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
+const checkedIcon = <CheckBoxIcon fontSize="small" />;
 
 interface DropdownOption {
   id: string;
@@ -30,7 +21,7 @@ interface DropdownOption {
 interface MovieModalProps {
   open: boolean;
   mode: "add" | "edit" | "view";
-  movie?: Movie;
+  movie?: string;
   onClose: () => void;
   onSubmit: (movie: Movie) => void;
 }
@@ -50,7 +41,7 @@ const Dropdown: React.FC<DropdownProps> = ({ options, value, onChange, placehold
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
-      className={`mt-1 block w-full h-12 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors duration-200 ${
+      className={`w-full h-12 border rounded-lg px-4 py-3 transition-all duration-200 ${
         error 
           ? 'border-red-300 focus:border-red-500 focus:ring-red-500' 
           : 'border-gray-300 focus:ring-black-500 focus:border-black-500'
@@ -69,33 +60,35 @@ const Dropdown: React.FC<DropdownProps> = ({ options, value, onChange, placehold
 const MovieModal: React.FC<MovieModalProps> = ({
   open,
   mode,
-  movie,
+  movie, // movieId as string
   onClose,
   onSubmit,
 }) => {
-  const [form, setForm] = useState<Movie>(
-    movie || {
-      nameVn: "",
-      nameEn: "",
-      director: "",
-      countryId: "",
-      formatId: "",
-      releaseDate: "",
-      endDate: "",
-      briefVn: "",
-      briefEn: "",
-      image: "",
-      trailer: "",
-      time: 90,
-      limitageId: "",
-      languageId: "",
-      status: "2",
-      sortorder: 2,
-    }
-  );
+  const [form, setForm] = useState<Movie>({
+    nameVn: "",
+    nameEn: "",
+    director: "",
+    countryId: "",
+    releaseDate: "",
+    endDate: "",
+    briefVn: "",
+    briefEn: "",
+    image: "",
+    trailer: "",
+    time: 90,
+    limitageId: "",
+    status: "2",
+  });
 
   const [imageError, setImageError] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+
+  // Actor selection states
+  const [selectedActors, setSelectedActors] = useState<Actor[]>([]);
+  const [allActors, setAllActors] = useState<Actor[]>([]);
+  const [isActorModalOpen, setIsActorModalOpen] = useState(false);
+  const [loadingActors, setLoadingActors] = useState(false);
 
   // Mock data for dropdowns - you should replace with API calls
   const countries: DropdownOption[] = [
@@ -112,7 +105,7 @@ const MovieModal: React.FC<MovieModalProps> = ({
 
   const limitages: DropdownOption[] = [
     { id: "16e1ac95-3413-4069-8852-3df676ee17e6", name: "T13 - Phim dành cho khán giả từ đủ 13 tuổi trở lên" },
-    { id: "26e1ac95-3413-4069-8852-3df676ee17e7", name: "T16 - Phim dành cho khán giả từ đủ 16 tuổi trở lên" },
+    { id: "8a4524a5-36aa-4354-af88-c56a191592ac", name: "T16 - Phim dành cho khán giả từ đủ 16 tuổi trở lên" },
     { id: "36e1ac95-3413-4069-8852-3df676ee17e8", name: "T18 - Phim dành cho khán giả từ đủ 18 tuổi trở lên" },
   ];
 
@@ -129,31 +122,114 @@ const MovieModal: React.FC<MovieModalProps> = ({
     { id: "0", name: "Tạm ngưng" },
   ];
 
+  // Load all actors for autocomplete
+  const loadActors = async () => {
+    try {
+      setLoadingActors(true);
+      const actors = await actorApiService.getAllActors();
+      setAllActors(actors);
+    } catch (error) {
+      console.error('Error loading actors:', error);
+    } finally {
+      setLoadingActors(false);
+    }
+  };
+
+  // Fetch movie detail when movieId is provided
   useEffect(() => {
-    if (movie) setForm(movie);
-    else if (mode === "add") setForm({
-      nameVn: "",
-      nameEn: "",
-      director: "",
-      countryId: "",
-      formatId: "",
-      releaseDate: "",
-      endDate: "",
-      briefVn: "",
-      briefEn: "",
-      image: "",
-      trailer: "",
-      time: 90,
-      limitageId: "",
-      languageId: "",
-      status: "2",
-      sortorder: 2,
-    });
+    const fetchMovieDetail = async () => {
+      if (movie && (mode === "edit" || mode === "view")) {
+        setLoading(true);
+        try {
+          const movieDetail: MovieDetail = await movieApiService.getMovieDetail(movie);
+          // Convert MovieDetail to Movie interface
+          setForm({
+            id: movieDetail.id,
+            nameVn: movieDetail.nameVn,
+            nameEn: movieDetail.nameEn,
+            director: movieDetail.director,
+            releaseDate: movieDetail.releaseDate,
+            endDate: movieDetail.endDate,
+            briefVn: movieDetail.briefVn,
+            briefEn: movieDetail.briefEn,
+            image: movieDetail.image,
+            trailer: movieDetail.trailer,
+            time: movieDetail.time,
+            ratings: movieDetail.ratings,
+            status: movieDetail.status,
+            // Use mapped fields from API (you'll need to map these IDs later)
+            countryId: movieDetail.countryVn, // Temporary - should map to ID
+            limitageId: movieDetail.limitageNameVn, // Temporary - should map to ID  
+          });
+          
+          // Load actors for this movie if available
+          // TODO: Load movie actors from API when endpoint is available
+          setSelectedActors(movieDetail.listActor || []);
+          console.log('Fetched movie detail:', movieDetail);
+        } catch (error) {
+          console.error('Error fetching movie detail:', error);
+        }
+        setLoading(false);
+      } else if (mode === "add") {
+        // Reset form for add mode
+        setForm({
+          nameVn: "",
+          nameEn: "",
+          director: "",
+          countryId: "",
+          releaseDate: "",
+          endDate: "",
+          briefVn: "",
+          briefEn: "",
+          image: "",
+          trailer: "",
+          time: 90,
+          limitageId: "",
+          status: "2",
+        });
+        setSelectedActors([]);
+      }
+    };
+
+    if (open) {
+      fetchMovieDetail();
+      loadActors(); // Load actors for autocomplete
+    }
+    
     setImageError(false);
     setErrors({});
   }, [movie, mode, open]);
 
+  // Remove actor from selection
+  const removeActor = (actorId: string) => {
+    setSelectedActors(prev => prev.filter(actor => actor.id !== actorId));
+  };
+
+  // Handle new actor creation
+  const handleNewActorSubmit = (newActor: Actor) => {
+    // Add the new actor to selection
+    setSelectedActors(prev => [...prev, newActor]);
+    setIsActorModalOpen(false);
+  };
+
   if (!open) return null;
+
+  // Show loading spinner while fetching movie detail
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+        <div className="bg-white rounded-2xl shadow-2xl p-8 z-20">
+          <div className="flex items-center justify-center space-x-2">
+            <div className="w-4 h-4 bg-blue-600 rounded-full animate-pulse"></div>
+            <div className="w-4 h-4 bg-blue-600 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+            <div className="w-4 h-4 bg-blue-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+          </div>
+          <p className="text-center text-slate-600 mt-4">Đang tải thông tin phim...</p>
+        </div>
+      </div>
+    );
+  }
 
   const isView = mode === "view";
   const isAdd = mode === "add";
@@ -171,20 +247,12 @@ const MovieModal: React.FC<MovieModalProps> = ({
       newErrors.director = "Đạo diễn là bắt buộc";
     }
 
-    if (!form.formatId.trim()) {
-      newErrors.formatId = "Định dạng là bắt buộc";
-    }
-
-    if (!form.countryId.trim()) {
+    if (!form.countryId?.trim()) {
       newErrors.countryId = "Quốc gia là bắt buộc";
     }
 
-    if (!form.limitageId.trim()) {
+    if (!form.limitageId?.trim()) {
       newErrors.limitageId = "Giới hạn tuổi là bắt buộc";
-    }
-
-    if (!form.languageId.trim()) {
-      newErrors.languageId = "Ngôn ngữ là bắt buộc";
     }
 
     if (!form.releaseDate) {
@@ -232,15 +300,50 @@ const MovieModal: React.FC<MovieModalProps> = ({
         newErrors.image = "File poster phải là định dạng ảnh";
       }
     }
-    // If image is string (from existing movie) or empty in edit mode, it's valid
+
+    // if (!form.listActor || form.listActor.length === 0) {
+    //   newErrors.listActor = "Danh sách diễn viên là bắt buộc";
+    // }
 
     setErrors(newErrors);
+    
+    // Log validation results for debugging
+    if (Object.keys(newErrors).length > 0) {
+      console.log('Validation errors found:', newErrors);
+    }
+    
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = () => {
-    if (validateForm() && onSubmit) {
-      onSubmit(form);
+    console.log('Submit clicked');
+    console.log('Form data:', form);
+    console.log('Selected actors:', selectedActors);
+    
+    const isValid = validateForm();
+    console.log('Validation result:', isValid);
+    console.log('Validation errors:', errors);
+    
+    if (isValid && onSubmit) {
+      console.log('Calling onSubmit with form data');
+      // Add selected actors to form before submitting
+      const formWithActors = {
+        ...form,
+        listActor: selectedActors
+      };
+      console.log('Final form data:', formWithActors);
+      onSubmit(formWithActors);
+    } else {
+      console.log('Validation failed or onSubmit not provided');
+      console.log('onSubmit:', onSubmit);
+      
+      // Show validation errors to user
+      if (Object.keys(errors).length > 0) {
+        const errorMessages = Object.entries(errors).map(([field, message]) => `${field}: ${message}`).join('\n');
+        alert('Vui lòng kiểm tra các lỗi sau:\n\n' + errorMessages);
+      } else if (!onSubmit) {
+        alert('onSubmit function is not provided');
+      }
     }
   };
 
@@ -387,9 +490,9 @@ const MovieModal: React.FC<MovieModalProps> = ({
               {/* Movie Titles */}
               <div className="grid grid-cols-1 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                     <Film className="w-4 h-4" />
-                    Tên phim (Tiếng Việt) *
+                    Tên phim (Tiếng Việt)<span className="text-red-500 font-">*</span>
                   </label>
                   <input
                     type="text"
@@ -435,7 +538,7 @@ const MovieModal: React.FC<MovieModalProps> = ({
               {/* Director and Format */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                     <User className="w-4 h-4" />
                     Đạo diễn *
                   </label>
@@ -445,7 +548,7 @@ const MovieModal: React.FC<MovieModalProps> = ({
                     value={form.director}
                     onChange={handleChange}
                     disabled={isView}
-                    className={`w-full border rounded-lg px-4 py-3 transition-all duration-200 ${
+                    className={`w-full h-12 border rounded-lg px-4 py-3 transition-all duration-200 ${
                       isView 
                         ? 'bg-slate-50 border-slate-200 text-slate-600' 
                         : errors.director
@@ -461,28 +564,28 @@ const MovieModal: React.FC<MovieModalProps> = ({
                 
                 <div>
                   <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                    <Film className="w-4 h-4" />
-                    Định dạng *
+                    <Star className="w-4 h-4" />
+                    Quốc gia *
                   </label>
-                  
-                    {isView ? (
-                        <input
-                        type="text"
-                        value={getOptionName(formats, form.formatId)}
-                        readOnly
-                        className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200 text-slate-600"
-                        />
-                    ) : (
-                        <Dropdown
-                        options={formats}
-                        value={form.formatId}
-                        onChange={(value) => setForm({ ...form, formatId: value })}
-                        placeholder="Chọn định dạng"
-                        error={!!errors.formatId}
-                        />
-                    )}
-                  {errors.formatId && (
-                    <p className="text-red-500 text-xs mt-1">{errors.formatId}</p>
+
+                  {isView ? (
+                    <input
+                      type="text"
+                      value={getOptionName(countries, form.countryId || '')}
+                      readOnly
+                      className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200 text-slate-600"
+                    />
+                  ) : (
+                    <Dropdown
+                      options={countries}
+                      value={form.countryId || ''}
+                      onChange={(value) => setForm({ ...form, countryId: value })}
+                      placeholder="Chọn quốc gia"
+                      error={!!errors.countryId}
+                    />
+                  )}
+                  {errors.countryId && (
+                    <p className="text-red-500 text-xs mt-1">{errors.countryId}</p>
                   )}
                 </div>
               </div>
@@ -490,7 +593,7 @@ const MovieModal: React.FC<MovieModalProps> = ({
               {/* Dates and Duration */}
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
                     Ngày phát hành *
                   </label>
@@ -537,7 +640,7 @@ const MovieModal: React.FC<MovieModalProps> = ({
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                     <Clock className="w-4 h-4" />
                     Thời lượng (phút) *
                   </label>
@@ -563,62 +666,6 @@ const MovieModal: React.FC<MovieModalProps> = ({
                 </div>
               </div>
 
-              {/* Country and Language */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                    <Star className="w-4 h-4" />
-                    Quốc gia *
-                  </label>
-
-                  {isView ? (
-                    <input
-                      type="text"
-                      value={getOptionName(countries, form.countryId)}
-                      readOnly
-                      className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200 text-slate-600"
-                    />
-                  ) : (
-                    <Dropdown
-                      options={countries}
-                      value={form.countryId}
-                      onChange={(value) => setForm({ ...form, countryId: value })}
-                      placeholder="Chọn quốc gia"
-                      error={!!errors.countryId}
-                    />
-                  )}
-                  {errors.countryId && (
-                    <p className="text-red-500 text-xs mt-1">{errors.countryId}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                    <Star className="w-4 h-4" />
-                    Ngôn ngữ *
-                  </label>
-                  {isView ? (
-                    <input
-                      type="text"
-                      value={getOptionName(languages, form.languageId)}
-                      readOnly
-                      className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200 text-slate-600"
-                    />
-                  ) : (
-                    <Dropdown
-                      options={languages}
-                      value={form.languageId}
-                      onChange={(value) => setForm({ ...form, languageId: value })}
-                      placeholder="Chọn ngôn ngữ"
-                      error={!!errors.languageId}
-                    />
-                  )}
-                  {errors.languageId && (
-                    <p className="text-red-500 text-xs mt-1">{errors.languageId}</p>
-                  )}
-                </div>
-              </div>
-
               {/* Age Limit and sortorder */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -629,14 +676,14 @@ const MovieModal: React.FC<MovieModalProps> = ({
                   {isView ? (
                     <input
                       type="text"
-                      value={getOptionName(limitages, form.limitageId)}
+                      value={getOptionName(limitages, form.limitageId || '')}
                       readOnly
                       className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200 text-slate-600"
                     />
                   ) : (
                     <Dropdown
                       options={limitages}
-                      value={form.limitageId}
+                      value={form.limitageId || ''}
                       onChange={(value) => setForm({ ...form, limitageId: value })}
                       placeholder="Chọn giới hạn tuổi"
                       error={!!errors.limitageId}
@@ -717,9 +764,147 @@ const MovieModal: React.FC<MovieModalProps> = ({
                 
               </div>
 
+              {/* Actor Selection */}
+              <div>
+                <label className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Diễn viên
+                </label>
+
+                {!isView && (
+                  <div className="space-y-3">
+                    {/* Actor Search with MUI Autocomplete */}
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <Autocomplete
+                          multiple
+                          id="actor-autocomplete"
+                          options={allActors}
+                          loading={loadingActors}
+                          value={selectedActors}
+                          onChange={(_event, newValue) => {
+                            setSelectedActors(newValue);
+                          }}
+                          getOptionLabel={(option) => option.name}
+                          getOptionKey={(option) => option.id ? option.id : option.name}
+                          isOptionEqualToValue={(option, value) => {
+                            // Handle comparison when ids might be missing
+                            if (option.id && value.id) {
+                              return option.id === value.id;
+                            }
+                            // Fallback to name comparison if no IDs
+                            return option.name === value.name;
+                          }}
+                          renderOption={(props, option, { selected }) => (
+                            <li {...props}>
+                              <Checkbox
+                                icon={icon}
+                                checkedIcon={checkedIcon}
+                                style={{ marginRight: 8 }}
+                                checked={selected}
+                              />
+                              <div className="flex items-center gap-2">
+                                {option.img && typeof option.img === 'string' ? (
+                                  <img 
+                                    src={`http://127.0.0.1:9000/${option.img}`}
+                                    alt={option.name}
+                                    className="w-8 h-8 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center">
+                                    <User className="w-4 h-4 text-slate-400" />
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="font-medium">{option.name}</p>
+                                  {option.nationality && (
+                                    <p className="text-xs text-slate-500">{option.nationality}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </li>
+                          )}
+                          renderInput={(params) => (
+                            <TextField 
+                              {...params} 
+                              label="Chọn diễn viên" 
+                              placeholder="Tìm kiếm và chọn diễn viên..."
+                              variant="outlined"
+                            />
+                          )}
+                          renderTags={(tagValue, getTagProps) => (
+                            tagValue.map((option, index) => (
+                              <div
+                                {...getTagProps({ index })}
+                                className="inline-flex items-center gap-2 bg-blue-50 text-blue-800 px-3 py-1 rounded-lg border border-blue-200 m-1"
+                              >
+                                {option.img && typeof option.img === 'string' ? (
+                                  <img 
+                                    src={`http://127.0.0.1:9000/${option.img}`}
+                                    alt={option.name}
+                                    className="w-5 h-5 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <User className="w-4 h-4" />
+                                )}
+                                <span className="text-sm font-medium">{option.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => removeActor(option.id || '')}
+                                  className="ml-1 text-blue-600 hover:text-blue-800 transition-colors"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))
+                          )}
+                          sx={{ width: '100%' }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsActorModalOpen(true)}
+                        className="px-4 h-12 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 flex items-center gap-2"
+                        title="Thêm diễn viên mới"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        Thêm mới
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* View Mode - Show selected actors */}
+                {isView && selectedActors.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedActors.map((actor) => (
+                      <div
+                        key={actor.id}
+                        className="inline-flex items-center gap-2 bg-slate-100 text-slate-800 px-3 py-2 rounded-lg"
+                      >
+                        {actor.img && typeof actor.img === 'string' ? (
+                          <img 
+                            src={`http://127.0.0.1:9000/${actor.img}`}
+                            alt={actor.name}
+                            className="w-5 h-5 rounded-full object-cover"
+                          />
+                        ) : (
+                          <User className="w-4 h-4" />
+                        )}
+                        <span className="text-sm font-medium">{actor.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {isView && selectedActors.length === 0 && (
+                  <div className="text-slate-500 text-sm">Chưa có diễn viên nào được chọn</div>
+                )}
+              </div>
+
               {/* Description */}
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                   <FileText className="w-4 h-4" />
                   Mô tả phim (Tiếng Việt)
                 </label>
@@ -738,7 +923,7 @@ const MovieModal: React.FC<MovieModalProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                   <FileText className="w-4 h-4" />
                   Mô tả phim (Tiếng Anh)
                 </label>
@@ -783,6 +968,14 @@ const MovieModal: React.FC<MovieModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Actor Modal for adding new actors */}
+      <ActorModal
+        open={isActorModalOpen}
+        mode="add"
+        onClose={() => setIsActorModalOpen(false)}
+        onSubmit={handleNewActorSubmit}
+      />
     </div>
   );
 };

@@ -1,14 +1,19 @@
+import AdminMainLayout from "@/modules/admin/layouts/main";
+import ActorManagement from "@/modules/admin/pages/ActorManagement";
+import Dashboard from "@/modules/admin/pages/Dashboard";
+import MovieManagement from "@/modules/admin/pages/MovieManagement";
+import RoomManagement from "@/modules/admin/pages/RoomManagement";
+import SecurityManagement from "@/modules/admin/pages/SecurityManagement";
+import ShowtimeManagement from "@/modules/admin/pages/ShowtimeManagement";
+import SystemManagement from "@/modules/admin/pages/SystemManagement";
+import TheaterManagement from "@/modules/admin/pages/TheaterManagement";
+import UserManagement from "@/modules/admin/pages/UserManagement";
 import { useState } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
+import AdminLogin from "../../admin/pages/Login";
 import Layout from "../layout";
 import MovieDetail from "../pages/film-detail";
 import Home from "../pages/home";
-import AdminLogin from "../../admin/pages/Login";
-import AdminMainLayout from "@/modules/admin/layouts/main";
-import Dashboard from "@/modules/admin/pages/Dashboard";
-import MovieManagement from "@/modules/admin/pages/MovieManagement";
-import ShowtimeManagement from "@/modules/admin/pages/ShowtimeManagement";
-import RoomManagement from "@/modules/admin/pages/RoomManagement";
 
 // Giả lập kiểm tra đăng nhập admin (bạn nên thay bằng logic thực tế)
 const isAdminAuthenticated = () => {
@@ -38,9 +43,13 @@ const Routers = () => {
                 <Route element={<AdminPrivateRoute />}>
                     <Route index element={<Dashboard />} />
                     <Route path="movies" element={<MovieManagement />} />
+                    <Route path="actors" element={<ActorManagement />} />
                     <Route path="showtimes" element={<ShowtimeManagement />} />
+                    <Route path="theaters" element={<TheaterManagement />} />
                     <Route path="rooms" element={<RoomManagement />} />
-                    <Route path="users" element={<h1>Quản lý người dùng</h1>} />
+                    <Route path="users" element={<UserManagement />} />
+                    <Route path="system" element={<SystemManagement />} />
+                    <Route path="security" element={<SecurityManagement />} />
                     {/* Các route con khác */}
                 </Route>
             </Route>

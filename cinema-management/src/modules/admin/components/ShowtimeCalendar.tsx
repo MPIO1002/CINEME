@@ -57,7 +57,13 @@ const ShowtimeCalendar: React.FC<ShowtimeCalendarProps> = ({
   // Get showtimes for a specific date
   const getShowtimesForDate = (date: Date | null) => {
     if (!date) return [];
-    const dateString = date.toISOString().split('T')[0];
+    
+    // Format date to YYYY-MM-DD without timezone conversion
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${day}`;
+    
     return showtimes.filter(showtime => showtime.showDate === dateString);
   };
 
@@ -168,7 +174,12 @@ const ShowtimeCalendar: React.FC<ShowtimeCalendarProps> = ({
               } ${isCurrentDay ? 'ring-2 ring-blue-500' : ''}`}
               onClick={() => {
                 if (date && !isPastDay) {
-                  onDateClick(date.toISOString().split('T')[0]);
+                  // Format date consistently without timezone conversion
+                  const year = date.getFullYear();
+                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                  const day = String(date.getDate()).padStart(2, '0');
+                  const dateString = `${year}-${month}-${day}`;
+                  onDateClick(dateString);
                 }
               }}
             >
