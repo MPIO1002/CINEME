@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faClock, faMapMarkerAlt, faCreditCard, faCalendarAlt, faStar } from '@fortawesome/free-solid-svg-icons';
 import { API_BASE_URL } from '../../../../components/api-config';
 import ProgressBar from '../../components/progress-bar';
+import io from 'socket.io-client';
 
 interface MovieDetail {
   id: string;
@@ -60,7 +61,7 @@ const BookingPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isBooking, setIsBooking] = useState(false);
   const [lockedSeats, setLockedSeats] = useState<string[]>([]);
-  const wsRef = useRef<WebSocket | null>(null);
+  const wsRef = useRef<SocketIOClient.Socket | null>(null);
 
   // Generate next 7 days
   const generateDates = () => {
@@ -168,58 +169,48 @@ const BookingPage: React.FC = () => {
     if (!selectedShowtime) return;
 
     // Close existing connection
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
+    // if (wsRef.current) {
+    //   wsRef.current.close();
+    // }
 
     // Create new WebSocket connection
-    const ws = new WebSocket(`ws://0.0.0.0:8085/?showtime=${selectedShowtime.id}`);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      console.log('WebSocket connected for showtime:', selectedShowtime.id);
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        
-        if (data.event === 'seat_locked') {
-          // Add seats to locked list
-          setLockedSeats(prev => [...prev, ...data.seatIds]);
-          console.log('Seats locked by another user:', data.seatIds);
-        } else if (data.event === 'seat_locked_failed') {
-          console.log('Seat locking failed:', data.message);
-        }
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+    
+    wsRef.current = io('ws://172.29.80.1:8085', {
+      reconnection: false,
+      transports: ['polling', 'websocket'],
+      query: {
+        showtime: selectedShowtime.id
       }
-    };
+    });
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
 
-    ws.onclose = () => {
-      console.log('WebSocket connection closed');
-    };
+    wsRef.current.on('connect', () => { 
+    console.log('WebSocket connected for showtime:', selectedShowtime.id);
+    });
 
-    // Cleanup on unmount or showtime change
-    return () => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close();
-      }
-    };
+
+    wsRef.current.on('disconnect', () => {
+    console.log('WebSocket disconnected');
+    });
+
+    wsRef.current.on('seat_locked', (data: any) => {
+      console.log('Seats locked by another user:', data.seatIds);
+      setLockedSeats(prev => [...prev, ...data.seatIds]);
+    });
+
+    wsRef.current.on('seat_locked_failed', (data: any) => {
+      console.log('Seat locking failed:', data.message);
+    });
   }, [selectedShowtime]);
 
   // Cleanup WebSocket on component unmount
-  useEffect(() => {
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
-  }, []);
+  // useEffect(() => {
+  //   return () => {
+  //     if (wsRef.current) {
+  //       wsRef.current.close();
+  //     }
+  //   };
+  // }, []);
 
   const handleSeatClick = (seat: Seat) => {
     if (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) return;
@@ -269,45 +260,25 @@ const BookingPage: React.FC = () => {
       
       if (data.statusCode === 200 && data.data) {
         // Booking request successful - got payment URL
-        
-        // Send seat_locked event via WebSocket to notify other users
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({
-            event: 'seat_locked',
-            seatIds: selectedSeats.map(seat => seat.id),
-            showtimeId: selectedShowtime.id
-          }));
-        }
-        
-        // Redirect to VNPay payment URL
         window.location.href = data.data;
         
       } else {
         // Booking failed
-        alert('Không thể tạo yêu cầu thanh toán: ' + (data.message || 'Vui lòng thử lại'));
+        alert('Không thể tiến thành thanh toán: ' + (data.message || 'Vui lòng thử lại'));
         
-        // Send seat_locked_failed event via WebSocket
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({
-            event: 'seat_locked_failed',
-            message: data.message || 'Booking failed',
-            seatIds: selectedSeats.map(seat => seat.id),
-            showtimeId: selectedShowtime.id
-          }));
-        }
       }
     } catch (error) {
       console.error('Error creating booking:', error);
       
       // Send seat_locked_failed event via WebSocket
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          event: 'seat_locked_failed',
-          message: 'Network error',
-          seatIds: selectedSeats.map(seat => seat.id),
-          showtimeId: selectedShowtime.id
-        }));
-      }
+      // if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      //   wsRef.current.send(JSON.stringify({
+      //     event: 'seat_locked_failed',
+      //     message: 'Network error',
+      //     seatIds: selectedSeats.map(seat => seat.id),
+      //     showtimeId: selectedShowtime.id
+      //   }));
+      // }
     } finally {
       setIsBooking(false);
     }
