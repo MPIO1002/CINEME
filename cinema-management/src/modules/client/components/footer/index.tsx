@@ -33,10 +33,11 @@ const TEXT = {
 
 const Footer = ({ lang }: { lang: "vi" | "en" }) => (
   <footer
-    className="pt-10 pb-6 px-4"
+    className="pt-10 pb-6 px-4 border-t"
     style={{
       background: "var(--color-background)",
       color: "var(--color-text)",
+      borderTopColor: "rgba(254,253,252,0.2)"
     }}
   >
     <div className="max-w-6xl mx-auto">

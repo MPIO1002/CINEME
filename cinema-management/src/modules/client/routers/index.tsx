@@ -12,8 +12,10 @@ import { useState } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import AdminLogin from "../../admin/pages/Login";
 import Layout from "../layout";
-import MovieDetail from "../pages/film-detail";
 import Home from "../pages/home";
+import FilmDetail from "../pages/film-detail";
+import BookingPage from "../pages/booking";
+import PaymentResult from "../pages/payment-result";
 
 // Giả lập kiểm tra đăng nhập admin (bạn nên thay bằng logic thực tế)
 const isAdminAuthenticated = () => {
@@ -33,8 +35,9 @@ const Routers = () => {
         {/* Client routes */}
         <Route element={<Layout lang={lang} setLang={setLang}> <Outlet /> </Layout>}>
           <Route path="/" element={<Home lang={lang} />} />
-          <Route path="/movies" element={<h1>Danh sach movies</h1>} />
-          <Route path="/movies/:movieId" element={<MovieDetail />} />
+          <Route path="/film/:id" element={<FilmDetail />} />
+          <Route path="/booking/:id" element={<BookingPage />} />
+          <Route path="/payment-result" element={<PaymentResult />} />
         </Route>
 
         {/* Admin routes */}

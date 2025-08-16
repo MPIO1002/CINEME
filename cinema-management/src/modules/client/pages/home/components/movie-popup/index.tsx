@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTicket } from "@fortawesome/free-solid-svg-icons";
 import { API_BASE_URL } from "../../../../../../components/api-config";
@@ -32,6 +33,7 @@ type MovieDetail = {
 };
 
 const MoviePopup: React.FC<MoviePopupProps> = ({ movieId, lang, onShowTrailer }) => {
+    const navigate = useNavigate();
     const [detail, setDetail] = useState<MovieDetail | null>(null);
 
     useEffect(() => {
@@ -91,19 +93,25 @@ const MoviePopup: React.FC<MoviePopupProps> = ({ movieId, lang, onShowTrailer })
                         </div>
                     )}
                     <div className="flex gap-2 mt-auto text-sm">
-                        <a href={`/movies/${movieId}/#booking`}
+                        <a href={`booking/${movieId}/`}
                             className="flex-1 bg-gradient-to-r from-[var(--color-accent)] to-white hover:from-[var(--color-secondary)] hover:to-yellow-100 text-[var(--color-background)] font-semibold py-2 rounded-lg transition flex items-center justify-center gap-2 cursor-pointer"
                         >
                             <FontAwesomeIcon icon={faTicket} className="w-5 h-5 text-[var(--color-background)]" />
                             <span className="font-bold">{lang === "en" ? "Buy Ticket" : "Mua vé"}</span>
                         </a>
-                        <a href={`/movies/ ${movieId}`} className="flex-1 border border-gray-400 hover:bg-black rounded-lg py-2 font-semibold flex items-center justify-center gap-2 cursor-pointer">
+                        <button
+                            onClick={() => {
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                navigate(`/film/${movieId}`);
+                            }}
+                            className="flex-1 border border-gray-400 hover:bg-black rounded-lg py-2 font-semibold flex items-center justify-center gap-2 cursor-pointer"
+                        >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                 <circle cx="12" cy="12" r="10" stroke="currentColor" />
                                 <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l2 2" />
                             </svg>
                             {lang === "en" ? "Details" : "Xem chi tiết"}
-                        </a>
+                        </button>
                         {detail.trailer && (
                             <button
                                 className="flex-1 border border-gray-400 hover:bg-black rounded-lg py-2 font-semibold flex items-center justify-center gap-2 cursor-pointer"
