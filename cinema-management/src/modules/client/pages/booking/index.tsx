@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faClock, faMapMarkerAlt, faCreditCard, faCalendarAlt, faStar } from '@fortawesome/free-solid-svg-icons';
-import { API_BASE_URL } from '../../../../components/api-config';
+import { API_BASE_URL, WEBSOCKET_URL } from '../../../../components/api-config';
 import ProgressBar from '../../components/progress-bar';
+import { useToast } from '../../../../hooks/useToast';
 import io from 'socket.io-client';
 
 interface MovieDetail {
@@ -48,8 +49,19 @@ interface Seat {
   isSelected?: boolean;
 }
 
+interface UserData {
+  id: string;
+  email: string;
+  fullName: string;
+  accessToken: string;
+  refreshToken: string;
+}
+
 const BookingPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { showToast } = useToast();
+  const [user, setUser] = useState<UserData | null>(null);
   const [movie, setMovie] = useState<MovieDetail | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTheater, setSelectedTheater] = useState<Theater | null>(null);
@@ -80,6 +92,47 @@ const BookingPage: React.FC = () => {
   };
 
   const dates = generateDates();
+
+  // Check for user authentication
+  useEffect(() => {
+    const checkUserData = () => {
+      const savedUserData = localStorage.getItem('userData');
+      if (savedUserData) {
+        try {
+          const userData = JSON.parse(savedUserData);
+          setUser(userData);
+        } catch (error) {
+          console.error('Error parsing saved user data:', error);
+          localStorage.removeItem('userData');
+        }
+      } else {
+        setUser(null);
+      }
+    };
+
+    // Check initially
+    checkUserData();
+
+    // Listen for storage changes
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'userData') {
+        checkUserData();
+      }
+    };
+
+    // Listen for window focus (in case user logged in from another tab)
+    const handleFocus = () => {
+      checkUserData();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
 
   // Fetch movie details
   useEffect(() => {
@@ -166,16 +219,8 @@ const BookingPage: React.FC = () => {
 
   // WebSocket connection for real-time seat locking
   useEffect(() => {
-    if (!selectedShowtime) return;
-
-    // Close existing connection
-    // if (wsRef.current) {
-    //   wsRef.current.close();
-    // }
-
-    // Create new WebSocket connection
-    
-    wsRef.current = io('ws://172.29.80.1:8085', {
+    if (!selectedShowtime) return; 
+    wsRef.current = io(WEBSOCKET_URL, {
       reconnection: false,
       transports: ['polling', 'websocket'],
       query: {
@@ -203,17 +248,9 @@ const BookingPage: React.FC = () => {
     });
   }, [selectedShowtime]);
 
-  // Cleanup WebSocket on component unmount
-  // useEffect(() => {
-  //   return () => {
-  //     if (wsRef.current) {
-  //       wsRef.current.close();
-  //     }
-  //   };
-  // }, []);
-
   const handleSeatClick = (seat: Seat) => {
-    if (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) return;
+    // Can't click on EMPTY seats (walkways)
+    if (seat.seatType === 'EMPTY' || seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) return;
     
     const isSelected = selectedSeats.find(s => s.id === seat.id);
     if (isSelected) {
@@ -224,6 +261,9 @@ const BookingPage: React.FC = () => {
   };
 
   const getSeatColor = (seat: Seat) => {
+    // EMPTY seats are walkways - transparent/invisible
+    if (seat.seatType === 'EMPTY') return 'transparent';
+    
     if (selectedSeats.find(s => s.id === seat.id)) return '#ffd700'; // Yellow for selected
     if (lockedSeats.includes(seat.id)) return '#ff8c00'; // Orange for locked by others
     if (seat.status !== 'AVAILABLE') return '#666'; // Gray for booked/unavailable
@@ -238,11 +278,17 @@ const BookingPage: React.FC = () => {
   const handleBooking = async () => {
     if (!selectedShowtime || selectedSeats.length === 0) return;
 
+    // Check if user is logged in
+    if (!user) {
+      showToast('warning', 'Vui lòng đăng nhập để đặt vé');
+      return;
+    }
+
     setIsBooking(true);
     
     try {
       const bookingData = {
-        userId: "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d", // Temporary hardcoded userId
+        userId: user.id,
         showtimeId: selectedShowtime.id,
         listSeatId: selectedSeats.map(seat => seat.id),
         amount: totalPrice
@@ -264,21 +310,12 @@ const BookingPage: React.FC = () => {
         
       } else {
         // Booking failed
-        alert('Không thể tiến thành thanh toán: ' + (data.message || 'Vui lòng thử lại'));
+        showToast('error', 'Không thể tiến thành thanh toán: ' + (data.message || 'Vui lòng thử lại'));
         
       }
     } catch (error) {
       console.error('Error creating booking:', error);
-      
-      // Send seat_locked_failed event via WebSocket
-      // if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      //   wsRef.current.send(JSON.stringify({
-      //     event: 'seat_locked_failed',
-      //     message: 'Network error',
-      //     seatIds: selectedSeats.map(seat => seat.id),
-      //     showtimeId: selectedShowtime.id
-      //   }));
-      // }
+      showToast('error', 'Có lỗi xảy ra khi đặt vé. Vui lòng thử lại!');
     } finally {
       setIsBooking(false);
     }
@@ -538,21 +575,31 @@ const BookingPage: React.FC = () => {
                       </span>
                       <div className="flex gap-2 flex-wrap justify-center">
                         {seatRows[row].map((seat) => (
-                          <button
-                            key={seat.id}
-                            onClick={() => handleSeatClick(seat)}
-                            disabled={seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)}
-                            className="w-8 h-8 rounded text-sm font-bold transition-all duration-200 hover:scale-110"
-                            style={{
-                              backgroundColor: getSeatColor(seat),
-                              color: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? '#999' : 'white',
-                              cursor: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? 'not-allowed' : 'pointer',
-                              opacity: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? 0.5 : 1,
-                              fontSize: '12px'
-                            }}
-                          >
-                            {seat.seatNumber.slice(1)}
-                          </button>
+                          seat.seatType === 'EMPTY' ? (
+                            // Render walkway as completely empty space
+                            <div
+                              key={seat.id}
+                              className="w-8 h-8"
+                            >
+                              {/* Empty space for walkway */}
+                            </div>
+                          ) : (
+                            <button
+                              key={seat.id}
+                              onClick={() => handleSeatClick(seat)}
+                              disabled={seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)}
+                              className="w-8 h-8 rounded text-sm font-bold transition-all duration-200 hover:scale-110"
+                              style={{
+                                backgroundColor: getSeatColor(seat),
+                                color: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? '#999' : 'white',
+                                cursor: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? 'not-allowed' : 'pointer',
+                                opacity: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? 0.5 : 1,
+                                fontSize: '12px'
+                              }}
+                            >
+                              {seat.seatNumber.slice(1)}
+                            </button>
+                          )
                         ))}
                       </div>
                       <span className="w-8 text-center font-bold text-lg" style={{ color: 'var(--color-text)' }}>

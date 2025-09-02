@@ -1,6 +1,10 @@
 import { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUser, faGear, faChevronDown } from "@fortawesome/free-solid-svg-icons";
+import { faUser, faGear, faChevronDown, faSignOutAlt, faUserCircle } from "@fortawesome/free-solid-svg-icons";
+import { API_BASE_URL } from "../../../../components/api-config";
+import AuthModal from "../auth-modal";
+import { useToast } from "../../../../hooks/useToast";
 
 const LANGUAGES = [
   { code: "vi", label: "VIE", flag: "/VN.webp" },
@@ -22,6 +26,26 @@ const TEXT = {
   }
 };
 
+interface Movie {
+  id: string;
+  nameVn: string;
+  nameEn: string;
+  image: string;
+}
+
+interface Theater {
+  id: string;
+  nameEn: string;
+  nameVn: string;
+}
+
+interface UserData {
+  email: string;
+  fullName: string;
+  accessToken: string;
+  refreshToken: string;
+}
+
 const Nav = ({
   lang,
   onLangChange,
@@ -29,14 +53,43 @@ const Nav = ({
   lang: "vi" | "en";
   onLangChange?: (lang: "vi" | "en") => void;
 }) => {
+  const navigate = useNavigate();
+  const { showToast } = useToast();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [user, setUser] = useState<UserData | null>(null);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  
+  // Popup states
+  const [showMoviePopup, setShowMoviePopup] = useState(false);
+  const [showTheaterPopup, setShowTheaterPopup] = useState(false);
+  const [movies, setMovies] = useState<Movie[]>([]);
+  const [theaters, setTheaters] = useState<Theater[]>([]);
+  const [isLoadingMovies, setIsLoadingMovies] = useState(false);
+  const [isLoadingTheaters, setIsLoadingTheaters] = useState(false);
+  
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const userDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Check for saved user data on mount
+  useEffect(() => {
+    const savedUserData = localStorage.getItem('userData');
+    if (savedUserData) {
+      try {
+        const userData = JSON.parse(savedUserData);
+        setUser(userData);
+      } catch (error) {
+        console.error('Error parsing saved user data:', error);
+        localStorage.removeItem('userData');
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -49,10 +102,73 @@ const Nav = ({
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
+      if (userDropdownRef.current && !userDropdownRef.current.contains(e.target as Node)) {
+        setShowUserDropdown(false);
+      }
     };
-    if (open) document.addEventListener("mousedown", handleClick);
+    if (open || showUserDropdown) document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
+  }, [open, showUserDropdown]);
+
+  // Handle login success
+  const handleLoginSuccess = (userData: UserData) => {
+    setUser(userData);
+  };
+
+  // Handle logout
+  const handleLogout = () => {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('userData');
+    setUser(null);
+    setShowUserDropdown(false);
+    showToast('success', 'Đăng xuất thành công!');
+    navigate('/');
+  };
+
+  // Fetch movies function
+  const fetchMovies = async () => {
+    if (movies.length > 0) return; // Don't fetch if already loaded
+    
+    setIsLoadingMovies(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/movies`);
+      const data = await response.json();
+      
+      if (data.statusCode === 200) {
+        setMovies(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching movies:', error);
+    } finally {
+      setIsLoadingMovies(false);
+    }
+  };
+
+  // Fetch theaters function
+  const fetchTheaters = async () => {
+    if (theaters.length > 0) return; // Don't fetch if already loaded
+    
+    setIsLoadingTheaters(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/theaters`);
+      const data = await response.json();
+      
+      if (data.statusCode === 200) {
+        setTheaters(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching theaters:', error);
+    } finally {
+      setIsLoadingTheaters(false);
+    }
+  };
+
+  // Handle movie click
+  const handleMovieClick = () => {
+    setShowMoviePopup(false);
+    navigate('/');
+  };
 
   return (
     <nav
@@ -72,9 +188,84 @@ const Nav = ({
       </a>
       {/* Menu giữa */}
       <ul className="flex gap-8 font-medium text-base">
-        <li className="hover:text-[var(--color-secondary)] cursor-pointer transition">{TEXT[lang].phim}</li>
-        <li className="hover:text-[var(--color-secondary)] cursor-pointer transition">{TEXT[lang].rap}</li>
-        <li className="hover:text-[var(--color-secondary)] cursor-pointer transition">{TEXT[lang].suatchieu}</li>
+        <li 
+          className="hover:text-[var(--color-secondary)] cursor-pointer transition relative"
+          onMouseEnter={() => {
+            setShowMoviePopup(true);
+            fetchMovies();
+          }}
+          onMouseLeave={() => setShowMoviePopup(false)}
+        >
+          {TEXT[lang].phim}
+          
+          {/* Movies Popup */}
+          {showMoviePopup && (
+            <div className="absolute top-full left-0 mt-2 w-96 bg-[var(--color-background)] border border-gray-700 rounded-lg shadow-xl z-50">
+              <div className="p-4">
+                <h3 className="text-lg font-bold mb-3 text-[var(--color-accent)]">Danh sách phim</h3>
+                {isLoadingMovies ? (
+                  <div className="text-center py-4">Đang tải...</div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {movies.slice(0, 8).map((movie) => (
+                      <div 
+                        key={movie.id} 
+                        onClick={handleMovieClick}
+                        className="flex gap-2 p-2 hover:bg-[var(--color-secondary)] rounded-lg transition cursor-pointer"
+                      >
+                        <img 
+                          src={movie.image} 
+                          alt={movie.nameVn}
+                          className="w-8 h-12 object-cover rounded flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-white text-xs truncate">{movie.nameVn}</h4>
+                          <p className="text-gray-400 text-xs truncate">{movie.nameEn}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </li>
+        
+        <li 
+          className="hover:text-[var(--color-secondary)] cursor-pointer transition relative"
+          onMouseEnter={() => {
+            setShowTheaterPopup(true);
+            fetchTheaters();
+          }}
+          onMouseLeave={() => setShowTheaterPopup(false)}
+        >
+          {TEXT[lang].rap}
+          
+          {/* Theaters Popup */}
+          {showTheaterPopup && (
+            <div className="absolute top-full left-0 mt-2 w-80 bg-[var(--color-background)] border border-gray-700 rounded-lg shadow-xl z-50">
+              <div className="p-4">
+                <h3 className="text-lg font-bold mb-3 text-[var(--color-accent)]">Danh sách rạp</h3>
+                {isLoadingTheaters ? (
+                  <div className="text-center py-4">Đang tải...</div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {theaters.slice(0, 8).map((theater) => (
+                      <div key={theater.id} className="p-2 hover:bg-[var(--color-secondary)] rounded-lg transition cursor-pointer">
+                        <h4 className="font-medium text-white text-xs truncate">{theater.nameVn}</h4>
+                        <p className="text-gray-400 text-xs truncate">{theater.nameEn}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </li>
+        
+        <li className="hover:text-[var(--color-secondary)] cursor-pointer transition">
+          <a href="/showtimes">{TEXT[lang].suatchieu}</a>
+        </li>
       </ul>
       {/* Icon user, setting, và chọn ngôn ngữ */}
       <div className="flex items-center gap-5">
@@ -118,13 +309,71 @@ const Nav = ({
             </ul>
           )}
         </div>
-        <button aria-label="User" className="hover:text-[var(--color-accent)] transition">
-          <FontAwesomeIcon icon={faUser} className="w-6 h-6" />
-        </button>
-        <button aria-label="Settings" className="hover:text-[var(--color-accent)] transition">
+        
+        {/* User section */}
+        {user ? (
+          // User is logged in - show user dropdown (without user icon)
+          <div className="relative" ref={userDropdownRef}>
+            <button
+              onClick={() => setShowUserDropdown(v => !v)}
+              className="flex items-center gap-2 hover:text-[var(--color-accent)] transition cursor-pointer"
+            >
+              <span className="text-base font-medium">{user.fullName}</span>
+              <FontAwesomeIcon icon={faChevronDown} className="w-3 h-3" />
+            </button>
+            
+            {showUserDropdown && (
+              <div className="absolute right-0 mt-2 w-48 bg-[var(--color-background)] border border-gray-400/20 rounded-lg shadow-xl z-50">
+                <div className="p-2">
+                  <div className="px-3 py-2 text-sm text-gray-300 border-b border-gray-600">
+                    <div className="font-medium text-white">{user.fullName}</div>
+                    <div className="text-xs text-gray-400">{user.email}</div>
+                  </div>
+                  
+                  <button
+                    onClick={() => {
+                      setShowUserDropdown(false);
+                      navigate('/profile');
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-white hover:bg-[var(--color-accent)]/10 rounded-md transition flex items-center gap-2 mt-1"
+                  >
+                    <FontAwesomeIcon icon={faUserCircle} className="w-4 h-4" />
+                    Hồ sơ cá nhân
+                  </button>
+                  
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-md transition flex items-center gap-2"
+                  >
+                    <FontAwesomeIcon icon={faSignOutAlt} className="w-4 h-4" />
+                    Đăng xuất
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          // User is not logged in - show login button
+          <button 
+            aria-label="User" 
+            className="hover:text-[var(--color-accent)] transition cursor-pointer"
+            onClick={() => setShowAuthModal(true)}
+          >
+            <FontAwesomeIcon icon={faUser} className="w-6 h-6" />
+          </button>
+        )}
+        
+        <button aria-label="Settings" className="hover:text-[var(--color-accent)] transition cursor-pointer">
           <FontAwesomeIcon icon={faGear} className="w-6 h-6" />
         </button>
       </div>
+
+      {/* Auth Modal */}
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)}
+        onLoginSuccess={handleLoginSuccess}
+      />
     </nav>
   );
 };
