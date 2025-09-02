@@ -1,36 +1,9 @@
-import { Calendar, CheckCircle, Clock, Edit3, Eye, Film, MapPin, Plus, X } from "lucide-react";
+import { AlertTriangle, Calendar, CheckCircle, Clock, Edit3, Eye, Film, MapPin, Plus, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
-
-interface Showtime {
-  id?: string;
-  movieId: string;
-  movieName?: string;
-  movieImage?: string;
-  roomId: string;
-  roomName?: string;
-  showDate: string;
-  startTime: string;
-  endTime: string;
-  ticketPrice: number;
-  status: 'ACTIVE' | 'SOLD_OUT' | 'CANCELLED';
-  bookedSeats?: number;
-  totalSeats?: number;
-}
-
-interface Movie {
-  id: string;
-  nameVn: string;
-  nameEn: string;
-  image: string;
-  time: number;
-}
-
-interface Room {
-  id: string;
-  name: string;
-  totalSeats: number;
-  type: '2D' | '3D' | 'IMAX';
-}
+import { type Movie } from '../../../services/movieApi';
+import { type Room } from '../../../services/roomApi';
+import { type Showtime } from '../../../services/showtimeApi';
+import { type Theater } from '../../../services/theaterApi';
 
 interface ShowtimeModalProps {
   open: boolean;
@@ -38,8 +11,10 @@ interface ShowtimeModalProps {
   showtime?: Showtime;
   movies: Movie[];
   rooms: Room[];
+  theaters: Theater[];
   onClose: () => void;
   onSubmit: (showtime: Showtime) => void;
+  onTheaterChange?: (theaterId: string) => void; // New callback for loading rooms
 }
 
 const ShowtimeModal: React.FC<ShowtimeModalProps> = ({
@@ -48,18 +23,29 @@ const ShowtimeModal: React.FC<ShowtimeModalProps> = ({
   showtime,
   movies,
   rooms,
+  theaters,
   onClose,
   onSubmit,
+  onTheaterChange,
 }) => {
   const [form, setForm] = useState<Showtime>(
     showtime || {
-      movieId: "",
-      roomId: "",
-      showDate: "",
-      startTime: "",
-      endTime: "",
-      ticketPrice: 120000,
-      status: "ACTIVE",
+        movieId: "",
+        theaterId: "",
+        roomId: "",
+        date: "",
+        startTime: "",
+        endTime: "",
+        movieNameVn: "",
+        movieNameEn: "",
+        languageVn: "",
+        languageEn: "",
+        formatVn: "",
+        formatEn: "",
+        roomName: "",
+        // totalSeats: 0,
+        // availableSeats: 0,
+        // bookedSeats: 0,
     }
   );
 
@@ -71,12 +57,21 @@ const ShowtimeModal: React.FC<ShowtimeModalProps> = ({
     } else if (mode === "add") {
       setForm({
         movieId: "",
+        theaterId: "",
         roomId: "",
-        showDate: "",
+        date: "",
         startTime: "",
         endTime: "",
-        ticketPrice: 120000,
-        status: "ACTIVE",
+        movieNameVn: "",
+        movieNameEn: "",
+        languageVn: "",
+        languageEn: "",
+        formatVn: "",
+        formatEn: "",
+        roomName: "",
+        // totalSeats: 0,
+        // availableSeats: 0,
+        // bookedSeats: 0,
       });
     }
     setErrors({});
@@ -95,16 +90,20 @@ const ShowtimeModal: React.FC<ShowtimeModalProps> = ({
     const newErrors: Record<string, string> = {};
 
     // Required fields
-    if (!form.movieId.trim()) {
+    if (!form.movieId || !form.movieId.trim()) {
       newErrors.movieId = "Phim là bắt buộc";
     }
 
-    if (!form.roomId.trim()) {
+    if (!form.theaterId || !form.theaterId.trim()) {
+      newErrors.theaterId = "Rạp là bắt buộc";
+    }
+
+    if (!form.roomId || !form.roomId.trim()) {
       newErrors.roomId = "Phòng chiếu là bắt buộc";
     }
 
-    if (!form.showDate) {
-      newErrors.showDate = "Ngày chiếu là bắt buộc";
+    if (!form.date) {
+      newErrors.date = "Ngày chiếu là bắt buộc";
     }
 
     if (!form.startTime) {
@@ -125,19 +124,14 @@ const ShowtimeModal: React.FC<ShowtimeModalProps> = ({
       }
     }
 
-    // Validate price
-    if (form.ticketPrice <= 0) {
-      newErrors.ticketPrice = "Giá vé phải lớn hơn 0";
-    }
-
     // Validate date (not in the past for new showtimes)
-    if (mode === "add" && form.showDate) {
+    if (mode === "add" && form.date) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const showDate = new Date(form.showDate);
+      const showDate = new Date(form.date);
       
       if (showDate < today) {
-        newErrors.showDate = "Ngày chiếu không thể là ngày trong quá khứ";
+        newErrors.date = "Ngày chiếu không thể là ngày trong quá khứ";
       }
     }
 
@@ -145,43 +139,154 @@ const ShowtimeModal: React.FC<ShowtimeModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
+  // Check if form is valid for enabling/disabling submit button
+  const isFormValid = (): boolean => {
+    const requiredFields = ['movieId', 'theaterId', 'roomId', 'date', 'startTime', 'endTime', 'formatVn', 'languageVn'];
+
+    // Check if all required fields are filled
+    const hasAllRequiredFields = requiredFields.every(field => {
+      const value = form[field as keyof Showtime];
+      return value && (typeof value === 'string' ? value.trim() : true);
+    });
+
+    // Check if there are no validation errors
+    const hasNoErrors = Object.keys(errors).length === 0;
+
+    // Additional date validation for new showtimes
+    let isDateValid = true;
+    if (mode === "add" && form.date) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const showDate = new Date(form.date);
+      isDateValid = showDate >= today;
+    }
+    
+    return hasAllRequiredFields && hasNoErrors && isDateValid;
+  };
+
+  // Get validation message for disabled button
+  const getDisabledMessage = (): string => {
+    if (!form.movieId) return "Vui lòng chọn phim";
+    if (!form.theaterId) return "Vui lòng chọn rạp";
+    if (!form.roomId) return "Vui lòng chọn phòng chiếu";
+    if (!form.date) return "Vui lòng chọn ngày chiếu";
+    if (!form.startTime) return "Vui lòng chọn giờ bắt đầu";
+    if (!form.endTime) return "Vui lòng chọn giờ kết thúc";
+    if (!form.formatVn) return "Vui lòng chọn định dạng phim";
+    if (!form.languageVn) return "Vui lòng chọn ngôn ngữ phim";
+
+    // Time validation (must match logic in isFormValid)
+    if (form.startTime && form.endTime) {
+      const start = new Date(`2000-01-01T${form.startTime}:00`);
+      const end = new Date(`2000-01-01T${form.endTime}:00`);
+      if (end <= start) return "Giờ kết thúc phải sau giờ bắt đầu";
+    }
+    
+    // Date validation (must match logic in isFormValid)
+    if (mode === "add" && form.date) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const showDate = new Date(form.date);
+      if (showDate < today) return "Ngày chiếu không thể là ngày trong quá khứ";
+    }
+    
+    // Check for validation errors
+    if (Object.keys(errors).length > 0) return "Vui lòng sửa các lỗi trước khi tiếp tục";
+    
+    // This should not happen if the function is called correctly (only when !isFormValid())
+    return "Có lỗi không xác định";
+  };
+
   const handleSubmit = () => {
     if (validateForm() && onSubmit) {
-      // Auto-calculate end time based on movie duration
-      if (selectedMovie && form.startTime && !form.endTime) {
-        const startTime = new Date(`2000-01-01T${form.startTime}:00`);
-        const endTime = new Date(startTime.getTime() + selectedMovie.time * 60000);
-        const endTimeStr = endTime.toTimeString().substring(0, 5);
-        setForm(prev => ({ ...prev, endTime: endTimeStr }));
+      // Auto-calculate end time based on movie duration if not present
+      if (selectedMovie && form.startTime && !form.endTime && selectedMovie.time) {
+        try {
+          const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+          if (timeRegex.test(form.startTime)) {
+            const [hours, minutes] = form.startTime.split(':').map(Number);
+            const start = new Date();
+            start.setHours(hours, minutes, 0, 0);
+            
+            const end = new Date(start.getTime() + selectedMovie.time * 60000);
+            const endTimeStr = end.toTimeString().substring(0, 5);
+            setForm(prev => ({ ...prev, endTime: endTimeStr }));
+          }
+        } catch (error) {
+          console.error('Error calculating end time in submit:', error);
+        }
       }
 
       const submitData: Showtime = {
         ...form,
-        movieName: selectedMovie?.nameVn,
-        movieImage: selectedMovie?.image,
-        roomName: selectedRoom?.name,
-        totalSeats: selectedRoom?.totalSeats,
-        bookedSeats: form.bookedSeats || 0,
+        movieNameVn: selectedMovie?.nameVn || form.movieNameVn,
+        roomName: selectedRoom?.name || '',
+        // Ensure all required fields are filled
+        movieId: form.movieId || '',
+        theaterId: form.theaterId || '',
+        roomId: form.roomId || '',
+        date: form.date || '',
+        startTime: form.startTime || '',
+        endTime: form.endTime || '',
+        languageVn: form.languageVn || 'Lồng Tiếng',
+        languageEn: form.languageEn || 'VN',
+        formatVn: form.formatVn || '2D',
+        formatEn: form.formatEn || '2D',
       };
-
       onSubmit(submitData);
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm((prev) => {
+      const newForm = { ...prev, [name]: value };
+      
+      // Auto-set English equivalents
+      if (name === 'formatVn') {
+        newForm.formatEn = value; // Same format for English
+      }
+      if (name === 'languageVn') {
+        const langMap: Record<string, string> = {
+          'Lồng Tiếng': 'VN',
+          'Phụ Đề': 'EN',
+          'Tiếng Anh': 'EN'
+        };
+        newForm.languageEn = langMap[value] || value;
+      }
+      
+      return newForm;
+    });
+    
+    // Handle theater change - load rooms for selected theater
+    if (name === 'theaterId' && onTheaterChange) {
+      onTheaterChange(value);
+      // Reset room selection when theater changes
+      setForm(prev => ({ ...prev, roomId: '' }));
+    }
     
     // Auto-calculate end time when movie or start time changes
     if (name === 'movieId' || name === 'startTime') {
       const movie = name === 'movieId' ? movies.find(m => m.id === value) : selectedMovie;
       const startTime = name === 'startTime' ? value : form.startTime;
       
-      if (movie && startTime) {
-        const start = new Date(`2000-01-01T${startTime}:00`);
-        const end = new Date(start.getTime() + movie.time * 60000);
-        const endTimeStr = end.toTimeString().substring(0, 5);
-        setForm(prev => ({ ...prev, endTime: endTimeStr }));
+      if (movie && startTime && movie.time) {
+        try {
+          // Validate startTime format (HH:MM)
+          const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+          if (timeRegex.test(startTime)) {
+            const [hours, minutes] = startTime.split(':').map(Number);
+            const start = new Date();
+            start.setHours(hours, minutes, 0, 0);
+            
+            const end = new Date(start.getTime() + movie.time * 60000);
+            const endTimeStr = end.toTimeString().substring(0, 5);
+            setForm(prev => ({ ...prev, endTime: endTimeStr }));
+          }
+        } catch (error) {
+          console.error('Error calculating end time:', error);
+          // Don't update endTime if there's an error
+        }
       }
     }
     
@@ -215,19 +320,84 @@ const ShowtimeModal: React.FC<ShowtimeModalProps> = ({
     }
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('vi-VN').format(price);
+  // Helper function to check if field can be edited
+  const canEditField = (fieldName: string): boolean => {
+    if (mode !== "edit" || !showtime) return true;
+    
+    // Business logic for field editing restrictions
+    const hasBookedSeats = (showtime.bookedSeats || 0) > 0;
+    const isStartingSoon = showtime.date && showtime.startTime ? (() => {
+      const now = new Date();
+      const showtimeDate = new Date(showtime.date);
+      const [hours, minutes] = showtime.startTime.split(':').map(Number);
+      const startDateTime = new Date(showtimeDate);
+      startDateTime.setHours(hours, minutes, 0, 0);
+      const timeDiff = startDateTime.getTime() - now.getTime();
+      return timeDiff < 2 * 60 * 60 * 1000; // Less than 2 hours
+    })() : false;
+
+    const currentStatus = getShowtimeStatus(showtime.date, showtime.startTime, showtime.endTime);
+    const isOngoingOrFinished = currentStatus.key === 'ongoing' || currentStatus.key === 'finished';
+
+    // Rules for field editing
+    switch (fieldName) {
+      case 'movieId':
+        return !hasBookedSeats && !isOngoingOrFinished;
+      case 'roomId':
+        return !hasBookedSeats && !isOngoingOrFinished; // Room change affects seat map
+      case 'date':
+      case 'startTime':
+      case 'endTime':
+        return !hasBookedSeats && !isStartingSoon && !isOngoingOrFinished;
+      case 'languageVn':
+      case 'languageEn':
+      case 'formatVn':
+      case 'formatEn':
+        return !isOngoingOrFinished; // Can change language/format with warning
+      default:
+        return true;
+    }
   };
 
-  const formatDateForInput = (dateString: string) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toISOString().split('T')[0];
+  // Get warning message for field editing
+  const getFieldWarning = (fieldName: string): string => {
+    if (mode !== "edit" || !showtime) return '';
+    
+    const hasBookedSeats = (showtime.bookedSeats || 0) > 0;
+    
+    switch (fieldName) {
+      case 'languageVn':
+      case 'formatVn':
+        return hasBookedSeats ? 'Thay đổi này có thể ảnh hưởng đến khách hàng đã đặt vé' : '';
+      default:
+        return '';
+    }
   };
 
-  const formatDateDisplay = (dateString: string) => {
-    if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString('vi-VN');
+  // Helper function to calculate showtime status based on date and time
+  const getShowtimeStatus = (date: string, startTime: string, endTime: string): { key: string; label: string; color: string } => {
+    if (!date || !startTime || !endTime) {
+      return { key: "unknown", label: "Không xác định", color: "bg-gray-100 text-gray-800" };
+    }
+
+    const now = new Date();
+    const showtimeDate = new Date(date);
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const [endHour, endMin] = endTime.split(':').map(Number);
+    
+    const startDateTime = new Date(showtimeDate);
+    startDateTime.setHours(startHour, startMin, 0, 0);
+    
+    const endDateTime = new Date(showtimeDate);
+    endDateTime.setHours(endHour, endMin, 0, 0);
+
+    if (now < startDateTime) {
+      return { key: "upcoming", label: "Sắp chiếu", color: "bg-blue-100 text-blue-800" };
+    } else if (now >= startDateTime && now <= endDateTime) {
+      return { key: "ongoing", label: "Đang chiếu", color: "bg-yellow-100 text-yellow-800" };
+    } else {
+      return { key: "finished", label: "Đã kết thúc", color: "bg-gray-100 text-gray-600" };
+    }
   };
 
   return (
@@ -264,23 +434,29 @@ const ShowtimeModal: React.FC<ShowtimeModalProps> = ({
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
           <div className="space-y-6">
-            {/* Movie & Room Selection */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Movie Selection */}
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                   <Film className="w-4 h-4" />
                   Phim *
+                  {!canEditField('movieId') && (
+                    <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
+                      Không thể thay đổi
+                    </span>
+                  )}
                 </label>
                 {isView ? (
                   <div className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200 text-slate-600">
-                    {selectedMovie?.nameVn || form.movieName || 'Chưa chọn phim'}
+                    {selectedMovie?.nameVn || form.movieNameVn || 'Chưa chọn phim'}
                   </div>
                 ) : (
                   <select
                     name="movieId"
-                    value={form.movieId}
+                    value={form.movieId || ''}
                     onChange={handleChange}
-                    className={`w-full px-3 py-3 border rounded-lg transition-all duration-200 ${
+                    disabled={!canEditField('movieId')}
+                    className={`w-full px-3 py-3 border rounded-lg transition-all duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed ${
                       errors.movieId
                         ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
                         : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
@@ -298,11 +474,57 @@ const ShowtimeModal: React.FC<ShowtimeModalProps> = ({
                   <p className="text-red-500 text-xs mt-1">{errors.movieId}</p>
                 )}
               </div>
+            </div>
 
+            {/* Theater & Room Selection */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Rạp chiếu *
+                  {!canEditField('theaterId') && (
+                    <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
+                      Không thể thay đổi
+                    </span>
+                  )}
+                </label>
+                {isView ? (
+                  <div className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200 text-slate-600">
+                    {theaters.find(t => t.id === form.theaterId)?.nameVn || 'Chưa chọn rạp'}
+                  </div>
+                ) : (
+                  <select
+                    name="theaterId"
+                    value={form.theaterId || ''}
+                    onChange={handleChange}
+                    disabled={!canEditField('theaterId')}
+                    className={`w-full px-3 py-3 border rounded-lg transition-all duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                      errors.theaterId
+                        ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                        : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                  >
+                    <option value="">Chọn rạp</option>
+                    {theaters.map((theater) => (
+                      <option key={theater.id} value={theater.id}>
+                        {theater.nameVn}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {errors.theaterId && (
+                  <p className="text-red-500 text-xs mt-1">{errors.theaterId}</p>
+                )}
+              </div>
               <div>
                 <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
                   Phòng chiếu *
+                  {!canEditField('roomId') && (
+                    <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
+                      Không thể thay đổi
+                    </span>
+                  )}
                 </label>
                 {isView ? (
                   <div className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200 text-slate-600">
@@ -314,13 +536,16 @@ const ShowtimeModal: React.FC<ShowtimeModalProps> = ({
                     name="roomId"
                     value={form.roomId}
                     onChange={handleChange}
-                    className={`w-full px-3 py-3 border rounded-lg transition-all duration-200 ${
+                    disabled={!form.theaterId || !canEditField('roomId')}
+                    className={`w-full px-3 py-3 border rounded-lg transition-all duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed ${
                       errors.roomId
                         ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
                         : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
                     }`}
                   >
-                    <option value="">Chọn phòng</option>
+                    <option value="">
+                      {!form.theaterId ? "Chọn rạp trước" : "Chọn phòng"}
+                    </option>
                     {rooms.map((room) => (
                       <option key={room.id} value={room.id}>
                         {room.name} ({room.totalSeats} ghế, {room.type})
@@ -340,26 +565,32 @@ const ShowtimeModal: React.FC<ShowtimeModalProps> = ({
                 <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
                   Ngày chiếu *
+                  {!canEditField('date') && (
+                    <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
+                      Không thể thay đổi
+                    </span>
+                  )}
                 </label>
                 {isView ? (
                   <div className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200 text-slate-600">
-                    {formatDateDisplay(form.showDate)}
+                    {form.date ? new Date(form.date).toLocaleDateString('vi-VN') : ''}
                   </div>
                 ) : (
                   <input
                     type="date"
-                    name="showDate"
-                    value={formatDateForInput(form.showDate)}
+                    name="date"
+                    value={form.date || ''}
                     onChange={handleChange}
-                    className={`w-full border rounded-lg px-4 py-3 transition-all duration-200 ${
-                      errors.showDate
+                    disabled={!canEditField('date')}
+                    className={`w-full border rounded-lg px-4 py-3 transition-all duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                      errors.date
                         ? 'border-red-300 focus:border-red-500'
                         : 'border-slate-300 focus:border-transparent'
                     }`}
                   />
                 )}
-                {errors.showDate && (
-                  <p className="text-red-500 text-xs mt-1">{errors.showDate}</p>
+                {errors.date && (
+                  <p className="text-red-500 text-xs mt-1">{errors.date}</p>
                 )}
               </div>
 
@@ -367,6 +598,11 @@ const ShowtimeModal: React.FC<ShowtimeModalProps> = ({
                 <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                   <Clock className="w-4 h-4" />
                   Giờ bắt đầu *
+                  {!canEditField('startTime') && (
+                    <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
+                      Không thể thay đổi
+                    </span>
+                  )}
                 </label>
                 {isView ? (
                   <div className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200 text-slate-600">
@@ -378,7 +614,8 @@ const ShowtimeModal: React.FC<ShowtimeModalProps> = ({
                     name="startTime"
                     value={form.startTime}
                     onChange={handleChange}
-                    className={`w-full border rounded-lg px-4 py-3 transition-all duration-200 ${
+                    disabled={!canEditField('startTime')}
+                    className={`w-full border rounded-lg px-4 py-3 transition-all duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed ${
                       errors.startTime
                         ? 'border-red-300 focus:border-red-500'
                         : 'border-slate-300 focus:border-transparent'
@@ -394,6 +631,11 @@ const ShowtimeModal: React.FC<ShowtimeModalProps> = ({
                 <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                   <Clock className="w-4 h-4" />
                   Giờ kết thúc *
+                  {!canEditField('endTime') && (
+                    <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
+                      Không thể thay đổi
+                    </span>
+                  )}
                 </label>
                 <div className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200 text-slate-600">
                   {form.endTime || 'Tự động tính'}
@@ -409,59 +651,95 @@ const ShowtimeModal: React.FC<ShowtimeModalProps> = ({
               </div>
             </div>
 
-            {/* Price & Status */}
+            {/* Format & Language */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-semibold text-slate-700 mb-2">
-                  Giá vé (VND) *
+                <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  Định dạng phim *
+                  {getFieldWarning('formatVn') && (
+                    <AlertTriangle className="w-4 h-4 text-amber-500" title={getFieldWarning('formatVn')} />
+                  )}
                 </label>
                 {isView ? (
                   <div className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200 text-slate-600">
-                    {formatPrice(form.ticketPrice)} VND
+                    {form.formatVn} / {form.formatEn}
                   </div>
                 ) : (
-                  <input
-                    type="number"
-                    name="ticketPrice"
-                    value={form.ticketPrice}
-                    onChange={handleChange}
-                    min="0"
-                    step="1000"
-                    className={`w-full border rounded-lg px-4 py-3 transition-all duration-200 ${
-                      errors.ticketPrice
-                        ? 'border-red-300 focus:border-red-500'
-                        : 'border-slate-300 focus:border-transparent'
-                    }`}
-                    placeholder="120000"
-                  />
-                )}
-                {errors.ticketPrice && (
-                  <p className="text-red-500 text-xs mt-1">{errors.ticketPrice}</p>
+                  <>
+                    <select
+                      name="formatVn"
+                      value={form.formatVn}
+                      onChange={handleChange}
+                      disabled={!canEditField('formatVn')}
+                      className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Chọn định dạng</option>
+                      <option value="2D">2D</option>
+                      <option value="3D">3D</option>
+                      <option value="IMAX">IMAX</option>
+                      <option value="4DX">4DX</option>
+                    </select>
+                    {getFieldWarning('formatVn') && (
+                      <p className="text-amber-600 text-xs mt-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        {getFieldWarning('formatVn')}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
 
               <div>
                 <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4" />
-                  Trạng thái
+                  Ngôn ngữ *
+                  {getFieldWarning('languageVn') && (
+                    <AlertTriangle className="w-4 h-4 text-amber-500" title={getFieldWarning('languageVn')} />
+                  )}
                 </label>
                 {isView ? (
                   <div className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200 text-slate-600">
-                    {form.status === 'ACTIVE' ? 'Mở bán' : 
-                     form.status === 'SOLD_OUT' ? 'Hết vé' : 'Đã hủy'}
+                    {form.languageVn} / {form.languageEn}
                   </div>
                 ) : (
-                  <select
-                    name="status"
-                    value={form.status}
-                    onChange={handleChange}
-                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  >
-                    <option value="ACTIVE">Mở bán</option>
-                    <option value="SOLD_OUT">Hết vé</option>
-                    <option value="CANCELLED">Đã hủy</option>
-                  </select>
+                  <>
+                    <select
+                      name="languageVn"
+                      value={form.languageVn}
+                      onChange={handleChange}
+                      disabled={!canEditField('languageVn')}
+                      className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Chọn ngôn ngữ</option>
+                      <option value="Lồng Tiếng">Lồng Tiếng</option>
+                      <option value="Phụ Đề">Phụ Đề</option>
+                      <option value="Tiếng Anh">Tiếng Anh</option>
+                    </select>
+                    {getFieldWarning('languageVn') && (
+                      <p className="text-amber-600 text-xs mt-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        {getFieldWarning('languageVn')}
+                      </p>
+                    )}
+                  </>
                 )}
+              </div>
+            </div>
+
+            {/* Status */}
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4" />
+                  Trạng thái
+                </label>
+                {(() => {
+                    const status = getShowtimeStatus(form.date, form.startTime, form.endTime);
+                    return (
+                    <div className={`flex justify-center items-center h-12 px-3 py-1 text-md font-semibold rounded-full ${status.color}`}>
+                        {status.label}
+                    </div>
+                    );
+                })()}
               </div>
             </div>
 
@@ -488,25 +766,39 @@ const ShowtimeModal: React.FC<ShowtimeModalProps> = ({
 
             {/* Action Buttons */}
             {!isView && (
-              <div className="flex gap-3 pt-4 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 px-6 py-3 border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-50 transition-colors duration-200"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  className={`flex-1 px-6 py-3 text-white rounded-lg font-semibold transition-colors duration-200 ${
-                    isAdd 
-                      ? 'bg-green-600 hover:bg-green-700' 
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
-                >
-                  {isAdd ? "Thêm suất chiếu" : "Lưu thay đổi"}
-                </button>
+              <div className="flex flex-col gap-3 pt-4 border-t border-slate-200">
+                {!isFormValid() && (
+                  <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-2">
+                    <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <span>{getDisabledMessage()}</span>
+                  </div>
+                )}
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="flex-1 px-6 py-3 border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-50 transition-colors duration-200"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={!isFormValid()}
+                    title={!isFormValid() ? getDisabledMessage() : ''}
+                    className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-colors duration-200 ${
+                      !isFormValid()
+                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                        : isAdd 
+                          ? 'bg-green-600 hover:bg-green-700 text-white' 
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
+                  >
+                    {isAdd ? "Thêm suất chiếu" : "Lưu thay đổi"}
+                  </button>
+                </div>
               </div>
             )}
           </div>

@@ -10,14 +10,19 @@ import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import SecurityIcon from '@mui/icons-material/Security';
 import SettingsIcon from '@mui/icons-material/Settings';
 import TheatersIcon from '@mui/icons-material/Theaters';
-import { CalendarRange, Film, Star } from "lucide-react";
+import { CalendarRange, EllipsisVertical, Film, Star } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 const Sidebar = () => {
     const [isOpen, setIsOpen] = useState(true);
     const [expandedMenus, setExpandedMenus] = useState<string[]>(['content']);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
     const { pathname } = useLocation();
+
+    const handleOpen = () => {
+        setIsMenuOpen(!isMenuOpen);
+    };
 
     const menuGroups = [
         {
@@ -99,7 +104,7 @@ const Sidebar = () => {
                 {isOpen ? <KeyboardArrowLeftIcon fontSize="small" /> : <KeyboardArrowRightIcon fontSize="small" />}
             </button>
             
-            <nav className="flex flex-col gap-1 overflow-visible px-2">
+            <nav className="flex flex-col gap-1 overflow-visible px-2 ">
                 {menuGroups.map(group => {
                     if (group.type === 'single') {
                         return (

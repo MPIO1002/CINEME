@@ -16,6 +16,8 @@ import Home from "../pages/home";
 import FilmDetail from "../pages/film-detail";
 import BookingPage from "../pages/booking";
 import PaymentResult from "../pages/payment-result";
+import ShowtimesPage from "../pages/showtimes";
+import Profile from "../pages/profile";
 
 // Giả lập kiểm tra đăng nhập admin (bạn nên thay bằng logic thực tế)
 const isAdminAuthenticated = () => {
@@ -26,6 +28,7 @@ const isAdminAuthenticated = () => {
 const AdminPrivateRoute = () => {
   return isAdminAuthenticated() ? <Outlet /> : <Navigate to="/admin/login" replace />;
 };
+
 const Routers = () => {
   const [lang, setLang] = useState<"vi" | "en">("vi");
 
@@ -38,6 +41,8 @@ const Routers = () => {
           <Route path="/film/:id" element={<FilmDetail />} />
           <Route path="/booking/:id" element={<BookingPage />} />
           <Route path="/payment-result" element={<PaymentResult />} />
+          <Route path="/showtimes" element={<ShowtimesPage />} />
+          <Route path="/profile" element={<Profile />} />
         </Route>
 
         {/* Admin routes */}

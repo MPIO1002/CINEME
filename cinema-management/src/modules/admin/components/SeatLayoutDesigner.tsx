@@ -6,20 +6,21 @@ import {
     Monitor,
     Plus,
     Save,
+    Square,
     Trash2,
     X,
     Zap
 } from 'lucide-react';
 import React, { useCallback, useState } from 'react';
 
-export type SeatType = 'regular' | 'vip' | 'couple' | 'disabled' | 'blocked';
+export type SeatType = 'regular' | 'vip' | 'couple' | 'disabled' | 'blocked' | 'empty';
 
 export interface Seat {
   id: string;
   row: number;
   column: number;
   type: SeatType;
-  label: string;
+  label?: string;
   isAvailable: boolean;
 }
 
@@ -38,7 +39,7 @@ const SeatLayoutDesigner: React.FC<SeatLayoutDesignerProps> = ({
   roomName,
   initialSeats = [],
   maxRows = 20,
-  maxColumns = 20,
+  maxColumns = 30,
   onSave,
   onClose,
 }) => {
@@ -46,14 +47,32 @@ const SeatLayoutDesigner: React.FC<SeatLayoutDesignerProps> = ({
   const [selectedTool, setSelectedTool] = useState<SeatType>('regular');
   const [gridSize, setGridSize] = useState({ rows: 10, columns: 12 });
   const [isDragging, setIsDragging] = useState(false);
+  
+  // Auto-adjust grid size based on existing seats
+  React.useEffect(() => {
+    if (initialSeats.length > 0) {
+      const maxRow = Math.max(...initialSeats.map(seat => seat.row)) + 1;
+      const maxCol = Math.max(...initialSeats.map(seat => seat.column)) + 1;
+      
+      setGridSize({
+        rows: Math.max(maxRow, 5), // Minimum 5 rows
+        columns: Math.max(maxCol, 6) // Minimum 6 columns
+      });
+      setSeats(initialSeats);
+    }
+  }, [initialSeats]);
 
   const findSeat = useCallback((row: number, column: number): Seat | undefined => {
     return seats.find(seat => seat.row === row && seat.column === column);
   }, [seats]);
 
-  const generateSeatLabel = useCallback((row: number, column: number): string => {
-    const rowLetter = String.fromCharCode(65 + row); // A, B, C...
-    return `${rowLetter}${column + 1}`;
+  const generateSeatLabel = useCallback((row: number, column: number, type: SeatType): string => {
+    if (type === 'empty') {
+      return "";
+    } else {
+      const rowLetter = String.fromCharCode(65 + row); // A, B, C...
+      return `${rowLetter}${column + 1}`;
+    }
   }, []);
 
   const addSeat = useCallback((row: number, column: number, type: SeatType) => {
@@ -62,7 +81,7 @@ const SeatLayoutDesigner: React.FC<SeatLayoutDesignerProps> = ({
       // Update existing seat
       setSeats(prev => prev.map(seat => 
         seat.row === row && seat.column === column 
-          ? { ...seat, type }
+          ? { ...seat, type, label: generateSeatLabel(row, column, type) }
           : seat
       ));
     } else {
@@ -72,7 +91,7 @@ const SeatLayoutDesigner: React.FC<SeatLayoutDesignerProps> = ({
         row,
         column,
         type,
-        label: generateSeatLabel(row, column),
+        label: generateSeatLabel(row, column, type),
         isAvailable: true
       };
       setSeats(prev => [...prev, newSeat]);
@@ -92,18 +111,20 @@ const SeatLayoutDesigner: React.FC<SeatLayoutDesignerProps> = ({
       case 'couple': return '❤️';
       case 'disabled': return '♿';
       case 'blocked': return '❌';
+      case 'empty': return '⬜';
       default: return '💺';
     }
   };
 
   const getSeatColor = (type: SeatType) => {
     switch (type) {
-      case 'regular': return 'bg-blue-200 hover:bg-blue-300 border-blue-400';
+      case 'regular': return 'bg-gray-300 border-gray-400 text-gray-800';
       case 'vip': return 'bg-yellow-200 hover:bg-yellow-300 border-yellow-400';
       case 'couple': return 'bg-pink-200 hover:bg-pink-300 border-pink-400';
-      case 'disabled': return 'bg-green-200 hover:bg-green-300 border-green-400';
+      case 'disabled': return 'bg-blue-300 border-blue-400 text-blue-800';
       case 'blocked': return 'bg-gray-300 hover:bg-gray-400 border-gray-500';
-      default: return 'bg-gray-100 hover:bg-gray-200 border-gray-300';
+      case 'empty': return 'bg-white hover:bg-gray-50 border-gray-300 border-dashed';
+      default: return 'bg-gray-300 border-gray-400 text-gray-800';
     }
   };
 
@@ -114,6 +135,7 @@ const SeatLayoutDesigner: React.FC<SeatLayoutDesignerProps> = ({
       case 'couple': return <Heart className="w-4 h-4" />;
       case 'disabled': return <Zap className="w-4 h-4" />;
       case 'blocked': return <X className="w-4 h-4" />;
+      case 'empty': return <Square className="w-4 h-4" />;
       default: return <Armchair className="w-4 h-4" />;
     }
   };
@@ -160,11 +182,23 @@ const SeatLayoutDesigner: React.FC<SeatLayoutDesignerProps> = ({
     const newSeats: Seat[] = [];
     const { rows, columns } = gridSize;
     
-    // Auto-generate a typical cinema layout
+    // Auto-generate a typical cinema layout with aisles
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < columns; col++) {
-        // Skip middle aisle
-        if (col === Math.floor(columns / 2)) continue;
+        // Create center aisle (middle columns)
+        const centerAisle = Math.floor(columns / 2);
+        if (col === centerAisle || col === centerAisle - 1) {
+          // Add empty space for center aisle
+          newSeats.push({
+            id: `${row}-${col}`,
+            row,
+            column: col,
+            type: 'empty',
+            label: generateSeatLabel(row, col, 'empty'),
+            isAvailable: false
+          });
+          continue;
+        }
         
         // Last 2 rows are VIP
         const isVipRow = row >= rows - 2;
@@ -185,7 +219,7 @@ const SeatLayoutDesigner: React.FC<SeatLayoutDesignerProps> = ({
           row,
           column: col,
           type: seatType,
-          label: generateSeatLabel(row, col),
+          label: generateSeatLabel(row, col, seatType),
           isAvailable: true
         });
       }
@@ -200,13 +234,19 @@ const SeatLayoutDesigner: React.FC<SeatLayoutDesignerProps> = ({
       vip: 0,
       couple: 0,
       disabled: 0,
+      empty: 0,
       total: 0
     };
     
     seats.forEach(seat => {
-      if (seat.type !== 'blocked') {
-        stats[seat.type]++;
-        stats.total++;
+      if (seat.type !== 'blocked' && seat.type !== 'empty') {
+        // Only count actual seats (not empty spaces or blocked)
+        if (seat.type === 'regular' || seat.type === 'vip' || seat.type === 'couple' || seat.type === 'disabled') {
+          stats[seat.type]++;
+          stats.total++;
+        }
+      } else if (seat.type === 'empty') {
+        stats.empty++;
       }
     });
     
@@ -268,7 +308,12 @@ const SeatLayoutDesigner: React.FC<SeatLayoutDesignerProps> = ({
                       min="5"
                       max={maxRows}
                       value={gridSize.rows}
-                      onChange={(e) => setGridSize(prev => ({ ...prev, rows: parseInt(e.target.value) }))}
+                      onChange={(e) => {
+                        const newRows = parseInt(e.target.value);
+                        setGridSize(prev => ({ ...prev, rows: newRows }));
+                        // Remove seats that are outside the new grid size
+                        setSeats(prevSeats => prevSeats.filter(seat => seat.row < newRows));
+                      }}
                       className="w-full mt-1"
                     />
                     <div className="text-xs text-gray-500 text-center">{gridSize.rows}</div>
@@ -280,7 +325,12 @@ const SeatLayoutDesigner: React.FC<SeatLayoutDesignerProps> = ({
                       min="6"
                       max={maxColumns}
                       value={gridSize.columns}
-                      onChange={(e) => setGridSize(prev => ({ ...prev, columns: parseInt(e.target.value) }))}
+                      onChange={(e) => {
+                        const newColumns = parseInt(e.target.value);
+                        setGridSize(prev => ({ ...prev, columns: newColumns }));
+                        // Remove seats that are outside the new grid size
+                        setSeats(prevSeats => prevSeats.filter(seat => seat.column < newColumns));
+                      }}
                       className="w-full mt-1"
                     />
                     <div className="text-xs text-gray-500 text-center">{gridSize.columns}</div>
@@ -292,7 +342,7 @@ const SeatLayoutDesigner: React.FC<SeatLayoutDesignerProps> = ({
               <div className="bg-white rounded-lg p-4 border border-gray-200">
                 <h3 className="font-semibold text-gray-700 mb-3">Công cụ vẽ</h3>
                 <div className="space-y-2">
-                  {(['regular', 'vip', 'couple', 'disabled', 'blocked'] as SeatType[]).map(type => (
+                  {(['regular', 'vip', 'couple', 'disabled', 'empty', 'blocked'] as SeatType[]).map(type => (
                     <button
                       key={type}
                       onClick={() => setSelectedTool(type)}
@@ -308,7 +358,8 @@ const SeatLayoutDesigner: React.FC<SeatLayoutDesignerProps> = ({
                         {type === 'regular' ? 'Thường' :
                          type === 'vip' ? 'VIP' :
                          type === 'couple' ? 'Đôi' :
-                         type === 'disabled' ? 'Khuyết tật' : 'Xóa/Chặn'}
+                         type === 'disabled' ? 'Khuyết tật' :
+                         type === 'empty' ? 'Khoảng trống' : 'Xóa/Chặn'}
                       </span>
                     </button>
                   ))}
@@ -356,8 +407,12 @@ const SeatLayoutDesigner: React.FC<SeatLayoutDesignerProps> = ({
                     <span>♿ Khuyết tật:</span>
                     <span className="font-medium">{stats.disabled}</span>
                   </div>
+                  <div className="flex justify-between">
+                    <span>⬜ Khoảng trống:</span>
+                    <span className="font-medium">{stats.empty}</span>
+                  </div>
                   <div className="flex justify-between border-t pt-2 font-bold">
-                    <span>Tổng cộng:</span>
+                    <span>Tổng ghế:</span>
                     <span>{stats.total}</span>
                   </div>
                 </div>
@@ -404,7 +459,7 @@ const SeatLayoutDesigner: React.FC<SeatLayoutDesignerProps> = ({
                         }`}
                         onMouseDown={() => handleMouseDown(row, column)}
                         onMouseEnter={() => handleMouseEnter(row, column)}
-                        title={seat ? `${seat.label} - ${seat.type}` : `${generateSeatLabel(row, column)} - Trống`}
+                        title={seat ? `${seat.label} - ${seat.type}` : `${generateSeatLabel(row, column, 'regular')} - Trống`}
                       >
                         {seat && (
                           <span className="text-xs">
@@ -444,8 +499,12 @@ const SeatLayoutDesigner: React.FC<SeatLayoutDesignerProps> = ({
                     <span className="text-sm">Khuyết tật</span>
                   </div>
                   <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-white border border-gray-300 border-dashed rounded flex items-center justify-center">⬜</div>
+                    <span className="text-sm">Khoảng trống</span>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <div className="w-6 h-6 bg-gray-50 border border-gray-200 rounded"></div>
-                    <span className="text-sm">Trống</span>
+                    <span className="text-sm">Chưa sử dụng</span>
                   </div>
                 </div>
               </div>
@@ -457,7 +516,7 @@ const SeatLayoutDesigner: React.FC<SeatLayoutDesignerProps> = ({
         <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
           <div className="flex justify-between items-center">
             <div className="text-sm text-gray-600">
-              💡 Kéo thả để vẽ nhiều ghế cùng lúc, click để thêm/sửa từng ghế
+              💡 Kéo thả để vẽ nhiều ghế cùng lúc. Sử dụng "Khoảng trống" để tạo lối đi giữa các ghế
             </div>
             <div className="flex gap-3">
               <button

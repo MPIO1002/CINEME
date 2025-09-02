@@ -13,7 +13,7 @@ export interface Movie {
   briefEn: string;
   image: string | File | ""; // API returns string, form accepts File
   trailer: string | File | ""; // API returns string, form accepts File
-  status: string;
+  status: string; // Auto-calculated based on releaseDate and endDate
   ratings?: string; // Optional
   time: number;
   // Additional fields needed for form (optional, filled when needed)
@@ -142,11 +142,12 @@ export const movieApiService = {
       console.log('=== End FormData Debug ===');
 
       // Try the most basic approach - direct axios call with no custom config
+      console.log('Starting upload...');
       const response = await axios({
         method: 'POST',
         url: 'http://localhost:8080/api/v1/movies',
         data: formData,
-        timeout: 120000,
+        timeout: 60000, // Reduce timeout to 60 seconds for faster feedback
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
             const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);

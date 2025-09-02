@@ -55,27 +55,28 @@ const RoomModal: React.FC<RoomModalProps> = ({
   onClose,
   onSubmit,
 }) => {
-  const [form, setForm] = useState<Room>(
-    room || {
-      name: "",
-      type: "2D",
-      location: "",
-      totalSeats: 100,
-      vipSeats: 20,
-      regularSeats: 80,
-      coupleSeats: 0,
-      status: "ACTIVE",
-      screenSize: "15m x 8m",
-      screenResolution: "4K",
-      audioSystem: "Dolby Digital",
-      hasAirCondition: true,
-      hasEmergencyExit: true,
-      hasDolbyAtmos: false,
-      has4K: true,
-      description: "",
-      seatLayout: [],
-    }
-  );
+  // Initialize with empty form by default - will be set in useEffect
+  const getDefaultForm = (): Room => ({
+    name: "",
+    type: "2D",
+    location: "",
+    totalSeats: 100,
+    vipSeats: 20,
+    regularSeats: 80,
+    coupleSeats: 0,
+    status: "ACTIVE",
+    screenSize: "15m x 8m",
+    screenResolution: "4K",
+    audioSystem: "Dolby Digital",
+    hasAirCondition: true,
+    hasEmergencyExit: true,
+    hasDolbyAtmos: false,
+    has4K: true,
+    description: "",
+    seatLayout: [],
+  });
+
+  const [form, setForm] = useState<Room>(getDefaultForm());
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showSeatDesigner, setShowSeatDesigner] = useState(false);
@@ -102,12 +103,14 @@ const RoomModal: React.FC<RoomModalProps> = ({
               // Map API seat data to component format
               const mappedSeats = seats.map(seat => {
                 // Map API seatType to component type
-                const getTypeFromAPI = (apiType: string): 'regular' | 'vip' | 'couple' | 'disabled' | 'blocked' => {
+                const getTypeFromAPI = (apiType: string): 'regular' | 'vip' | 'couple' | 'disabled' | 'blocked' | 'empty' => {
                   switch (apiType.toUpperCase()) {
                     case 'VIP': return 'vip';
                     case 'COUPLE': return 'couple';
                     case 'DISABLED': return 'disabled';
-                    case 'STANDARD': 
+                    case 'BLOCKED': return 'blocked';
+                    case 'EMPTY': return 'empty';
+                    case 'STANDARD': return 'regular';
                     default: return 'regular';
                   }
                 };
@@ -145,26 +148,13 @@ const RoomModal: React.FC<RoomModalProps> = ({
           setLoadingSeatData(false);
         }
       } else if (mode === "add") {
-        // Reset form for new room
-        setForm({
-          name: "",
-          type: "2D",
-          location: "",
-          totalSeats: 100,
-          vipSeats: 20,
-          regularSeats: 80,
-          coupleSeats: 0,
-          status: "ACTIVE",
-          screenSize: "15m x 8m",
-          screenResolution: "4K",
-          audioSystem: "Dolby Digital",
-          hasAirCondition: true,
-          hasEmergencyExit: true,
-          hasDolbyAtmos: false,
-          has4K: true,
-          description: "",
-          seatLayout: [],
-        });
+        // Reset ALL states for new room
+        setForm(getDefaultForm());
+        
+        // Reset all related states
+        setShowSeatDesigner(false);
+        setLoadingSeatData(false);
+        setLoading(false);
       }
       setErrors({});
     };
@@ -262,16 +252,60 @@ const RoomModal: React.FC<RoomModalProps> = ({
     }
   };
 
+  // Function to convert API seat data to SeatLayoutDesigner format
+  const convertAPISeatsToDesignerFormat = (apiSeats: Seat[]): Seat[] => {
+    if (!apiSeats || apiSeats.length === 0) return [];
+    
+    return apiSeats.map(seat => {
+      const parsed = parseSeatNumber(seat.label);
+      // Convert row letter to number (A=0, B=1, C=2, etc.)
+      const rowNumber = parsed.rowLetter.charCodeAt(0) - 65;
+      
+      // Map seat type properly
+      let seatType: 'regular' | 'vip' | 'couple' | 'disabled' | 'blocked' | 'empty' = 'regular';
+      if (seat.type && ['regular', 'vip', 'couple', 'disabled', 'blocked', 'empty'].includes(seat.type)) {
+        seatType = seat.type as 'regular' | 'vip' | 'couple' | 'disabled' | 'blocked' | 'empty';
+      }
+      
+      return {
+        id: `${rowNumber}-${parsed.columnNumber - 1}`,
+        row: rowNumber,
+        column: parsed.columnNumber - 1, // Convert to 0-based index
+        type: seatType,
+        label: seat.label,
+        isAvailable: seat.isAvailable ?? true
+      };
+    });
+  };
+
+  // Function to convert SeatLayoutDesigner format back to API format
+  const convertDesignerSeatsToAPIFormat = (designerSeats: Seat[]): Seat[] => {
+    return designerSeats.map(seat => {
+      const rowLetter = String.fromCharCode(65 + seat.row); // Convert back to letter
+      const seatLabel = `${rowLetter}${seat.column + 1}`; // Convert back to 1-based
+      
+      return {
+        ...seat,
+        label: seatLabel,
+        id: seat.id || `${seat.row}-${seat.column}`
+      };
+    });
+  };
+
   const handleSeatLayoutSave = (seats: Seat[]) => {
-    setForm(prev => ({ ...prev, seatLayout: seats }));
+    // Convert from designer format back to API format
+    console.log('Seat layout saved from designer:', seats);
+    const apiFormatSeats = convertDesignerSeatsToAPIFormat(seats);
+    setForm(prev => ({ ...prev, seatLayout: apiFormatSeats }));
     setShowSeatDesigner(false);
     
-    // Auto-calculate seat counts from layout
+    // Auto-calculate seat counts from layout (excluding empty spaces and blocked seats)
+    const actualSeats = seats.filter(s => s.type !== 'empty' && s.type !== 'blocked');
     const counts = {
-      regular: seats.filter(s => s.type === 'regular').length,
-      vip: seats.filter(s => s.type === 'vip').length,
-      couple: seats.filter(s => s.type === 'couple').length,
-      disabled: seats.filter(s => s.type === 'disabled').length,
+      regular: actualSeats.filter(s => s.type === 'regular').length,
+      vip: actualSeats.filter(s => s.type === 'vip').length,
+      couple: actualSeats.filter(s => s.type === 'couple').length,
+      disabled: actualSeats.filter(s => s.type === 'disabled').length,
     };
     
     const total = counts.regular + counts.vip + counts.couple + counts.disabled;
@@ -373,6 +407,7 @@ const RoomModal: React.FC<RoomModalProps> = ({
                         case 'vip': return 'bg-yellow-300 border-yellow-400 text-yellow-800';
                         case 'couple': return 'bg-pink-300 border-pink-400 text-pink-800';
                         case 'disabled': return 'bg-blue-300 border-blue-400 text-blue-800';
+                        case 'empty': return 'bg-white border-gray-300 border-dashed';
                         default: return 'bg-gray-300 border-gray-400 text-gray-800';
                       }
                     };
@@ -382,6 +417,7 @@ const RoomModal: React.FC<RoomModalProps> = ({
                         case 'vip': return '👑';
                         case 'couple': return '❤️';
                         case 'disabled': return '♿';
+                        case 'empty': return '';
                         default: return '💺';
                       }
                     };
@@ -587,133 +623,6 @@ const RoomModal: React.FC<RoomModalProps> = ({
                 <Users className="w-5 h-5" />
                 Cấu hình ghế ngồi
               </h3>
-              
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="text-sm font-semibold text-slate-700 mb-2">
-                    Tổng số ghế *
-                  </label>
-                  {isView ? (
-                    <div className="w-full border rounded-lg px-4 py-3 bg-white border-slate-200 text-slate-600">
-                      {loadingSeatData ? (
-                        <span className="flex items-center">
-                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Đang tải dữ liệu ghế...
-                        </span>
-                      ) : (
-                        `${form.totalSeats} ghế`
-                      )}
-                    </div>
-                  ) : (
-                    <input
-                      type="number"
-                      name="totalSeats"
-                      value={form.totalSeats}
-                      onChange={handleChange}
-                      disabled={loadingSeatData}
-                      min="1"
-                      className={`w-full px-3 py-3 border rounded-lg transition-all duration-200 ${
-                        loadingSeatData
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : errors.totalSeats
-                          ? 'border-red-300 focus:border-red-500'
-                          : 'border-slate-300 focus:border-blue-500'
-                      }`}
-                    />
-                  )}
-                  {errors.totalSeats && (
-                    <p className="text-red-500 text-xs mt-1">{errors.totalSeats}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-slate-700 mb-2">
-                    Ghế VIP
-                  </label>
-                  {isView ? (
-                    <div className="w-full border rounded-lg px-4 py-3 bg-white border-slate-200 text-slate-600">
-                      {form.vipSeats} ghế
-                    </div>
-                  ) : (
-                    <input
-                      type="number"
-                      name="vipSeats"
-                      value={form.vipSeats}
-                      onChange={handleChange}
-                      min="0"
-                      className={`w-full px-3 py-3 border rounded-lg transition-all duration-200 ${
-                        errors.vipSeats
-                          ? 'border-red-300 focus:border-red-500'
-                          : 'border-slate-300 focus:border-blue-500'
-                      }`}
-                    />
-                  )}
-                  {errors.vipSeats && (
-                    <p className="text-red-500 text-xs mt-1">{errors.vipSeats}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-slate-700 mb-2">
-                    Ghế thường
-                  </label>
-                  {isView ? (
-                    <div className="w-full border rounded-lg px-4 py-3 bg-white border-slate-200 text-slate-600">
-                      {form.regularSeats} ghế
-                    </div>
-                  ) : (
-                    <input
-                      type="number"
-                      name="regularSeats"
-                      value={form.regularSeats}
-                      onChange={handleChange}
-                      min="0"
-                      className={`w-full px-3 py-3 border rounded-lg transition-all duration-200 ${
-                        errors.regularSeats
-                          ? 'border-red-300 focus:border-red-500'
-                          : 'border-slate-300 focus:border-blue-500'
-                      }`}
-                    />
-                  )}
-                  {errors.regularSeats && (
-                    <p className="text-red-500 text-xs mt-1">{errors.regularSeats}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-slate-700 mb-2">
-                    Ghế đôi
-                  </label>
-                  {isView ? (
-                    <div className="w-full border rounded-lg px-4 py-3 bg-white border-slate-200 text-slate-600">
-                      {form.coupleSeats || 0} ghế
-                    </div>
-                  ) : (
-                    <input
-                      type="number"
-                      name="coupleSeats"
-                      value={form.coupleSeats || 0}
-                      onChange={handleChange}
-                      min="0"
-                      className={`w-full px-3 py-3 border rounded-lg transition-all duration-200 ${
-                        errors.coupleSeats
-                          ? 'border-red-300 focus:border-red-500'
-                          : 'border-slate-300 focus:border-blue-500'
-                      }`}
-                    />
-                  )}
-                  {errors.coupleSeats && (
-                    <p className="text-red-500 text-xs mt-1">{errors.coupleSeats}</p>
-                  )}
-                </div>
-              </div>
-
-              {errors.seatMismatch && (
-                <p className="text-red-500 text-sm mt-2">{errors.seatMismatch}</p>
-              )}
 
               {/* Seat Layout Preview */}
               <div className="mt-4 p-4 bg-white rounded-lg border border-slate-200">
@@ -737,7 +646,7 @@ const RoomModal: React.FC<RoomModalProps> = ({
                       🎬 MÀN HÌNH
                     </div>
                     <div className="text-sm text-slate-600 mb-2">
-                      Đã thiết kế: {form.seatLayout.length} ghế
+                      Đã thiết kế: {form.seatLayout.filter(s => s.type !== 'empty' && s.type !== 'blocked').length} ghế
                     </div>
                     {/* Render actual seat layout from API data */}
                     {renderSeatLayoutFromAPI()}
@@ -760,6 +669,10 @@ const RoomModal: React.FC<RoomModalProps> = ({
                           <div className="w-5 h-5 bg-blue-300 border-blue-400 border-2 rounded flex items-center justify-center">♿</div>
                           <span>Khuyết tật ({form.seatLayout.filter(s => s.type === 'disabled').length})</span>
                         </div>
+                        <div className="flex items-center space-x-1">
+                          <div className="w-5 h-5 bg-white border-gray-300 border-2 border-dashed rounded"></div>
+                          <span>Lối đi ({form.seatLayout.filter(s => s.type === 'empty').length})</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -773,11 +686,10 @@ const RoomModal: React.FC<RoomModalProps> = ({
                   </div>
                 ) : (
                   <div className="text-center">
-                    <div className="bg-gray-800 text-white py-2 px-4 rounded-lg mb-4 inline-block">
+                    {/* <div className="bg-gray-800 text-white py-2 px-4 rounded-lg mb-4 inline-block">
                       🎬 MÀN HÌNH
                     </div>
                     <div className="space-y-2">
-                      {/* Sample seat layout visualization */}
                       <div className="flex justify-center space-x-1">
                         {Array.from({ length: Math.min(10, Math.ceil(form.totalSeats / 8)) }).map((_, i) => (
                           <div key={i} className="w-6 h-6 bg-blue-200 rounded border text-xs flex items-center justify-center">
@@ -803,214 +715,11 @@ const RoomModal: React.FC<RoomModalProps> = ({
                       <span>💺 Thường</span>
                       <span>👑 VIP</span>
                       <span>❤️ Đôi</span>
-                    </div>
+                    </div> */}
+                    <div className="text-gray-500">Chưa có bố cục ghế. Vui lòng thiết kế trước khi lưu.</div>
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* Technical Specifications */}
-            <div className="bg-purple-50 rounded-lg p-4">
-              <h3 className="text-lg font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                <Monitor className="w-5 h-5" />
-                Thông số kỹ thuật
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-semibold text-slate-700 mb-2">
-                    Kích thước màn hình *
-                  </label>
-                  {isView ? (
-                    <div className="w-full border rounded-lg px-4 py-3 bg-white border-slate-200 text-slate-600">
-                      {form.screenSize}
-                    </div>
-                  ) : (
-                    <input
-                      type="text"
-                      name="screenSize"
-                      value={form.screenSize}
-                      onChange={handleChange}
-                      className={`w-full px-3 py-3 border rounded-lg transition-all duration-200 ${
-                        errors.screenSize
-                          ? 'border-red-300 focus:border-red-500'
-                          : 'border-slate-300 focus:border-blue-500'
-                      }`}
-                      placeholder="Ví dụ: 15m x 8m"
-                    />
-                  )}
-                  {errors.screenSize && (
-                    <p className="text-red-500 text-xs mt-1">{errors.screenSize}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-slate-700 mb-2">
-                    Độ phân giải
-                  </label>
-                  {isView ? (
-                    <div className="w-full border rounded-lg px-4 py-3 bg-white border-slate-200 text-slate-600">
-                      {form.screenResolution}
-                    </div>
-                  ) : (
-                    <select
-                      name="screenResolution"
-                      value={form.screenResolution}
-                      onChange={handleChange}
-                      className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                    >
-                      <option value="HD">HD (1080p)</option>
-                      <option value="4K">4K</option>
-                      <option value="8K IMAX">8K IMAX</option>
-                    </select>
-                  )}
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                    <Volume2 className="w-4 h-4" />
-                    Hệ thống âm thanh
-                  </label>
-                  {isView ? (
-                    <div className="w-full border rounded-lg px-4 py-3 bg-white border-slate-200 text-slate-600">
-                      {form.audioSystem}
-                    </div>
-                  ) : (
-                    <select
-                      name="audioSystem"
-                      value={form.audioSystem}
-                      onChange={handleChange}
-                      className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                    >
-                      <option value="Stereo">Stereo</option>
-                      <option value="Dolby Digital">Dolby Digital</option>
-                      <option value="Dolby Atmos">Dolby Atmos</option>
-                      <option value="DTS:X">DTS:X</option>
-                      <option value="IMAX Sound System">IMAX Sound System</option>
-                      <option value="4DX Motion Sound">4DX Motion Sound</option>
-                    </select>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Features & Facilities */}
-            <div className="bg-green-50 rounded-lg p-4">
-              <h3 className="text-lg font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                <Zap className="w-5 h-5" />
-                Tính năng & Tiện ích
-              </h3>
-              
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="flex items-center">
-                  {isView ? (
-                    <div className="flex items-center space-x-2">
-                      <span className={form.has4K ? "text-green-600" : "text-gray-400"}>
-                        {form.has4K ? "✅" : "❌"}
-                      </span>
-                      <span className="text-sm text-slate-700">4K</span>
-                    </div>
-                  ) : (
-                    <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="has4K"
-                        checked={form.has4K}
-                        onChange={handleChange}
-                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-slate-700">4K</span>
-                    </label>
-                  )}
-                </div>
-
-                <div className="flex items-center">
-                  {isView ? (
-                    <div className="flex items-center space-x-2">
-                      <span className={form.hasDolbyAtmos ? "text-green-600" : "text-gray-400"}>
-                        {form.hasDolbyAtmos ? "✅" : "❌"}
-                      </span>
-                      <span className="text-sm text-slate-700">Dolby Atmos</span>
-                    </div>
-                  ) : (
-                    <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="hasDolbyAtmos"
-                        checked={form.hasDolbyAtmos}
-                        onChange={handleChange}
-                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-slate-700">Dolby Atmos</span>
-                    </label>
-                  )}
-                </div>
-
-                <div className="flex items-center">
-                  {isView ? (
-                    <div className="flex items-center space-x-2">
-                      <span className={form.hasAirCondition ? "text-green-600" : "text-gray-400"}>
-                        {form.hasAirCondition ? "✅" : "❌"}
-                      </span>
-                      <span className="text-sm text-slate-700">Điều hòa</span>
-                    </div>
-                  ) : (
-                    <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="hasAirCondition"
-                        checked={form.hasAirCondition}
-                        onChange={handleChange}
-                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-slate-700">Điều hòa</span>
-                    </label>
-                  )}
-                </div>
-
-                <div className="flex items-center">
-                  {isView ? (
-                    <div className="flex items-center space-x-2">
-                      <span className={form.hasEmergencyExit ? "text-green-600" : "text-gray-400"}>
-                        {form.hasEmergencyExit ? "✅" : "❌"}
-                      </span>
-                      <span className="text-sm text-slate-700">Lối thoát khẩn cấp</span>
-                    </div>
-                  ) : (
-                    <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="hasEmergencyExit"
-                        checked={form.hasEmergencyExit}
-                        onChange={handleChange}
-                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-slate-700">Lối thoát khẩn cấp</span>
-                    </label>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="text-sm font-semibold text-slate-700 mb-2">
-                Mô tả
-              </label>
-              {isView ? (
-                <div className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200 text-slate-600 min-h-[80px]">
-                  {form.description || "Không có mô tả"}
-                </div>
-              ) : (
-                <textarea
-                  name="description"
-                  value={form.description}
-                  onChange={handleChange}
-                  rows={3}
-                  className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="Mô tả về phòng chiếu..."
-                />
-              )}
             </div>
 
             {/* Performance Stats (View mode only) */}
@@ -1091,7 +800,13 @@ const RoomModal: React.FC<RoomModalProps> = ({
       <SeatLayoutDesigner
         open={showSeatDesigner}
         roomName={form.name || "Phòng chiếu"}
-        initialSeats={loadingSeatData ? [] : (form.seatLayout || [])}
+        initialSeats={
+          loadingSeatData 
+            ? [] 
+            : mode === "add" 
+            ? [] // Always start with empty layout for new rooms
+            : convertAPISeatsToDesignerFormat(form.seatLayout || [])
+        }
         onSave={handleSeatLayoutSave}
         onClose={() => setShowSeatDesigner(false)}
       />

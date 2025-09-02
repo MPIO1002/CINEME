@@ -1,14 +1,18 @@
 import { Calendar, CheckCircle, Clock, Edit3, Eye, FileText, Film, Image, Plus, Star, User, UserPlus, X } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { actorApiService, type Actor } from '../../../services/actorApi';
 import { movieApiService, type Movie, type MovieDetail } from '../../../services/movieApi';
 import ActorModal from './ActorModal';
 
+import { countryApiService } from "@/services/countryApi";
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import Autocomplete from '@mui/material/Autocomplete';
 import Checkbox from '@mui/material/Checkbox';
 import TextField from '@mui/material/TextField';
+
+// Cache để lưu trữ movie details đã fetch
+const movieDetailCache = new Map<string, MovieDetail>();
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
@@ -77,7 +81,7 @@ const MovieModal: React.FC<MovieModalProps> = ({
     trailer: "",
     time: 90,
     limitageId: "",
-    status: "2",
+    status: "", // Will be calculated automatically
   });
 
   const [imageError, setImageError] = useState(false);
@@ -87,40 +91,15 @@ const MovieModal: React.FC<MovieModalProps> = ({
   // Actor selection states
   const [selectedActors, setSelectedActors] = useState<Actor[]>([]);
   const [allActors, setAllActors] = useState<Actor[]>([]);
+  const [countries, setCountries] = useState<DropdownOption[]>([]);
   const [isActorModalOpen, setIsActorModalOpen] = useState(false);
   const [loadingActors, setLoadingActors] = useState(false);
 
-  // Mock data for dropdowns - you should replace with API calls
-  const countries: DropdownOption[] = [
-    { id: "e05acda1-df71-4578-a40b-6766a1ba8e23", name: "Việt Nam" },
-    { id: "550e8400-e29b-41d4-a716-446655440001", name: "Hoa Kỳ" },
-    { id: "550e8400-e29b-41d4-a716-446655440002", name: "Nhật Bản" },
-  ];
-
-  const formats: DropdownOption[] = [
-    { id: "7835de0f-c073-43d4-a086-e1d9ae8dbed4", name: "2D" },
-    { id: "f2345678-2345-2345-2345-234567890123", name: "3D" },
-    { id: "f3456789-3456-3456-3456-345678901234", name: "IMAX" },
-  ];
-
-  const limitages: DropdownOption[] = [
+  const limitages: DropdownOption[] = useMemo(() => [
     { id: "16e1ac95-3413-4069-8852-3df676ee17e6", name: "T13 - Phim dành cho khán giả từ đủ 13 tuổi trở lên" },
     { id: "8a4524a5-36aa-4354-af88-c56a191592ac", name: "T16 - Phim dành cho khán giả từ đủ 16 tuổi trở lên" },
     { id: "36e1ac95-3413-4069-8852-3df676ee17e8", name: "T18 - Phim dành cho khán giả từ đủ 18 tuổi trở lên" },
-  ];
-
-  const languages: DropdownOption[] = [
-    { id: "1db4ab93-0c22-44d5-96f1-f78f8e3a0ecb", name: "Tiếng Việt" },
-    { id: "2db4ab93-0c22-44d5-96f1-f78f8e3a0ecc", name: "Tiếng Anh" },
-    { id: "3db4ab93-0c22-44d5-96f1-f78f8e3a0ecd", name: "Tiếng Nhật" },
-  ];
-
-  const statuses: DropdownOption[] = [
-    { id: "1", name: "Đang chiếu" },
-    { id: "2", name: "Sắp chiếu" },
-    { id: "3", name: "Đã kết thúc" },
-    { id: "0", name: "Tạm ngưng" },
-  ];
+  ], []);
 
   // Load all actors for autocomplete
   const loadActors = async () => {
@@ -135,70 +114,126 @@ const MovieModal: React.FC<MovieModalProps> = ({
     }
   };
 
-  // Fetch movie detail when movieId is provided
-  useEffect(() => {
-    const fetchMovieDetail = async () => {
-      if (movie && (mode === "edit" || mode === "view")) {
-        setLoading(true);
-        try {
-          const movieDetail: MovieDetail = await movieApiService.getMovieDetail(movie);
-          // Convert MovieDetail to Movie interface
-          setForm({
-            id: movieDetail.id,
-            nameVn: movieDetail.nameVn,
-            nameEn: movieDetail.nameEn,
-            director: movieDetail.director,
-            releaseDate: movieDetail.releaseDate,
-            endDate: movieDetail.endDate,
-            briefVn: movieDetail.briefVn,
-            briefEn: movieDetail.briefEn,
-            image: movieDetail.image,
-            trailer: movieDetail.trailer,
-            time: movieDetail.time,
-            ratings: movieDetail.ratings,
-            status: movieDetail.status,
-            // Use mapped fields from API (you'll need to map these IDs later)
-            countryId: movieDetail.countryVn, // Temporary - should map to ID
-            limitageId: movieDetail.limitageNameVn, // Temporary - should map to ID  
-          });
-          
-          // Load actors for this movie if available
-          // TODO: Load movie actors from API when endpoint is available
-          setSelectedActors(movieDetail.listActor || []);
-          console.log('Fetched movie detail:', movieDetail);
-        } catch (error) {
-          console.error('Error fetching movie detail:', error);
-        }
-        setLoading(false);
-      } else if (mode === "add") {
-        // Reset form for add mode
-        setForm({
-          nameVn: "",
-          nameEn: "",
-          director: "",
-          countryId: "",
-          releaseDate: "",
-          endDate: "",
-          briefVn: "",
-          briefEn: "",
-          image: "",
-          trailer: "",
-          time: 90,
-          limitageId: "",
-          status: "2",
-        });
-        setSelectedActors([]);
-      }
-    };
-
-    if (open) {
-      fetchMovieDetail();
-      loadActors(); // Load actors for autocomplete
+  const fetchCountries = async () => {
+    try {
+      const countryList = await countryApiService.getAllCountries();
+      // Convert Country[] to DropdownOption[] format
+      const countryOptions = countryList.map(country => ({
+        id: country.id,
+        name: country.nameVn // Use Vietnamese name for display
+      }));
+      setCountries(countryOptions);
+    } catch (error) {
+      console.error('Error loading countries:', error);
     }
-    
+  };
+
+  // Effect 1: load base data when modal opens (actors, countries) and reset add-mode form
+  useEffect(() => {
+    if (!open) return;
+
+    loadActors(); // Load actors for autocomplete
+    fetchCountries(); // Load countries for dropdown
+
+    // If opening in add mode, reset the form immediately
+    if (mode === "add") {
+      setForm({
+        nameVn: "",
+        nameEn: "",
+        director: "",
+        countryId: "",
+        releaseDate: "",
+        endDate: "",
+        briefVn: "",
+        briefEn: "",
+        image: "",
+        trailer: "",
+        time: 90,
+        limitageId: "",
+        status: "",
+      });
+      setSelectedActors([]);
+    }
+
     setImageError(false);
     setErrors({});
-  }, [movie, mode, open]);
+  }, [open, mode]);
+
+  // Effect 2: fetch movie detail when modal open AND movie id + countries are ready
+  useEffect(() => {
+    if (!open) return;
+
+    const fetchMovieDetail = async () => {
+      if (!movie || !(mode === "edit" || mode === "view") || countries.length === 0) return;
+
+      // Kiểm tra cache trước
+      if (movieDetailCache.has(movie)) {
+        const cachedDetail = movieDetailCache.get(movie)!;
+
+        const countryId = countries.find(c => c.name === cachedDetail.countryVn)?.id || '';
+        const limitageId = limitages.find(l => l.name.includes(cachedDetail.limitageNameVn))?.id || '';
+
+        setForm({
+          id: cachedDetail.id,
+          nameVn: cachedDetail.nameVn,
+          nameEn: cachedDetail.nameEn,
+          director: cachedDetail.director,
+          releaseDate: cachedDetail.releaseDate,
+          endDate: cachedDetail.endDate,
+          briefVn: cachedDetail.briefVn,
+          briefEn: cachedDetail.briefEn,
+          image: cachedDetail.image,
+          trailer: cachedDetail.trailer,
+          time: cachedDetail.time,
+          ratings: cachedDetail.ratings,
+          status: cachedDetail.status,
+          countryId: countryId,
+          limitageId: limitageId,
+        });
+
+        setSelectedActors(cachedDetail.listActor || []);
+        console.log('Loaded from cache:', cachedDetail);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const movieDetail: MovieDetail = await movieApiService.getMovieDetail(movie);
+
+        // Lưu vào cache
+        movieDetailCache.set(movie, movieDetail);
+
+        const countryId = countries.find(c => c.name === movieDetail.countryVn)?.id || '';
+        const limitageId = limitages.find(l => l.name.includes(movieDetail.limitageNameVn))?.id || '';
+
+        setForm({
+          id: movieDetail.id,
+          nameVn: movieDetail.nameVn,
+          nameEn: movieDetail.nameEn,
+          director: movieDetail.director,
+          releaseDate: movieDetail.releaseDate,
+          endDate: movieDetail.endDate,
+          briefVn: movieDetail.briefVn,
+          briefEn: movieDetail.briefEn,
+          image: movieDetail.image,
+          trailer: movieDetail.trailer,
+          time: movieDetail.time,
+          ratings: movieDetail.ratings,
+          status: movieDetail.status,
+          countryId: countryId,
+          limitageId: limitageId,
+        });
+
+        setSelectedActors(movieDetail.listActor || []);
+        console.log('Fetched movie detail:', movieDetail);
+      } catch (error) {
+        console.error('Error fetching movie detail:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMovieDetail();
+  }, [open, movie, mode, countries, limitages]);
 
   // Remove actor from selection
   const removeActor = (actorId: string) => {
@@ -387,6 +422,52 @@ const MovieModal: React.FC<MovieModalProps> = ({
     return option ? option.name : id;
   };
 
+  // Helper function to convert YouTube URL to embed URL
+  const getEmbedUrl = (url: string) => {
+    if (!url) return '';
+    
+    // Check if it's a YouTube URL
+    const youtubeRegex = /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/;
+    const match = url.match(youtubeRegex);
+    
+    if (match && match[1]) {
+      // Convert to YouTube embed URL
+      return `https://www.youtube.com/embed/${match[1]}`;
+    }
+    
+    // If it's not YouTube, return the original URL (for local server videos)
+    return url;
+  };
+
+  // Helper function to check if URL is from local server
+  const isLocalServerUrl = (url: string) => {
+    return url && url.includes('127.0.0.1:9000/resources');
+  };
+
+  // Helper function to calculate movie status based on dates
+  const getMovieStatus = (releaseDate: string, endDate: string): { key: string; label: string; color: string } => {
+    if (!releaseDate || !endDate) {
+      return { key: "unknown", label: "Không xác định", color: "bg-gray-100 text-gray-800" };
+    }
+
+    const now = new Date();
+    const release = new Date(releaseDate);
+    const end = new Date(endDate);
+
+    // Set time to start of day for accurate comparison
+    now.setHours(0, 0, 0, 0);
+    release.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+
+    if (now < release) {
+      return { key: "upcoming", label: "Sắp chiếu", color: "bg-blue-100 text-blue-800" };
+    } else if (now >= release && now <= end) {
+      return { key: "showing", label: "Đang chiếu", color: "bg-green-100 text-green-800" };
+    } else {
+      return { key: "ended", label: "Đã kết thúc", color: "bg-red-100 text-red-800" };
+    }
+  };
+
   const formatDateForInput = (dateString: string) => {
   if (!dateString) return '';
   const date = new Date(dateString);
@@ -571,7 +652,7 @@ const MovieModal: React.FC<MovieModalProps> = ({
                   {isView ? (
                     <input
                       type="text"
-                      value={getOptionName(countries, form.countryId || '')}
+                      value={countries.find(c => c.id === form.countryId)?.name || 'Không xác định'}
                       readOnly
                       className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200 text-slate-600"
                     />
@@ -699,22 +780,14 @@ const MovieModal: React.FC<MovieModalProps> = ({
                     <CheckCircle className="w-4 h-4" />
                     Trạng thái
                   </label>
-                  {isView ? (
-                    <input
-                      type="text"
-                      value={getOptionName(statuses, form.status?.toString() || "")}
-                      readOnly
-                      className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200 text-slate-600"
-                    />
-                  ) : (
-                    <Dropdown
-                      options={statuses}
-                      value={form.status?.toString() || ""}
-                      onChange={(value) => setForm({ ...form, status: value })}
-                      placeholder="Chọn trạng thái phim"
-                      error={!!errors.status}
-                    />
-                  )}
+                    {(() => {
+                      const status = getMovieStatus(form.releaseDate, form.endDate);
+                      return (
+                        <div className={`flex justify-center items-center h-12 px-3 py-1 text-md font-semibold rounded-full ${status.color}`}>
+                          {status.label}
+                        </div>
+                      );
+                    })()}
                 </div>
               </div>
 
@@ -747,9 +820,37 @@ const MovieModal: React.FC<MovieModalProps> = ({
                 )}
                 
                 {isView && (
-                  <div className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200 text-slate-600">
-                    {form.trailer instanceof File ? 'File đã upload' : form.trailer || 'Chưa có file'}
-                  </div>
+                  form.trailer && typeof form.trailer === "string" ? (
+                    <div className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200">
+                      {isLocalServerUrl(form.trailer) ? (
+                        // Local server video
+                        <video
+                          src={form.trailer}
+                          controls
+                          width="100%"
+                          height="280"
+                          className="rounded-lg"
+                        >
+                          Trình duyệt của bạn không hỗ trợ video.
+                        </video>
+                      ) : (
+                        // YouTube or other embed videos
+                        <iframe
+                          src={getEmbedUrl(form.trailer)}
+                          title="Trailer"
+                          width="100%"
+                          height="280"
+                          allow="autoplay; encrypted-media"
+                          allowFullScreen
+                          className="rounded-lg border-0"
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <div className="w-full border rounded-lg px-4 py-3 bg-slate-50 border-slate-200 text-slate-600">
+                      {form.trailer instanceof File ? 'File đã upload' : 'Chưa có file trailer'}
+                    </div>
+                  )
                 )}
                 
                 {/* Display current trailer info */}
@@ -850,6 +951,7 @@ const MovieModal: React.FC<MovieModalProps> = ({
                                 <span className="text-sm font-medium">{option.name}</span>
                                 <button
                                   type="button"
+                                  tabIndex={-1}
                                   onClick={() => removeActor(option.id || '')}
                                   className="ml-1 text-blue-600 hover:text-blue-800 transition-colors"
                                 >
@@ -863,8 +965,9 @@ const MovieModal: React.FC<MovieModalProps> = ({
                       </div>
                       <button
                         type="button"
+                        tabIndex={-1}
                         onClick={() => setIsActorModalOpen(true)}
-                        className="px-4 h-12 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 flex items-center gap-2"
+                        className="px-4 h-14 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 flex items-center gap-2"
                         title="Thêm diễn viên mới"
                       >
                         <UserPlus className="w-4 h-4" />

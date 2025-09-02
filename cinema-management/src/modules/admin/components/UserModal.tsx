@@ -6,6 +6,7 @@ import {
     DollarSign,
     Edit3,
     Eye,
+    EyeOffIcon,
     Key,
     Mail,
     Phone,
@@ -65,6 +66,8 @@ const UserModal: React.FC<UserModalProps> = ({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<"info" | "permissions" | "activity">("info");
+  const [visibleEmails, setVisibleEmails] = useState<Set<string>>(new Set());
+  const [visiblePhones, setVisiblePhones] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (user) {
@@ -217,6 +220,28 @@ const UserModal: React.FC<UserModalProps> = ({
 
   const showPermissions = form.role === 'ADMIN' || form.role === 'STAFF';
 
+  const toggleEmailVisibility = (userId: string) => {
+    setVisibleEmails(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
+      }
+      return newSet;
+    });
+  };
+  const togglePhoneVisibility = (userId: string) => {
+    setVisiblePhones(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId); // Hide phone (remove from visible set)
+      } else {
+        newSet.add(userId); // Show phone (add to visible set)
+      }
+      return newSet;
+    });
+  };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
@@ -378,8 +403,20 @@ const UserModal: React.FC<UserModalProps> = ({
                       Email *
                     </label>
                     {isView ? (
-                      <div className="w-full border rounded-lg px-4 py-3 bg-white border-slate-200 text-slate-600">
-                        {form.email}
+                      <div className="w-full border rounded-lg px-4 py-3 bg-white border-slate-200 text-slate-600 relative">
+                          {visibleEmails && visibleEmails.has(form.id) ? form.email : "••••••••••••••••••••••••"}
+                        <button
+                        onClick={() => toggleEmailVisibility(form.id)}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors duration-200 absolute right-2 top-3"
+                        title={visibleEmails && visibleEmails.has(form.id) ? "Ẩn email" : "Hiện email"}
+                        type="button"
+                      >
+                        {visibleEmails && visibleEmails.has(form.id) ? (
+                          <Eye className="w-4 h-4 text-gray-400" />
+                        ) : (
+                          <EyeOffIcon className="w-4 h-4 text-gray-400" />
+                        )}
+                      </button>
                       </div>
                     ) : (
                       <input
@@ -406,8 +443,20 @@ const UserModal: React.FC<UserModalProps> = ({
                       Số điện thoại
                     </label>
                     {isView ? (
-                      <div className="w-full border rounded-lg px-4 py-3 bg-white border-slate-200 text-slate-600">
-                        {form.phone || "Chưa cập nhật"}
+                      <div className="w-full border rounded-lg px-4 py-3 bg-white border-slate-200 text-slate-600 relative">
+                        {visiblePhones && visiblePhones.has(form.id) ? form.phone : "••••••••••••"}
+                        <button
+                          onClick={() => togglePhoneVisibility(form.id)}
+                          className="p-1 hover:bg-gray-100 rounded transition-colors duration-200 absolute right-2 top-3"
+                          title={visiblePhones && visiblePhones.has(form.id) ? "Ẩn email" : "Hiện email"}
+                          type="button"
+                        >
+                          {visiblePhones && visiblePhones.has(form.id) ? (
+                            <Eye className="w-4 h-4 text-gray-400" />
+                          ) : (
+                            <EyeOffIcon className="w-4 h-4 text-gray-400" />
+                          )}
+                        </button>
                       </div>
                     ) : (
                       <input

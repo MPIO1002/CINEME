@@ -1,42 +1,14 @@
-import { Calendar, Clock, Edit, Eye, Film, Filter, List, MapPin, ClockPlus, Search, Trash2, CalendarClock } from 'lucide-react';
+import { Calendar, CalendarClock, Clock, ClockPlus, Edit, Eye, Film, Filter, List, MapPin, Search, Trash2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
+import { movieApiService, type Movie } from '../../../services/movieApi';
+import { type Room } from '../../../services/roomApi';
+import { createShowtime, deleteShowtime, getAllShowtimes, updateShowtime, validateShowtimeEdit, type Showtime } from '../../../services/showtimeApi';
+import { theaterApi, type Theater } from '../../../services/theaterApi';
 import { Pagination } from "../components/pagination";
 import ShowtimeCalendar from "../components/ShowtimeCalendar";
 import ShowtimeModal from "../components/ShowtimeModal";
 import type { Column } from "../components/tableProps";
 import { Table } from "../components/tableProps";
-import { theaterApi, type Theater } from '../../../services/theaterApi';
-// import { movieApi, type Movie } from '../../../services/movieApi';
-interface Showtime {
-id?: string;
-movieId: string;
-movieName?: string;
-movieImage?: string;
-roomId: string;
-roomName?: string;
-showDate: string;
-startTime: string;
-endTime: string;
-ticketPrice: number;
-status: 'ACTIVE' | 'SOLD_OUT' | 'CANCELLED';
-bookedSeats?: number;
-totalSeats?: number;
-}
-
-interface Movie {
-id: string;
-nameVn: string;
-nameEn: string;
-image: string;
-time: number;
-}
-
-interface Room {
-id: string;
-name: string;
-totalSeats: number;
-type: '2D' | '3D' | 'IMAX';
-}
 
 const ShowtimeManagement: React.FC = () => {
 const [searchTerm, setSearchTerm] = useState('');
@@ -54,136 +26,78 @@ const [selectedShowtime, setSelectedShowtime] = useState<Showtime | undefined>(u
 const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
 
 // Filters
-const [selectedMovie, setSelectedMovie] = useState('');
 const [selectedTheater, setSelectedTheater] = useState('');
 const [selectedRoom, setSelectedRoom] = useState('');
+const [selectedFormat, setSelectedFormat] = useState('');
+const [selectedLanguage, setSelectedLanguage] = useState('');
+const [selectedStatus, setSelectedStatus] = useState('');
 
 const [dateFrom, setDateFrom] = useState('');
 const [dateTo, setDateTo] = useState('');
 
-const itemsPerPage = 10;
+const itemsPerPage = 5;
 
 // Mock data - replace with API calls
 useEffect(() => {
     fetchShowtimes();
     fetchMovies();
-    fetchRooms();
     fetchTheaters();
 }, []);
+
+// Load rooms when theater is selected
+useEffect(() => {
+    if (selectedTheater) {
+        fetchRooms(selectedTheater);
+        // Reset room selection when theater changes
+        setSelectedRoom('');
+    } else {
+        // Clear rooms when no theater is selected
+        setRooms([]);
+        setSelectedRoom('');
+    }
+}, [selectedTheater]);
 
 const fetchShowtimes = async () => {
     setLoading(true);
     try {
-    // Mock data - replace with actual API call
-    const mockShowtimes: Showtime[] = [
-        {
-        id: '1',
-        movieId: 'movie1',
-        movieName: 'Avatar: The Way of Water',
-        movieImage: 'https://via.placeholder.com/100x150',
-        roomId: 'room1',
-        roomName: 'Phòng 1',
-        showDate: '2025-08-08',
-        startTime: '14:00',
-        endTime: '17:30',
-        ticketPrice: 120000,
-        status: 'ACTIVE',
-        bookedSeats: 45,
-        totalSeats: 120
-        },
-        {
-        id: '2',
-        movieId: 'movie2',
-        movieName: 'Fast & Furious X',
-        movieImage: 'https://via.placeholder.com/100x150',
-        roomId: 'room2',
-        roomName: 'Phòng 2',
-        showDate: '2025-08-08',
-        startTime: '16:30',
-        endTime: '19:00',
-        ticketPrice: 150000,
-        status: 'ACTIVE',
-        bookedSeats: 80,
-        totalSeats: 100
-        },
-        {
-        id: '3',
-        movieId: 'movie1',
-        movieName: 'Avatar: The Way of Water',
-        movieImage: 'https://via.placeholder.com/100x150',
-        roomId: 'room1',
-        roomName: 'Phòng 1',
-        showDate: '2025-08-08',
-        startTime: '19:00',
-        endTime: '22:30',
-        ticketPrice: 120000,
-        status: 'SOLD_OUT',
-        bookedSeats: 120,
-        totalSeats: 120
-        },
-        {
-        id: '4',
-        movieId: 'movie2',
-        movieName: 'Fast & Furious X',
-        movieImage: 'https://via.placeholder.com/100x150',
-        roomId: 'room3',
-        roomName: 'Phòng 3',
-        showDate: '2025-08-09',
-        startTime: '15:00',
-        endTime: '17:30',
-        ticketPrice: 180000,
-        status: 'ACTIVE',
-        bookedSeats: 25,
-        totalSeats: 80
-        },
-        {
-        id: '5',
-        movieId: 'movie1',
-        movieName: 'Avatar: The Way of Water',
-        movieImage: 'https://via.placeholder.com/100x150',
-        roomId: 'room2',
-        roomName: 'Phòng 2',
-        showDate: '2025-08-09',
-        startTime: '20:00',
-        endTime: '23:30',
-        ticketPrice: 150000,
-        status: 'CANCELLED',
-        bookedSeats: 0,
-        totalSeats: 100
+        const response = await getAllShowtimes();
+        if (response.statusCode === 200) {
+            setShowtimes(response.data);
+            console.table(response.data);
         }
-    ];
-    setShowtimes(mockShowtimes);
     } catch (error) {
-    console.error('Error fetching showtimes:', error);
-    setShowtimes([]);
+        console.error('Error fetching showtimes:', error);
+        setShowtimes([]);
     }
     setLoading(false);
 };
 
 const fetchMovies = async () => {
     try {
-    // Mock data - replace with actual API call
-    const mockMovies: Movie[] = [
-        { id: 'movie1', nameVn: 'Avatar: The Way of Water', nameEn: 'Avatar: The Way of Water', image: 'https://via.placeholder.com/100x150', time: 192 },
-        { id: 'movie2', nameVn: 'Fast & Furious X', nameEn: 'Fast & Furious X', image: 'https://via.placeholder.com/100x150', time: 141 }
-    ];
-    setMovies(mockMovies);
+        const apiMovies = await movieApiService.getAllMovies();
+        setMovies(apiMovies);
     } catch (error) {
-    console.error('Error fetching movies:', error);
+        console.error('Error fetching movies:', error);
+        setMovies([]);
     }
 };
 
-const fetchRooms = async () => {
+const fetchRooms = async (theaterId: string) => {
     try {
-    // Mock data - replace with actual API call
-    const mockRooms: Room[] = [
-        { id: 'room1', name: 'Phòng 1', totalSeats: 120, type: '2D' },
-        { id: 'room2', name: 'Phòng 2', totalSeats: 100, type: '3D' },
-        { id: 'room3', name: 'Phòng 3', totalSeats: 80, type: 'IMAX' }
-    ];
-    setRooms(mockRooms);
+        const response = await theaterApi.getTheaterRooms(theaterId);
+        if (response.statusCode === 200) {
+            // Transform API data to match UI interface
+            const transformedRooms: Room[] = response.data.map((apiRoom: { id: string; name: string; type: string; totalSeats?: number }) => ({
+                id: apiRoom.id || '',
+                name: apiRoom.name,
+                totalSeats: apiRoom.totalSeats || 0,
+                type: (apiRoom.type === 'Standard' ? '2D' : apiRoom.type) as '2D' | '3D' | 'IMAX'
+            }));
+            setRooms(transformedRooms);
+        }
     } catch (error) {
-    console.error('Error fetching rooms:', error);
+        console.error('Error fetching rooms:', error);
+        setRooms([]);
     }
 };
 
@@ -198,70 +112,136 @@ const fetchTheaters = async () => {
     }
 };
 
-const handleSaveShowtime = (showtime: Showtime) => {
+const handleSaveShowtime = async (showtime: Showtime) => {
     setLoading(true);
     
-    console.log('Saving showtime:', showtime);
-    
-    if (modalMode === "add") {
-    // Add new showtime with generated ID
-    const newShowtime: Showtime = {
-        ...showtime,
-        id: Date.now().toString(),
-        bookedSeats: 0,
-    };
-    setShowtimes(prev => [...prev, newShowtime]);
-    alert('Thêm suất chiếu thành công!');
-    } else if (modalMode === "edit" && showtime.id) {
-    // Update existing showtime
-    setShowtimes(prev => prev.map(s => 
-        s.id === showtime.id ? { ...s, ...showtime } : s
-    ));
-    alert('Cập nhật suất chiếu thành công!');
+    try {
+        if (modalMode === "add") {
+            // Create new showtime
+            const showtimeData = {
+                movieId: showtime.movieId || '',
+                theaterId: showtime.theaterId || selectedTheater || theaters[0]?.id || '',
+                roomId: showtime.roomId,
+                date: showtime.date,
+                startTime: showtime.startTime, // keep as string - API will convert
+                endTime: showtime.endTime, // keep as string - API will convert
+                languageVn: showtime.languageVn || 'Lồng Tiếng',
+                languageEn: showtime.languageEn || 'VN',
+                formatVn: showtime.formatVn || '2D',
+                formatEn: showtime.formatEn || '2D'
+            };
+
+            // Validate required fields before sending
+            if (!showtimeData.movieId || !showtimeData.theaterId || !showtimeData.roomId || 
+                !showtimeData.date || !showtimeData.startTime || !showtimeData.endTime ||
+                !showtimeData.languageVn || !showtimeData.formatVn) {
+                alert('Vui lòng điền đầy đủ thông tin bắt buộc!');
+                setLoading(false);
+                return;
+            }
+            console.table(showtimeData);
+            const response = await createShowtime(showtimeData);
+            if (response.statusCode === 200 || response.statusCode === 201) {
+                alert('Thêm suất chiếu thành công!');
+                await fetchShowtimes(); // Refresh the list
+            }
+        } else if (modalMode === "edit" && showtime.id) {
+            // Validate edit permissions first
+            try {
+                const validationResponse = await validateShowtimeEdit(showtime.id);
+                if (!validationResponse.data.canEdit) {
+                    const reasons = validationResponse.data.reasons.join('\n');
+                    alert(`Không thể chỉnh sửa suất chiếu này:\n${reasons}`);
+                    setLoading(false);
+                    return;
+                }
+
+                // Show warnings if any
+                if (validationResponse.data.warnings.length > 0) {
+                    const warnings = validationResponse.data.warnings.join('\n');
+                    const confirmed = window.confirm(`Cảnh báo:\n${warnings}\n\nBạn có muốn tiếp tục?`);
+                    if (!confirmed) {
+                        setLoading(false);
+                        return;
+                    }
+                }
+            } catch (validationError) {
+                console.error('Error validating edit permissions:', validationError);
+                // Continue with edit if validation endpoint is not available
+            }
+
+            // Update existing showtime
+            const updateData = {
+                movieId: showtime.movieId,
+                theaterId: showtime.theaterId,
+                roomId: showtime.roomId,
+                date: showtime.date,
+                startTime: showtime.startTime?.substring(0, 5), // Convert to HH:mm format
+                endTime: showtime.endTime?.substring(0, 5), // Convert to HH:mm format
+                languageVn: showtime.languageVn,
+                languageEn: showtime.languageEn,
+                formatVn: showtime.formatVn,
+                formatEn: showtime.formatEn
+            };
+
+            console.log('Updating showtime:', updateData);
+            const response = await updateShowtime(showtime.id, updateData);
+            if (response.statusCode === 200) {
+                alert('Cập nhật suất chiếu thành công!');
+                await fetchShowtimes(); // Refresh the list
+            }
+        }
+        
+        setModalOpen(false);
+    } catch (error) {
+        console.error('Error saving showtime:', error);
+        
+        // Check if error has specific message from backend
+        if (error && typeof error === 'object' && 'response' in error) {
+            const axiosError = error as { response?: { data?: { message?: string } } };
+            const errorMessage = axiosError.response?.data?.message || 'Có lỗi xảy ra khi lưu suất chiếu!';
+            alert(errorMessage);
+        } else {
+            alert('Có lỗi xảy ra khi lưu suất chiếu!');
+        }
     }
     
-    setModalOpen(false);
     setLoading(false);
 };
 
 const handleDeleteShowtime = async (showtimeId: string) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa suất chiếu này?')) {
-    setLoading(true);
-    try {
-        console.log('Deleting showtime:', showtimeId);
-        alert('Xóa suất chiếu thành công!');
-        await fetchShowtimes();
-    } catch (error) {
-        console.error('Error deleting showtime:', error);
-        alert('Có lỗi xảy ra khi xóa suất chiếu!');
-    }
-    setLoading(false);
+        setLoading(true);
+        try {
+            const response = await deleteShowtime(showtimeId);
+            if (response.statusCode === 200) {
+                alert('Xóa suất chiếu thành công!');
+                await fetchShowtimes(); // Refresh the list
+            }
+        } catch (error) {
+            console.error('Error deleting showtime:', error);
+            alert('Có lỗi xảy ra khi xóa suất chiếu!');
+        }
+        setLoading(false);
     }
 };
 
 const getStatusLabel = (status: string) => {
     switch (status) {
-    case 'ACTIVE': return 'Mở bán';
-    case 'SOLD_OUT': return 'Hết vé';
-    case 'CANCELLED': return 'Đã hủy';
+    case 'UPCOMING': return 'Sắp chiếu';
+    case 'ONGOING': return 'Đang chiếu';
+    case 'FINISHED': return 'Đã kết thúc';
     default: return 'Không xác định';
     }
 };
 
 const getStatusColor = (status: string) => {
     switch (status) {
-    case 'ACTIVE': return 'bg-green-100 text-green-800';
-    case 'SOLD_OUT': return 'bg-red-100 text-red-800';
-    case 'CANCELLED': return 'bg-gray-100 text-gray-800';
+    case 'UPCOMING': return 'bg-blue-100 text-blue-800';
+    case 'ONGOING': return 'bg-yellow-100 text-yellow-800';
+    case 'FINISHED': return 'bg-gray-100 text-gray-600';
     default: return 'bg-gray-100 text-gray-800';
     }
-};
-
-const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND'
-    }).format(price);
 };
 
 const formatDate = (dateString: string) => {
@@ -294,17 +274,48 @@ const handleDateClick = (date: string) => {
     setViewMode('list');
 };
 
+// Get showtime status based on date and time
+const getShowtimeStatus = (date: string, startTime: string, endTime: string): 'UPCOMING' | 'ONGOING' | 'FINISHED' => {
+    const now = new Date();
+    const showtimeDate = new Date(date);
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const [endHour, endMin] = endTime.split(':').map(Number);
+    
+    const startDateTime = new Date(showtimeDate);
+    startDateTime.setHours(startHour, startMin, 0, 0);
+    
+    const endDateTime = new Date(showtimeDate);
+    endDateTime.setHours(endHour, endMin, 0, 0);
+    
+    if (now < startDateTime) {
+        return 'UPCOMING';
+    } else if (now >= startDateTime && now <= endDateTime) {
+        return 'ONGOING';
+    } else {
+        return 'FINISHED';
+    }
+};
+
 // Apply filters
 const filteredShowtimes = showtimes.filter(showtime => {
-    const matchesSearch = (showtime.movieName?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+    const matchesSearch = (showtime.movieNameVn?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
                         (showtime.roomName?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
-    const matchesMovie = !selectedMovie || showtime.movieId === selectedMovie;
     const matchesRoom = !selectedRoom || showtime.roomId === selectedRoom;
-    const matchesTheater = !selectedTheater || showtime.id === selectedTheater;
-    const matchesDateFrom = !dateFrom || showtime.showDate >= dateFrom;
-    const matchesDateTo = !dateTo || showtime.showDate <= dateTo;
+    const matchesTheater = !selectedTheater || showtime.theaterId === selectedTheater;
+    const matchesFormat = !selectedFormat || showtime.formatVn === selectedFormat;
+    const matchesLanguage = !selectedLanguage || showtime.languageVn === selectedLanguage;
+    const matchesStatus = !selectedStatus || (() => {
+        if (['UPCOMING', 'ONGOING', 'FINISHED'].includes(selectedStatus)) {
+            // Filter by time-based status
+            const calculatedStatus = getShowtimeStatus(showtime.date, showtime.startTime, showtime.endTime);
+            return calculatedStatus === selectedStatus;
+        }
+    })();
+    const matchesDateFrom = !dateFrom || showtime.date >= dateFrom;
+    const matchesDateTo = !dateTo || showtime.date <= dateTo;
 
-    return matchesSearch && matchesMovie && matchesRoom && matchesTheater && matchesDateFrom && matchesDateTo;
+    return matchesSearch && matchesRoom && matchesTheater && matchesFormat && 
+           matchesLanguage && matchesStatus && matchesDateFrom && matchesDateTo;
 });
 
 // Pagination
@@ -315,9 +326,11 @@ const paginatedShowtimes = filteredShowtimes.slice(startIndex, endIndex);
 // Clear all filters
 const clearFilters = () => {
     setSearchTerm('');
-    setSelectedMovie('');
     setSelectedRoom('');
     setSelectedTheater('');
+    setSelectedFormat('');
+    setSelectedLanguage('');
+    setSelectedStatus('');
     setDateFrom('');
     setDateTo('');
 };
@@ -329,10 +342,10 @@ const columns: Column<Showtime>[] = [
     title: 'Phim',
     render: (_, showtime) => (
         <div className="flex items-center">
-        <div className="w-12 h-16 bg-gray-200 rounded-lg mr-3 flex-shrink-0 overflow-hidden">
+        <div className="w-16 h-24 bg-gray-200 rounded-lg mr-3 flex-shrink-0 overflow-hidden">
             <img 
-            src={showtime.movieImage} 
-            alt={showtime.movieName}
+            src={showtime.img?.includes('http') ? showtime.img : `http://127.0.0.1:9000/${showtime.img}`}
+            alt={showtime.movieNameVn}
             className="w-full h-full object-cover"
             onError={(e) => {
                 const target = e.target as HTMLImageElement;
@@ -340,8 +353,8 @@ const columns: Column<Showtime>[] = [
             }}
             />
         </div>
-        <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">{showtime.movieName}</p>
+        <div className="">
+            <p className="text-sm font-medium text-gray-900 truncate">{showtime.movieNameVn}</p>
             <div className="flex items-center mt-1 text-xs text-gray-500">
             <Film className="w-3 h-3 mr-1" />
             <span>ID: {showtime.movieId}</span>
@@ -357,7 +370,7 @@ const columns: Column<Showtime>[] = [
         <div className="text-sm">
         <div className="flex items-center font-medium text-gray-900">
             <MapPin className="w-4 h-4 mr-1 text-gray-400" />
-            {showtime.roomName}
+            {showtime.roomName}{showtime.theaterName ? ` (Theater: ${showtime.theaterName})` : ' (Theater: Unknown)'}
         </div>
         <div className="text-xs text-gray-500 mt-1">
             {showtime.totalSeats} ghế
@@ -372,7 +385,7 @@ const columns: Column<Showtime>[] = [
         <div className="text-sm">
         <div className="flex items-center font-medium text-gray-900">
             <Calendar className="w-4 h-4 mr-1 text-gray-400" />
-            {formatDate(showtime.showDate)}
+            {formatDate(showtime.date)}
         </div>
         <div className="flex items-center text-gray-600 mt-1">
             <Clock className="w-3 h-3 mr-1" />
@@ -382,11 +395,20 @@ const columns: Column<Showtime>[] = [
     )
     },
     {
-    key: 'price',
-    title: 'Giá vé',
+    key: 'format',
+    title: 'Định dạng',
     render: (_, showtime) => (
         <div className="text-sm font-medium text-gray-900">
-        {formatPrice(showtime.ticketPrice)}
+        {showtime.formatVn || '2D'}
+        </div>
+    )
+    },
+    {
+    key: 'language',
+    title: 'Ngôn ngữ',
+    render: (_, showtime) => (
+        <div className="text-sm font-medium text-gray-900">
+        {showtime.languageVn}
         </div>
     )
     },
@@ -417,24 +439,27 @@ const columns: Column<Showtime>[] = [
     {
     key: 'status',
     title: 'Trạng thái',
-    render: (_, showtime) => (
-        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getStatusColor(showtime.status)}`}>
-        {getStatusLabel(showtime.status)}
+    render: (_, showtime) => {
+        const currentStatus = getShowtimeStatus(showtime.date, showtime.startTime, showtime.endTime);
+        return (
+        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getStatusColor(currentStatus)}`}>
+        {getStatusLabel(currentStatus)}
         </span>
-    )
+        );
+    }
     },
     {
     key: 'actions',
     title: 'Thao tác',
     render: (_, showtime) => (
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1">
         <button
             onClick={() => {
             setSelectedShowtime(showtime);
             setModalMode("view");
             setModalOpen(true);
             }}
-            className="text-blue-600 hover:text-blue-900 transition-colors"
+            className="text-blue-600 hover:text-blue-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-blue-100"
             title="Xem chi tiết"
         >
             <Eye size={16} />
@@ -445,14 +470,14 @@ const columns: Column<Showtime>[] = [
             setModalMode("edit");
             setModalOpen(true);
             }}
-            className="text-green-600 hover:text-green-900 transition-colors"
+            className="text-green-600 hover:text-green-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-green-100"
             title="Chỉnh sửa"
         >
             <Edit size={16} />
         </button>
         <button
             onClick={() => showtime.id && handleDeleteShowtime(showtime.id)}
-            className="text-red-600 hover:text-red-900 transition-colors"
+            className="text-red-600 hover:text-red-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-red-100"
             title="Xóa"
             disabled={!showtime.id}
         >
@@ -509,6 +534,10 @@ return (
             onClick={() => {
                 setModalMode("add");
                 setSelectedShowtime(undefined);
+                // Load all rooms for modal when adding new showtime
+                if (theaters.length > 0) {
+                    setRooms([]); // Reset rooms to allow user to select theater first
+                }
                 setModalOpen(true);
             }}
             >
@@ -544,7 +573,7 @@ return (
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 mt-4 pt-4 border-t-2 border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-4 mt-4 pt-4 border-t-2 border-gray-200">
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Rạp</label>
                 <select
@@ -567,9 +596,12 @@ return (
                 <select
                 value={selectedRoom}
                 onChange={(e) => setSelectedRoom(e.target.value)}
-                className="w-full h-11 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                disabled={!selectedTheater}
+                className="w-full h-11 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
-                <option value="">Tất cả phòng</option>
+                <option value="">
+                    {!selectedTheater ? "Chọn rạp trước" : "Tất cả phòng"}
+                </option>
                 {rooms.map(room => (
                     <option key={room.id} value={room.id}>
                     {room.name}
@@ -578,44 +610,74 @@ return (
                 </select>
             </div>
 
-            {/* Movie Filter */}
+            {/* Format Filter */}
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Phim</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Định dạng</label>
                 <select
-                value={selectedMovie}
-                onChange={(e) => setSelectedMovie(e.target.value)}
+                value={selectedFormat}
+                onChange={(e) => setSelectedFormat(e.target.value)}
                 className="w-full h-11 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                 >
-                <option value="">Tất cả phim</option>
-                {movies.map(movie => (
-                    <option key={movie.id} value={movie.id}>
-                    {movie.nameVn}
-                    </option>
-                ))}
+                <option value="">Tất cả định dạng</option>
+                <option value="2D">2D</option>
+                <option value="3D">3D</option>
+                <option value="IMAX">IMAX</option>
+                <option value="4DX">4DX</option>
                 </select>
             </div>
 
-            {/* Date From */}
+            {/* Language Filter */}
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Từ ngày</label>
-                <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
+                <label className="block text-sm font-medium text-gray-700 mb-2">Ngôn ngữ</label>
+                <select
+                value={selectedLanguage}
+                onChange={(e) => setSelectedLanguage(e.target.value)}
                 className="w-full h-11 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                />
+                >
+                <option value="">Tất cả ngôn ngữ</option>
+                <option value="Lồng Tiếng">Lồng Tiếng</option>
+                <option value="Phụ Đề">Phụ Đề</option>
+                <option value="Tiếng Anh">Tiếng Anh</option>
+                </select>
             </div>
 
-            {/* Date To */}
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Đến ngày</label>
-                <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="w-full h-11 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                />
             </div>
+            <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-3 gap-4 mt-4 pt-4 border-t-2 border-gray-200'>
+                {/* Date From */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Từ ngày</label>
+                    <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="w-full h-11 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    />
+                </div>
+
+                {/* Date To */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Đến ngày</label>
+                    <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="w-full h-11 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    />
+                </div>
+                {/* Status Filter */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Trạng thái</label>
+                    <select
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                    className="w-full h-11 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    >
+                        <option value="">Tất cả trạng thái</option>
+                        <option value="UPCOMING">Sắp chiếu</option>
+                        <option value="ONGOING">Đang chiếu</option>
+                        <option value="FINISHED">Đã kết thúc</option>
+                    </select>
+                </div>
             </div>
         </div>
         )}
@@ -655,8 +717,16 @@ return (
         showtime={selectedShowtime}
         movies={movies}
         rooms={rooms}
+        theaters={theaters}
         onClose={() => setModalOpen(false)}
         onSubmit={handleSaveShowtime}
+        onTheaterChange={(theaterId) => {
+            if (theaterId) {
+                fetchRooms(theaterId);
+            } else {
+                setRooms([]);
+            }
+        }}
         />
     </div>
 );

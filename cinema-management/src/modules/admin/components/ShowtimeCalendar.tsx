@@ -1,21 +1,6 @@
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Film } from 'lucide-react';
 import React, { useState } from 'react';
-
-interface Showtime {
-  id?: string;
-  movieId: string;
-  movieName?: string;
-  movieImage?: string;
-  roomId: string;
-  roomName?: string;
-  showDate: string;
-  startTime: string;
-  endTime: string;
-  ticketPrice: number;
-  status: 'ACTIVE' | 'SOLD_OUT' | 'CANCELLED';
-  bookedSeats?: number;
-  totalSeats?: number;
-}
+import { type Showtime } from '../../../services/showtimeApi';
 
 interface ShowtimeCalendarProps {
   showtimes: Showtime[];
@@ -29,6 +14,39 @@ const ShowtimeCalendar: React.FC<ShowtimeCalendarProps> = ({
   onDateClick,
 }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  // Get showtime status color
+  const getShowtimeStatusColor = (showtime: Showtime, isPastDay: boolean) => {
+    if (isPastDay) {
+      return 'bg-gray-200 text-gray-500';
+    }
+    
+    // Calculate status based on current time
+    const now = new Date();
+    const showtimeDate = new Date(showtime.date);
+    const [startHour, startMin] = showtime.startTime.split(':').map(Number);
+    const startDateTime = new Date(showtimeDate);
+    startDateTime.setHours(startHour, startMin, 0, 0);
+    
+    const [endHour, endMin] = showtime.endTime.split(':').map(Number);
+    const endDateTime = new Date(showtimeDate);
+    endDateTime.setHours(endHour, endMin, 0, 0);
+    
+    // Check occupancy rate
+    const occupancyRate = showtime.totalSeats ? (showtime.bookedSeats || 0) / showtime.totalSeats : 0;
+    
+    if (now > endDateTime) {
+      return 'bg-gray-400 text-white'; // Finished
+    } else if (now >= startDateTime && now <= endDateTime) {
+      return 'bg-yellow-500 text-white'; // Ongoing
+    } else if (occupancyRate >= 0.9) {
+      return 'bg-red-500 text-white'; // Nearly sold out
+    } else if (occupancyRate >= 0.7) {
+      return 'bg-orange-500 text-white'; // High demand
+    } else {
+      return 'bg-green-500 text-white'; // Available
+    }
+  };
 
   // Get days in month
   const getDaysInMonth = (date: Date) => {
@@ -64,7 +82,7 @@ const ShowtimeCalendar: React.FC<ShowtimeCalendarProps> = ({
     const day = String(date.getDate()).padStart(2, '0');
     const dateString = `${year}-${month}-${day}`;
     
-    return showtimes.filter(showtime => showtime.showDate === dateString);
+    return showtimes.filter(showtime => showtime.date === dateString);
   };
 
   // Navigate months
@@ -103,16 +121,6 @@ const ShowtimeCalendar: React.FC<ShowtimeCalendarProps> = ({
     const compareDate = new Date(date);
     compareDate.setHours(0, 0, 0, 0);
     return compareDate < today;
-  };
-
-  // Get status color for showtime
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ACTIVE': return 'bg-green-500';
-      case 'SOLD_OUT': return 'bg-red-500';
-      case 'CANCELLED': return 'bg-gray-500';
-      default: return 'bg-gray-500';
-    }
   };
 
   const days = getDaysInMonth(currentMonth);
@@ -206,15 +214,13 @@ const ShowtimeCalendar: React.FC<ShowtimeCalendarProps> = ({
                           onShowtimeClick(showtime);
                         }}
                         className={`text-xs p-1 rounded cursor-pointer transition-colors ${
-                          isPastDay 
-                            ? 'bg-gray-200 text-gray-500' 
-                            : `${getStatusColor(showtime.status)} text-white hover:opacity-80`
-                        }`}
-                        title={`${showtime.movieName || 'Unknown Movie'} - ${showtime.roomName || 'Unknown Room'} - ${showtime.startTime}`}
+                          getShowtimeStatusColor(showtime, isPastDay)
+                        } hover:opacity-80`}
+                        title={`${showtime.movieNameVn || 'Unknown Movie'} - ${showtime.roomName || 'Unknown Room'} - ${showtime.startTime}`}
                       >
                         <div className="flex items-center gap-1 truncate">
                           <Film className="w-3 h-3 flex-shrink-0" />
-                          <span className="truncate">{showtime.movieName || 'Unknown Movie'}</span>
+                          <span className="truncate">{showtime.movieNameVn || 'Unknown Movie'}</span>
                         </div>
                         <div className="flex items-center gap-1 mt-0.5">
                           <Clock className="w-3 h-3 flex-shrink-0" />
@@ -242,15 +248,23 @@ const ShowtimeCalendar: React.FC<ShowtimeCalendarProps> = ({
       <div className="flex items-center justify-center gap-6 mt-6 pt-4 border-t border-gray-200">
         <div className="flex items-center gap-2 text-sm">
           <div className="w-3 h-3 bg-green-500 rounded"></div>
-          <span className="text-gray-600">Mở bán</span>
+          <span className="text-gray-600">Còn vé</span>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <div className="w-3 h-3 bg-orange-500 rounded"></div>
+          <span className="text-gray-600">Gần hết vé</span>
         </div>
         <div className="flex items-center gap-2 text-sm">
           <div className="w-3 h-3 bg-red-500 rounded"></div>
           <span className="text-gray-600">Hết vé</span>
         </div>
         <div className="flex items-center gap-2 text-sm">
-          <div className="w-3 h-3 bg-gray-500 rounded"></div>
-          <span className="text-gray-600">Đã hủy</span>
+          <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+          <span className="text-gray-600">Đang chiếu</span>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <div className="w-3 h-3 bg-gray-400 rounded"></div>
+          <span className="text-gray-600">Đã kết thúc</span>
         </div>
         <div className="flex items-center gap-2 text-sm">
           <div className="w-3 h-3 border-2 border-blue-500 rounded"></div>

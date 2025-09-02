@@ -6,6 +6,7 @@ import {
     Grid,
     HousePlus,
     List,
+    Loader2,
     MapPin,
     Monitor,
     Search,
@@ -218,8 +219,8 @@ const RoomManagement: React.FC = () => {
         roomsData.map(async (room) => {
           if (room.id) {
             try {
-              const roomWithSeats = await roomApiService.getRoomWithSeats(room.id);
-              return convertApiRoomToLocal(roomWithSeats);
+              const roomSeats = await roomApiService.getRoomSeats(room.id);
+              return convertApiRoomToLocal({ ...room, seatLayout: roomSeats });
             } catch (error) {
               console.warn(`Failed to fetch seats for room ${room.id}:`, error);
               return convertApiRoomToLocal(room);
@@ -610,7 +611,69 @@ const RoomManagement: React.FC = () => {
         </div>
 
         {/* Content based on view mode */}
-        {viewMode === 'cards' ? (
+        {loading ? (
+                  /* Loading State */
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+                    {viewMode === 'cards' ? (
+                      /* Loading Cards */
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {Array.from({ length: itemsPerPage }).map((_, index) => (
+                          <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-pulse">
+                            <div className="p-4 border-b border-gray-100">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center space-x-2">
+                                  <div className="w-8 h-8 bg-gray-200 rounded"></div>
+                                  <div className="h-5 bg-gray-200 rounded w-32"></div>
+                                </div>
+                                <div className="flex space-x-1">
+                                  <div className="w-6 h-6 bg-gray-200 rounded"></div>
+                                  <div className="w-6 h-6 bg-gray-200 rounded"></div>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <div className="h-6 bg-gray-200 rounded w-24"></div>
+                                <div className="h-6 bg-gray-200 rounded w-20"></div>
+                              </div>
+                            </div>
+                            <div className="p-4 space-y-3">
+                              <div className="space-y-2">
+                                <div className="h-4 bg-gray-200 rounded w-full"></div>
+                                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                              </div>
+                              <div className="space-y-2">
+                                <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                                <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                              </div>
+                              <div className="bg-gray-100 rounded-lg p-3">
+                                <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
+                                <div className="h-4 bg-gray-200 rounded w-28"></div>
+                              </div>
+                              <div>
+                                <div className="flex justify-between items-center mb-1">
+                                  <div className="h-3 bg-gray-200 rounded w-16"></div>
+                                  <div className="h-3 bg-gray-200 rounded w-8"></div>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2"></div>
+                              </div>
+                            </div>
+                            <div className="h-12 bg-gray-100 border-t border-gray-100"></div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      /* Loading Table */
+                      <div className="animate-pulse">
+                        <div className="flex items-center justify-center py-16">
+                          <div className="flex flex-col items-center">
+                            <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
+                            <div className="text-gray-500 text-lg font-medium">Đang tải dữ liệu rạp chiếu phim...</div>
+                            <div className="text-gray-400 text-sm mt-2">Vui lòng chờ trong giây lát</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : viewMode === 'cards' ? (
           /* Cards View */
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -631,14 +694,14 @@ const RoomManagement: React.FC = () => {
                                     setModalMode("edit");
                                     setModalOpen(true);
                                 }}
-                                className="p-1 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
+                                className=" text-gray-400 hover:text-blue-600 transition-colors cursor-pointer p-2 rounded-lg hover:bg-blue-100"
                                 title="Chỉnh sửa"
                                 >
                                 <Edit size={14} />
                                 </button>
                                 <button
                                 onClick={() => room.id && handleDeleteRoom(room.id)}
-                                className="p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
+                                className="p-2 text-gray-400 hover:text-red-600 transition-colors cursor-pointer rounded-lg hover:bg-red-100"
                                 title="Xóa"
                                 >
                                 <Trash2 size={14} />

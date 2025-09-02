@@ -1,5 +1,7 @@
-import {formatApiService, type Format } from "@/services/formatApi";
-import {languageApiService , type Language} from "@/services/languageApi";
+import { countryApiService, type Country } from "@/services/countryApi";
+import { formatApiService, type Format } from "@/services/formatApi";
+import { genreApiService, type Genre } from "@/services/genreApi";
+import { languageApiService, type Language } from "@/services/languageApi";
 import { Edit, Flag, Languages, Plus, Settings, Tags, Trash2, Users, Video } from "lucide-react";
 import React, { useEffect, useState } from "react";
 
@@ -7,69 +9,59 @@ const SystemManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState("countries");
   const [languages, setLanguages] = useState<Language[]>([]);
   const [formats, setFormats] = useState<Format[]>([]);
+  const [genres, setGenres] = useState<Genre[]>([]);
+  const [countries, setCountries] = useState<Country[]>([]);
 
 
   useEffect(() => {
     fetchLanguages();
     fetchFormats();
+    fetchGenres();
+    fetchCountries();
   }, []);
 
   const fetchLanguages = async () => {
     try {
       const response = await languageApiService.getAllLanguages();
-      setLanguages(response);
+      setLanguages(Array.isArray(response) ? response : []);
     } catch (error) {
       console.error("Error fetching languages:", error);
+      setLanguages([]);
     }
   };
 
   const fetchFormats = async () => {
     try {
       const response = await formatApiService.getAllFormats();
-      setFormats(response);
+      setFormats(Array.isArray(response) ? response : []);
     } catch (error) {
       console.error("Error fetching formats:", error);
+      setFormats([]);
+    }
+  };
+
+  const fetchGenres = async () => {
+    try {
+      const response = await genreApiService.getAllGenres();
+      setGenres(Array.isArray(response) ? response : []);
+    } catch (error) {
+      console.error("Error fetching genres:", error);
+      setGenres([]);
+    }
+  };
+
+  const fetchCountries = async () => {
+    try {
+      const response = await countryApiService.getAllCountries();
+      setCountries(Array.isArray(response) ? response : []);
+    } catch (error) {
+      console.error("Error fetching countries:", error);
+      setCountries([]);
     }
   };
 
   // Mock data for each tab
   const mockData = {
-    countries: [
-      { id: 1, name: "Việt Nam", code: "VN", status: "active", movies: 25 },
-      { id: 2, name: "Hoa Kỳ", code: "US", status: "active", movies: 145 },
-      { id: 3, name: "Hàn Quốc", code: "KR", status: "active", movies: 68 },
-      { id: 4, name: "Nhật Bản", code: "JP", status: "active", movies: 42 },
-      { id: 5, name: "Trung Quốc", code: "CN", status: "active", movies: 33 },
-      { id: 6, name: "Thái Lan", code: "TH", status: "active", movies: 18 },
-      { id: 7, name: "Pháp", code: "FR", status: "inactive", movies: 12 }
-    ],
-    // formats: [
-    //   { id: 1, name: "2D", description: "Định dạng phim 2D truyền thống", status: "active", theaters: 15 },
-    //   { id: 2, name: "3D", description: "Định dạng phim 3D", status: "active", theaters: 12 },
-    //   { id: 3, name: "IMAX", description: "Định dạng IMAX siêu rộng", status: "active", theaters: 3 },
-    //   { id: 4, name: "4DX", description: "Định dạng 4DX với hiệu ứng vật lý", status: "active", theaters: 2 },
-    //   { id: 5, name: "ScreenX", description: "Định dạng ScreenX 270 độ", status: "active", theaters: 1 },
-    //   { id: 6, name: "Dolby Cinema", description: "Định dạng Dolby Cinema", status: "inactive", theaters: 0 }
-    // ],
-    genres: [
-      { id: 1, name: "Hành động", description: "Phim hành động, võ thuật", status: "active", movies: 85 },
-      { id: 2, name: "Tình cảm", description: "Phim tình cảm, lãng mạn", status: "active", movies: 62 },
-      { id: 3, name: "Kinh dị", description: "Phim kinh dị, ma quái", status: "active", movies: 34 },
-      { id: 4, name: "Hài kịch", description: "Phim hài, hài kịch", status: "active", movies: 45 },
-      { id: 5, name: "Khoa học viễn tưởng", description: "Phim khoa học viễn tưởng", status: "active", movies: 38 },
-      { id: 6, name: "Hoạt hình", description: "Phim hoạt hình, animation", status: "active", movies: 28 },
-      { id: 7, name: "Tâm lý", description: "Phim tâm lý, drama", status: "active", movies: 41 },
-      { id: 8, name: "Phiêu lưu", description: "Phim phiêu lưu, mạo hiểm", status: "active", movies: 29 }
-    ],
-    // languages: [
-    //   { id: 1, name: "Tiếng Việt", code: "vi", status: "active", movies: 45 },
-    //   { id: 2, name: "Tiếng Anh", code: "en", status: "active", movies: 185 },
-    //   { id: 3, name: "Tiếng Hàn", code: "ko", status: "active", movies: 68 },
-    //   { id: 4, name: "Tiếng Nhật", code: "ja", status: "active", movies: 42 },
-    //   { id: 5, name: "Tiếng Trung", code: "zh", status: "active", movies: 33 },
-    //   { id: 6, name: "Tiếng Thái", code: "th", status: "active", movies: 18 },
-    //   { id: 7, name: "Tiếng Pháp", code: "fr", status: "inactive", movies: 8 }
-    // ],
     limitages: [
       { id: 1, name: "P - Phổ biến", description: "Phim dành cho mọi lứa tuổi", minAge: 0, status: "active", movies: 65 },
       { id: 2, name: "K - Kho khan", description: "Phim không dành cho trẻ em dưới 13 tuổi", minAge: 13, status: "active", movies: 82 },
@@ -133,30 +125,18 @@ const SystemManagement: React.FC = () => {
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700">Quốc gia</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700">Mã code</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700">Số phim</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700">Trạng thái</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700">Thao tác</th>
+                    <th className="text-center py-3 px-4 font-medium text-slate-700">Tên tiếng Việt</th>
+                    <th className="text-center py-3 px-4 font-medium text-slate-700">Tên tiếng Anh</th>
+                    <th className="text-center py-3 px-4 font-medium text-slate-700">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {mockData.countries.map((country) => (
+                  {countries && countries.length > 0 ? countries.map((country) => (
                     <tr key={country.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="py-3 px-4 font-medium text-slate-800">{country.name}</td>
-                      <td className="py-3 px-4 text-slate-600">{country.code}</td>
-                      <td className="py-3 px-4 text-slate-600">{country.movies}</td>
+                      <td className="py-3 px-4 text-center font-medium text-slate-800">{country.nameVn}</td>
+                      <td className="py-3 px-4 text-center font-medium text-slate-800">{country.nameEn}</td>
                       <td className="py-3 px-4">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          country.status === "active"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}>
-                          {country.status === "active" ? "Hoạt động" : "Ngừng hoạt động"}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center gap-2">
                           <button className="p-1 text-blue-600 hover:bg-blue-100 rounded">
                             <Edit className="w-4 h-4" />
                           </button>
@@ -166,7 +146,13 @@ const SystemManagement: React.FC = () => {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )) : (
+                    <tr>
+                      <td colSpan={3} className="py-8 text-center text-slate-500">
+                        {countries === undefined ? "Đang tải..." : "Không có dữ liệu"}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -191,17 +177,17 @@ const SystemManagement: React.FC = () => {
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700">Định dạng</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700">Mô tả</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700">Số rạp</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700">Trạng thái</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700">Thao tác</th>
+                    <th className="text-center py-3 px-4 font-medium text-slate-700">Định dạng</th>
+                    {/* <th className="text-center py-3 px-4 font-medium text-slate-700">Mô tả</th>
+                    <th className="text-center py-3 px-4 font-medium text-slate-700">Số rạp</th>
+                    <th className="text-center py-3 px-4 font-medium text-slate-700">Trạng thái</th> */}
+                    <th className="text-center py-3 px-4 font-medium text-slate-700">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {formats.map((format) => (
+                  {formats && formats.length > 0 ? formats.map((format) => (
                     <tr key={format.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="py-3 px-4 font-medium text-slate-800">{format.nameVn}</td>
+                      <td className="py-3 px-4 text-center font-medium text-slate-800">{format.nameVn}</td>
                       {/* <td className="py-3 px-4 text-slate-600">{format.description}</td>
                       <td className="py-3 px-4 text-slate-600">{format.theaters}</td>
                       <td className="py-3 px-4">
@@ -214,7 +200,7 @@ const SystemManagement: React.FC = () => {
                         </span>
                       </td> */}
                       <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center gap-2">
                           <button className="p-1 text-blue-600 hover:bg-blue-100 rounded">
                             <Edit className="w-4 h-4" />
                           </button>
@@ -224,7 +210,13 @@ const SystemManagement: React.FC = () => {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )) : (
+                    <tr>
+                      <td colSpan={2} className="py-8 text-center text-slate-500">
+                        {formats === undefined ? "Đang tải..." : "Không có dữ liệu"}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -249,30 +241,18 @@ const SystemManagement: React.FC = () => {
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700">Thể loại</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700">Mô tả</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700">Số phim</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700">Trạng thái</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700">Thao tác</th>
+                    <th className="text-center py-3 px-4 font-medium text-slate-700">Tên tiếng Việt</th>
+                    <th className="text-center py-3 px-4 font-medium text-slate-700">Tên tiếng Anh</th>
+                    <th className="text-center py-3 px-4 font-medium text-slate-700">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {mockData.genres.map((genre) => (
+                  {genres && genres.length > 0 ? genres.map((genre) => (
                     <tr key={genre.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="py-3 px-4 font-medium text-slate-800">{genre.name}</td>
-                      <td className="py-3 px-4 text-slate-600">{genre.description}</td>
-                      <td className="py-3 px-4 text-slate-600">{genre.movies}</td>
+                      <td className="py-3 px-4 text-center font-medium text-slate-800">{genre.nameVn}</td>
+                      <td className="py-3 px-4 text-center font-medium text-slate-800">{genre.nameEn}</td>
                       <td className="py-3 px-4">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          genre.status === "active"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}>
-                          {genre.status === "active" ? "Hoạt động" : "Ngừng hoạt động"}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center gap-2">
                           <button className="p-1 text-blue-600 hover:bg-blue-100 rounded">
                             <Edit className="w-4 h-4" />
                           </button>
@@ -282,7 +262,13 @@ const SystemManagement: React.FC = () => {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )) : (
+                    <tr>
+                      <td colSpan={3} className="py-8 text-center text-slate-500">
+                        {genres === undefined ? "Đang tải..." : "Không có dữ liệu"}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -307,17 +293,19 @@ const SystemManagement: React.FC = () => {
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700">Ngôn ngữ</th>
-                    {/* <th className="text-left py-3 px-4 font-medium text-slate-700">Mã code</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700">Số phim</th> */}
-                    {/* <th className="text-left py-3 px-4 font-medium text-slate-700">Trạng thái</th> */}
-                    <th className="text-left py-3 px-4 font-medium text-slate-700">Thao tác</th>
+                    <th className="text-center py-3 px-4 font-medium text-slate-700">Tên tiếng Việt</th>
+                    <th className="text-center py-3 px-4 font-medium text-slate-700">Tên tiếng Anh</th>
+                    {/* <th className="text-center py-3 px-4 font-medium text-slate-700">Mã code</th>
+                    <th className="text-center py-3 px-4 font-medium text-slate-700">Số phim</th> */}
+                    {/* <th className="text-center py-3 px-4 font-medium text-slate-700">Trạng thái</th> */}
+                    <th className="text-center py-3 px-4 font-medium text-slate-700">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {languages.map((language) => (
+                  {languages && languages.length > 0 ? languages.map((language) => (
                     <tr key={language.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="py-3 px-4 font-medium text-slate-800">{language.nameVn}</td>
+                      <td className="text-center py-3 px-4 font-medium text-slate-800">{language.nameVn}</td>
+                      <td className="text-center py-3 px-4 font-medium text-slate-800">{language.nameEn}</td>
                       {/* <td className="py-3 px-4 text-slate-600">{language.code}</td>
                       <td className="py-3 px-4 text-slate-600">{language.movies}</td> */}
                       {/* <td className="py-3 px-4">
@@ -330,7 +318,7 @@ const SystemManagement: React.FC = () => {
                         </span>
                       </td> */}
                       <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center gap-2">
                           <button className="p-1 text-blue-600 hover:bg-blue-100 rounded">
                             <Edit className="w-4 h-4" />
                           </button>
@@ -340,7 +328,13 @@ const SystemManagement: React.FC = () => {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )) : (
+                    <tr>
+                      <td colSpan={3} className="py-8 text-center text-slate-500">
+                        {languages === undefined ? "Đang tải..." : "Không có dữ liệu"}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -415,7 +409,7 @@ const SystemManagement: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="h-full bg-gray-50">
         <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <div className="mb-8">
@@ -460,7 +454,7 @@ const SystemManagement: React.FC = () => {
       </div>
 
       {/* Quick Stats */}
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-5 gap-4">
+      {/* <div className="mt-8 grid grid-cols-1 md:grid-cols-5 gap-4">
         {tabs.map((tab) => {
           let itemCount = 0;
           let activeCount = 0;
@@ -512,7 +506,7 @@ const SystemManagement: React.FC = () => {
             </div>
           );
         })}
-      </div>
+      </div> */}
     </div>
     </div>
   );

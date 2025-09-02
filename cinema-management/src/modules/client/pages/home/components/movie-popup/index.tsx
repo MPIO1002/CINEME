@@ -1,8 +1,11 @@
+import { faTicket } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTicket } from "@fortawesome/free-solid-svg-icons";
 import { API_BASE_URL } from "../../../../../../components/api-config";
+
+// Cache để lưu trữ data đã fetch
+const movieDetailCache = new Map<string, MovieDetail>();
 
 if (typeof window !== "undefined" && !document.getElementById("scale-up-center-keyframes")) {
     const style = document.createElement("style");
@@ -37,12 +40,25 @@ const MoviePopup: React.FC<MoviePopupProps> = ({ movieId, lang, onShowTrailer })
     const [detail, setDetail] = useState<MovieDetail | null>(null);
 
     useEffect(() => {
+        // Kiểm tra cache trước
+        if (movieDetailCache.has(movieId)) {
+            setDetail(movieDetailCache.get(movieId)!);
+            return;
+        }
+
+        // Chỉ fetch nếu chưa có trong cache
         fetch(`${API_BASE_URL}/movies/${movieId}/detail`)
             .then(res => res.json())
             .then(data => {
                 if (data.statusCode === 200 && data.data) {
-                    setDetail(data.data);
+                    const movieDetail = data.data;
+                    setDetail(movieDetail);
+                    // Lưu vào cache
+                    movieDetailCache.set(movieId, movieDetail);
                 }
+            })
+            .catch(error => {
+                console.error('Error fetching movie detail:', error);
             });
     }, [movieId]);
 

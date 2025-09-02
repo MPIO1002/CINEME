@@ -189,23 +189,23 @@ const ActorManagement: React.FC = () => {
       key: 'actions',
       title: 'Hành động',
       render: (_, actor) => (
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1">
           <button 
-            className="text-blue-600 hover:text-blue-900 transition-colors" 
+            className="text-blue-600 hover:text-blue-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-blue-100" 
             title="Xem chi tiết"
             onClick={() => handleViewActor(actor.id || '')}
           >
             <Eye size={16} />
           </button>
           <button 
-            className="text-green-600 hover:text-green-900 transition-colors" 
+            className="text-green-600 hover:text-green-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-green-100" 
             title="Chỉnh sửa"
             onClick={() => handleEditActor(actor.id || '')}
           >
             <Edit size={16} />
           </button>
           <button 
-            className="text-red-600 hover:text-red-900 transition-colors" 
+            className="text-red-600 hover:text-red-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-red-100" 
             title="Xóa"
             onClick={() => handleDeleteActor(actor.id || '')}
           >

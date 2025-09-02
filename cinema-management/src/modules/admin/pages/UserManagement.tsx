@@ -1,5 +1,4 @@
 import {
-    Activity,
     AlertCircle,
     Ban,
     Calendar,
@@ -9,6 +8,8 @@ import {
     DollarSign,
     Edit,
     Eye,
+    EyeClosed,
+    EyeOffIcon,
     Filter,
     Phone,
     Search,
@@ -46,6 +47,9 @@ const UserManagement: React.FC = () => {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
+  
+  // Phone visibility state - track which phones are visible (default: all hidden)
+  const [visiblePhones, setVisiblePhones] = useState<Set<string>>(new Set());
 
   // Fetch users from API
   useEffect(() => {
@@ -232,8 +236,33 @@ const UserManagement: React.FC = () => {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
 
+  // Toggle phone visibility for a specific user
+  const togglePhoneVisibility = (userId: string) => {
+    setVisiblePhones(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId); // Hide phone (remove from visible set)
+      } else {
+        newSet.add(userId); // Show phone (add to visible set)
+      }
+      return newSet;
+    });
+  };
+
+  const [visibleEmails, setVisibleEmails] = useState<Set<string>>(new Set());
+  const toggleEmailVisibility = (userId: string) => {
+    setVisibleEmails(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
+      }
+      return newSet;
+    });
+  };
   return (
-    <div className="min-h-screen bg-gray-50 max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="bg-gray-50 max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
@@ -368,13 +397,51 @@ const UserManagement: React.FC = () => {
 
           {/* Content */}
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-gray-600">Đang tải danh sách người dùng...</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {Array.from({ length: itemsPerPage }).map((_, index) => (
+                  <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-pulse">
+                    <div className="p-4 border-b border-gray-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-8 h-8 bg-gray-200 rounded"></div>
+                          <div className="h-5 bg-gray-200 rounded w-32"></div>
+                        </div>
+                        <div className="flex space-x-1">
+                          <div className="w-6 h-6 bg-gray-200 rounded"></div>
+                          <div className="w-6 h-6 bg-gray-200 rounded"></div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="h-6 bg-gray-200 rounded w-24"></div>
+                        <div className="h-6 bg-gray-200 rounded w-20"></div>
+                      </div>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      <div className="space-y-2">
+                        <div className="h-4 bg-gray-200 rounded w-full"></div>
+                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                      </div>
+                      <div className="bg-gray-100 rounded-lg p-3">
+                        <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
+                        <div className="h-4 bg-gray-200 rounded w-28"></div>
+                      </div>
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <div className="h-3 bg-gray-200 rounded w-16"></div>
+                          <div className="h-3 bg-gray-200 rounded w-8"></div>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2"></div>
+                      </div>
+                    </div>
+                    <div className="h-12 bg-gray-100 border-t border-gray-100"></div>
+                  </div>
+                ))}
               </div>
-            </div>
-          ) : (
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
               {paginatedUsers.length === 0 ? (
                 <div className="col-span-full text-center py-12">
@@ -399,7 +466,23 @@ const UserManagement: React.FC = () => {
                             </div>
                             <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-gray-900 truncate">{user.fullName}</h3>
-                            <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm text-gray-500 truncate">
+                                {visibleEmails && visibleEmails.has(user.id) ? user.email : "••••••••••••••••••••••••"}
+                              </p>
+                              <button
+                                onClick={() => toggleEmailVisibility(user.id)}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title={visibleEmails && visibleEmails.has(user.id) ? "Ẩn email" : "Hiện email"}
+                                type="button"
+                              >
+                                {visibleEmails && visibleEmails.has(user.id) ? (
+                                  <Eye className="w-4 h-4 text-gray-400" />
+                                ) : (
+                                  <EyeOffIcon className="w-4 h-4 text-gray-400" />
+                                )}
+                              </button>
+                            </div>
                             </div>
                         </div>
 
@@ -426,7 +509,22 @@ const UserManagement: React.FC = () => {
                             {user.phone && (
                             <div className="flex items-center gap-2 text-sm text-gray-600">
                                 <Phone className="w-4 h-4" />
-                                <span>{user.phone}</span>
+                                <div className='flex items-center gap-3 w-30 relative'>
+                                    <span>
+                                        {visiblePhones && visiblePhones.has(user.id) ? user.phone : "••••••••••••"}
+                                    </span>
+                                    <button
+                                        onClick={() => togglePhoneVisibility(user.id)}
+                                        className="p-1 hover:bg-gray-100 rounded transition-colors absolute right-0 cursor-pointer"
+                                        title={visiblePhones.has(user.id) ? "Ẩn số điện thoại" : "Hiện số điện thoại"}
+                                    >
+                                        {visiblePhones.has(user.id) ? (
+                                            <Eye className="w-4 h-4 text-gray-400" />
+                                        ) : (
+                                            <EyeOffIcon className="w-4 h-4 text-gray-400" />
+                                        )}
+                                    </button>
+                                </div>
                             </div>
                             )}
                             <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -465,22 +563,22 @@ const UserManagement: React.FC = () => {
                   <div className="flex items-center gap-2 h-1/12">
                     <button
                       onClick={() => handleViewUser(user)}
-                      className="flex-1 py-2 px-3 text-purple-600 border border-purple-600 rounded-lg hover:bg-purple-50 transition-colors text-sm font-medium"
+                      className="flex-1 py-2 px-3 text-purple-600 border border-purple-600 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors text-sm font-medium cursor-pointer"
                     >
                       <Eye className="w-4 h-4 mx-auto" />
                     </button>
                     <button
                       onClick={() => handleEditUser(user)}
-                      className="flex-1 py-2 px-3 text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium"
+                      className="flex-1 py-2 px-3 text-blue-600 border border-blue-600 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors text-sm font-medium cursor-pointer"
                     >
                       <Edit className="w-4 h-4 mx-auto" />
                     </button>
                     <button
                       onClick={() => handleBanUser(user.id)}
-                      className={`flex-1 py-2 px-3 border rounded-lg transition-colors text-sm font-medium ${
+                      className={`flex-1 py-2 px-3 border rounded-lg transition-colors text-sm font-medium cursor-pointer ${
                         user.status === 'BANNED' 
-                          ? 'text-green-600 border-green-600 hover:bg-green-50' 
-                          : 'text-red-600 border-red-600 hover:bg-red-50'
+                          ? 'text-green-600 border-green-600 bg-green-50 hover:bg-green-100' 
+                          : 'text-red-600 border-red-600 bg-red-50 hover:bg-red-100'
                       }`}
                     >
                       <Ban className="w-4 h-4 mx-auto" />

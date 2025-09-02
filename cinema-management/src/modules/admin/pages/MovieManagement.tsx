@@ -43,6 +43,30 @@ const [releaseDateTo, setReleaseDateTo] = useState('');
 
 const itemsPerPage = 5;
 
+// Helper function to calculate movie status based on dates
+const getMovieStatus = (releaseDate: string, endDate: string): { key: string; label: string; color: string } => {
+    if (!releaseDate || !endDate) {
+        return { key: "unknown", label: "Không xác định", color: "bg-gray-100 text-gray-800" };
+    }
+
+    const now = new Date();
+    const release = new Date(releaseDate);
+    const end = new Date(endDate);
+
+    // Set time to start of day for accurate comparison
+    now.setHours(0, 0, 0, 0);
+    release.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+
+    if (now < release) {
+        return { key: "upcoming", label: "Sắp chiếu", color: "bg-blue-100 text-blue-800" };
+    } else if (now >= release && now <= end) {
+        return { key: "showing", label: "Đang chiếu", color: "bg-green-100 text-green-800" };
+    } else {
+        return { key: "ended", label: "Đã kết thúc", color: "bg-red-100 text-red-800" };
+    }
+};
+
 // Helper function to show alert
 const showAlert = (severity: 'error' | 'warning' | 'info' | 'success', title: string, message: string) => {
     setAlertState({
@@ -91,8 +115,13 @@ try {
     console.log('Selected movie:', selectedMovie);
 
     // Validate required fields before sending
-    const requiredFields = ['nameVn', 'director', 'countryId', 'limitageId', 'releaseDate', 'endDate', 'listActor'];
+    const requiredFields = ['nameVn', 'director', 'countryId', 'limitageId', 'releaseDate', 'endDate'];
     const missingFields = requiredFields.filter(field => !movie[field as keyof Movie]);
+    
+    // Special validation for listActor - commented out for now since it might not be required
+    // if (!movie.listActor || movie.listActor.length === 0) {
+    //     missingFields.push('listActor');
+    // }
     
     if (missingFields.length > 0) {
     showAlert('error', 'Lỗi xác thực', `Thiếu các trường bắt buộc: ${missingFields.join(', ')}`);
@@ -196,11 +225,27 @@ try {
     // image and trailer will be added below as files
     formData.append('time', Math.max(1, movie.time || 90).toString());
     formData.append('limitageId', movie.limitageId || '');
-
-    if (movie.status !== undefined && movie.status !== '') {
-    formData.append('status', movie.status.toString());
+    formData.append('ratings', movie.ratings?.trim() || '0'); // Default to 0 if not provided
+    // Note: status is now calculated automatically based on releaseDate and endDate
+    
+    // Backend expects listActorId (array of UUIDs), not listActor (array of Actor objects)
+    const actorIds = (movie.listActor || []).map(actor => actor.id).filter(id => id !== undefined);
+    console.log('Actor IDs to send:', actorIds);
+    
+    // For FormData with @ModelAttribute, send each UUID separately with the same field name
+    // This allows Spring Boot to automatically convert to List<UUID>
+    if (actorIds.length > 0) {
+        actorIds.forEach(actorId => {
+            if (actorId) {
+                formData.append('listActorId', actorId);
+            }
+        });
+    } else {
+        // Send empty array - some backends require at least one entry
+        // We'll send an empty string that backend can handle
+        console.log('No actors selected, sending empty listActorId');
+        // Actually don't append anything for empty list - let backend handle missing field
     }
-    formData.append('listActor', JSON.stringify(movie.listActor || []));
     // Handle image field - smart upload logic
     if (modalMode === "add") {
     // Khi thêm mới: bắt buộc phải có file
@@ -271,23 +316,6 @@ try {
 } finally {
     setLoading(false);
 }
-};
-const getStatusLabel = (status: string) => {
-    switch (status) {
-    case "1": return "Đang chiếu";
-    case "2": return "Sắp chiếu";
-    case "3": return "Ngừng chiếu";
-    default: return "Không xác định";
-    }
-};
-
-const getStatusColor = (status: string) => {
-    switch (status) {
-    case "1": return "bg-green-100 text-green-800";
-    case "2": return "bg-blue-100 text-blue-800";
-    case "3": return "bg-red-100 text-red-800";
-    default: return "bg-gray-100 text-gray-800";
-    }
 };
 
 const getRatingStars = (rating: string) => {
@@ -378,8 +406,12 @@ const filteredMovies = movies.filter(movie => {
                          movie.nameEn?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          movie.director?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    // Status filter
-    const matchesStatus = !selectedStatus || movie.status === selectedStatus;
+    // Status filter - now based on calculated status from dates
+    let matchesStatus = true;
+    if (selectedStatus) {
+        const movieStatus = getMovieStatus(movie.releaseDate, movie.endDate);
+        matchesStatus = movieStatus.key === selectedStatus;
+    }
 
     // Country filter
     const matchesCountry = !selectedCountry || (movie.countryId && movie.countryId === selectedCountry);
@@ -483,7 +515,7 @@ const columns: Column<Movie>[] = [
     key: 'releaseDate',
     title: 'Ngày phát hành',
     render: (_, movie) => (
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-gray-600 w-40">
         <p>Khởi chiếu: {formatDate(movie.releaseDate)}</p>
         <p className="text-xs text-gray-400">Kết thúc: {formatDate(movie.endDate)}</p>
         </div>
@@ -502,44 +534,47 @@ const columns: Column<Movie>[] = [
     {
     key: 'status',
     title: 'Trạng thái',
-    render: (status) => (
-        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getStatusColor(status)}`}>
-        {getStatusLabel(status)}
-        </span>
-    )
+    render: (_, movie) => {
+        const status = getMovieStatus(movie.releaseDate, movie.endDate);
+        return (
+            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${status.color}`}>
+                {status.label}
+            </span>
+        );
+    }
     },
     {
     key: 'actions',
     title: 'Hành động',
     render: (_, movie) => (
-        <div className="flex items-center space-x-2">
-        <button 
-            className="text-blue-600 hover:text-blue-900 transition-colors" 
-            title="Xem chi tiết"
-            onClick={() => { setModalMode("view"); setSelectedMovie(movie); setModalOpen(true); }}
-        >
-            <Eye size={16} />
-        </button>
-        <button 
-            className="text-green-600 hover:text-green-900 transition-colors" 
-            title="Chỉnh sửa"
-            onClick={() => { setModalMode("edit"); setSelectedMovie(movie); setModalOpen(true); }}
-        >
-            <Edit size={16} />
-        </button>
-        <button 
-            className="text-red-600 hover:text-red-900 transition-colors" 
-            title="Xóa"
-            onClick={() => handleDelete(movie)}
-        >
-            <Trash2 size={16} />
-        </button>
+        <div className="flex items-center space-x-1">
+            <button 
+                className="text-blue-600 hover:text-blue-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-blue-100" 
+                title="Xem chi tiết"
+                onClick={() => { setModalMode("view"); setSelectedMovie(movie); setModalOpen(true); }}
+            >
+                <Eye size={16} />
+            </button>
+            <button 
+                className="text-green-600 hover:text-green-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-green-100" 
+                title="Chỉnh sửa"
+                onClick={() => { setModalMode("edit"); setSelectedMovie(movie); setModalOpen(true); }}
+            >
+                <Edit size={16} />
+            </button>
+            <button 
+                className="text-red-600 hover:text-red-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-red-100" 
+                title="Xóa"
+                onClick={() => handleDelete(movie)}
+            >
+                <Trash2 size={16} />
+            </button>
         </div>
     )
     }
 ];
 return (
-    <div className="h-full bg-gray-50 max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className=" bg-gray-50 max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Alert Notification */}
         {alertState.show && (
             <div className="absolute bottom-5 right-10 z-100">
@@ -609,9 +644,9 @@ return (
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                     >
                         <option value="">Tất cả</option>
-                        <option value="1">Đang chiếu</option>
-                        <option value="2">Sắp chiếu</option>
-                        <option value="3">Ngừng chiếu</option>
+                        <option value="upcoming">Sắp chiếu</option>
+                        <option value="showing">Đang chiếu</option>
+                        <option value="ended">Đã kết thúc</option>
                     </select>
                 </div>
 
@@ -717,14 +752,12 @@ return (
 
         {/* Pagination */}
         {!loading && (
-            <div className="mt-6">
-                <Pagination
-                    currentPage={currentPage}
-                    totalItems={filteredMovies.length}
-                    itemsPerPage={itemsPerPage}
-                    onPageChange={setCurrentPage}
-                />
-            </div>
+            <Pagination
+                currentPage={currentPage}
+                totalItems={filteredMovies.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+            />
         )}
                 
         {/* Movie Modal */}
