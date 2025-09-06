@@ -56,7 +56,7 @@ const SeatLayoutDesigner: React.FC<SeatLayoutDesignerProps> = ({
       
       setGridSize({
         rows: Math.max(maxRow, 5), // Minimum 5 rows
-        columns: Math.max(maxCol, 6) // Minimum 6 columns
+        columns: Math.max(maxCol, 5) // Minimum 5 columns
       });
       setSeats(initialSeats);
     }

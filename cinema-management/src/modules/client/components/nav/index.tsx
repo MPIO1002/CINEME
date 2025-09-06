@@ -40,6 +40,7 @@ interface Theater {
 }
 
 interface UserData {
+  id: string;
   email: string;
   fullName: string;
   accessToken: string;
@@ -78,18 +79,52 @@ const Nav = ({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Check for saved user data on mount
+  // Check for saved user data on mount and listen for storage changes
   useEffect(() => {
-    const savedUserData = localStorage.getItem('userData');
-    if (savedUserData) {
-      try {
-        const userData = JSON.parse(savedUserData);
-        setUser(userData);
-      } catch (error) {
-        console.error('Error parsing saved user data:', error);
-        localStorage.removeItem('userData');
+    const checkUserData = () => {
+      const savedUserData = localStorage.getItem('userData');
+      if (savedUserData) {
+        try {
+          const userData = JSON.parse(savedUserData);
+          setUser(userData);
+        } catch (error) {
+          console.error('Error parsing saved user data:', error);
+          localStorage.removeItem('userData');
+        }
+      } else {
+        setUser(null);
       }
-    }
+    };
+
+    // Check initially
+    checkUserData();
+
+    // Listen for storage changes (including OAuth callbacks)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'userData') {
+        checkUserData();
+      }
+    };
+
+    // Listen for window focus (in case user logged in from another tab)
+    const handleFocus = () => {
+      checkUserData();
+    };
+
+    // Custom event for manual user data updates
+    const handleUserDataUpdate = () => {
+      checkUserData();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('userDataUpdated', handleUserDataUpdate);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('userDataUpdated', handleUserDataUpdate);
+    };
   }, []);
 
   useEffect(() => {
@@ -113,6 +148,8 @@ const Nav = ({
   // Handle login success
   const handleLoginSuccess = (userData: UserData) => {
     setUser(userData);
+    // Dispatch event to notify other components
+    window.dispatchEvent(new Event('userDataUpdated'));
   };
 
   // Handle logout

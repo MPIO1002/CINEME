@@ -44,8 +44,10 @@ interface Showtime {
 interface Seat {
   id: string;
   seatNumber: string;
-  seatType: string;
+  seatType?: string;
+  price: number;
   status: string;
+  color?: string;
   isSelected?: boolean;
 }
 
@@ -249,8 +251,8 @@ const BookingPage: React.FC = () => {
   }, [selectedShowtime]);
 
   const handleSeatClick = (seat: Seat) => {
-    // Can't click on EMPTY seats (walkways)
-    if (seat.seatType === 'EMPTY' || seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) return;
+    // Can't click on walkway seats or seats that aren't available or locked
+    if (seat.seatNumber.startsWith('W_') || seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) return;
     
     const isSelected = selectedSeats.find(s => s.id === seat.id);
     if (isSelected) {
@@ -261,18 +263,86 @@ const BookingPage: React.FC = () => {
   };
 
   const getSeatColor = (seat: Seat) => {
-    // EMPTY seats are walkways - transparent/invisible
-    if (seat.seatType === 'EMPTY') return 'transparent';
+    // Handle walkway seats (invisible)
+    if (seat.seatNumber.startsWith('W_')) {
+      return 'transparent';
+    }
     
-    if (selectedSeats.find(s => s.id === seat.id)) return '#ffd700'; // Yellow for selected
+    if (selectedSeats.find(s => s.id === seat.id)) {
+      // Darken the color by 50% when selected
+      const baseColor = seat.color || (seat.seatType === 'VIP' ? '#ff6b6b' : seat.seatType === 'Couple' ? '#9c27b0' : '#4CAF50');
+      
+      // Convert hex to RGB, then darken by 50%
+      const hex = baseColor.replace('#', '');
+      const r = Math.floor(parseInt(hex.substr(0, 2), 16) * 0.5);
+      const g = Math.floor(parseInt(hex.substr(2, 2), 16) * 0.5);
+      const b = Math.floor(parseInt(hex.substr(4, 2), 16) * 0.5);
+      
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+    
     if (lockedSeats.includes(seat.id)) return '#ff8c00'; // Orange for locked by others
     if (seat.status !== 'AVAILABLE') return '#666'; // Gray for booked/unavailable
+    
+    // Use backend color if provided, otherwise fallback to old logic
+    if (seat.color) return seat.color;
+    
+    // Fallback colors based on seatType
     if (seat.seatType === 'VIP') return '#ff6b6b'; // Red for VIP
+    if (seat.seatType === 'Couple') return '#9c27b0'; // Purple for couple
     return '#4CAF50'; // Green for standard available
   };
 
-  const getSeatPrice = (seatType: string) => {
-    return seatType === 'VIP' ? 150000 : 100000;
+  const getSeatPrice = (seatType: string, price: number) => {
+    // Use the price from backend if provided and not 0
+    if (price > 0) return price;
+    
+    // Fallback to hardcoded prices
+    switch (seatType) {
+      case 'VIP': return 100000;
+      case 'Couple': return 200000;
+      default: return 50000;
+    }
+  };
+
+  const getSeatWidth = (seatNumber: string) => {
+    if (seatNumber.includes('+')) {
+      // Count how many seats are in the group based on seatNumber format
+      const seatCount = seatNumber.split('+').length;
+      // Each seat is 32px, gap between seats is 8px
+      // Formula: (seatCount * 32px) + ((seatCount - 1) * 8px)
+      return (seatCount * 32) + ((seatCount - 1) * 8);
+    }
+    return 32; // Default single seat width (32px = w-8)
+  };
+
+  // Generate legend items from actual seat data
+  const generateLegendItems = () => {
+    const legendItems: Array<{ color: string; label: string; type: string }> = [];
+    const seenTypes = new Set<string>();
+
+    // Get unique seat types with their colors from the seat data
+    seats.forEach(seat => {
+      if (seat.seatType && seat.color && !seat.seatNumber.startsWith('W_')) {
+        const typeKey = seat.seatType;
+        if (!seenTypes.has(typeKey)) {
+          seenTypes.add(typeKey);
+          legendItems.push({
+            color: seat.color,
+            label: seat.seatType,
+            type: typeKey
+          });
+        }
+      }
+    });
+
+    // Add status-based legend items
+    legendItems.push(
+      { color: '#666', label: 'Đã bán', type: 'unavailable' },
+      { color: '#ff8c00', label: 'Đang được đặt', type: 'locked' }
+    );
+
+    return legendItems;
   };
 
   const handleBooking = async () => {
@@ -321,7 +391,7 @@ const BookingPage: React.FC = () => {
     }
   };
 
-  const totalPrice = selectedSeats.reduce((sum, seat) => sum + getSeatPrice(seat.seatType), 0);
+  const totalPrice = selectedSeats.reduce((sum, seat) => sum + getSeatPrice(seat.seatType || 'Standard', seat.price), 0);
 
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -333,21 +403,38 @@ const BookingPage: React.FC = () => {
     return new Date(dateString).toLocaleDateString('vi-VN');
   };
 
-  // Group seats by row
+  // Group seats by row and create proper alignment with walkways
   const groupSeatsByRow = (seats: Seat[]) => {
     const rows: { [key: string]: Seat[] } = {};
     seats.forEach(seat => {
-      const row = seat.seatNumber.charAt(0);
+      let row: string;
+      if (seat.seatNumber.startsWith('W_')) {
+        // Extract row from walkway format like "W_C3" -> "C"
+        row = seat.seatNumber.substring(2, 3);
+      } else {
+        row = seat.seatNumber.charAt(0);
+      }
       if (!rows[row]) rows[row] = [];
       rows[row].push(seat);
     });
     
-    // Sort seats within each row by number
+    // Sort seats within each row by their position number
     Object.keys(rows).forEach(row => {
       rows[row].sort((a, b) => {
-        const aNum = parseInt(a.seatNumber.slice(1));
-        const bNum = parseInt(b.seatNumber.slice(1));
-        return aNum - bNum;
+        const getPosition = (seatNumber: string) => {
+          if (seatNumber.startsWith('W_')) {
+            // For walkway like "W_C3", get position 3
+            return parseInt(seatNumber.substring(3));
+          } else if (seatNumber.includes('+')) {
+            // For couple seats like "F1+F2", get starting position 1
+            return parseInt(seatNumber.split('+')[0].slice(1));
+          } else {
+            // For regular seats like "A1", get position 1
+            return parseInt(seatNumber.slice(1));
+          }
+        };
+        
+        return getPosition(a.seatNumber) - getPosition(b.seatNumber);
       });
     });
     
@@ -574,33 +661,38 @@ const BookingPage: React.FC = () => {
                         {row}
                       </span>
                       <div className="flex gap-2 flex-wrap justify-center">
-                        {seatRows[row].map((seat) => (
-                          seat.seatType === 'EMPTY' ? (
-                            // Render walkway as completely empty space
+                        {seatRows[row].map((seat) => 
+                          seat.seatNumber.startsWith('W_') ? (
+                            // Render walkway as empty space
                             <div
                               key={seat.id}
-                              className="w-8 h-8"
+                              className="h-8"
+                              style={{ width: `${getSeatWidth(seat.seatNumber)}px` }}
                             >
-                              {/* Empty space for walkway */}
+                              {/* Empty walkway space */}
                             </div>
                           ) : (
                             <button
                               key={seat.id}
                               onClick={() => handleSeatClick(seat)}
                               disabled={seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)}
-                              className="w-8 h-8 rounded text-sm font-bold transition-all duration-200 hover:scale-110"
+                              className="rounded text-sm font-bold transition-all duration-200 hover:scale-110 h-8"
                               style={{
+                                width: `${getSeatWidth(seat.seatNumber)}px`,
                                 backgroundColor: getSeatColor(seat),
                                 color: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? '#999' : 'white',
                                 cursor: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? 'not-allowed' : 'pointer',
                                 opacity: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? 0.5 : 1,
-                                fontSize: '12px'
+                                fontSize: seat.seatNumber.includes('+') && seat.seatNumber.split('+').length > 2 ? '9px' : '10px'
                               }}
                             >
-                              {seat.seatNumber.slice(1)}
+                              {seat.seatNumber.includes('+')
+                                ? seat.seatNumber.replace(/[A-Z]/g, '').replace('+', '  ')
+                                : seat.seatNumber.slice(1)
+                              }
                             </button>
                           )
-                        ))}
+                        )}
                       </div>
                       <span className="w-8 text-center font-bold text-lg" style={{ color: 'var(--color-text)' }}>
                         {row}
@@ -611,26 +703,12 @@ const BookingPage: React.FC = () => {
 
                 {/* Legend */}
                 <div className="flex justify-center gap-6 text-base flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded" style={{ backgroundColor: '#4CAF50' }}></div>
-                    <span>Có thể chọn</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded" style={{ backgroundColor: '#666' }}></div>
-                    <span>Đã bán</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded" style={{ backgroundColor: '#ffd700' }}></div>
-                    <span>Đã chọn</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded" style={{ backgroundColor: '#ff8c00' }}></div>
-                    <span>Đang được đặt</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded" style={{ backgroundColor: '#ff6b6b' }}></div>
-                    <span>VIP</span>
-                  </div>
+                  {generateLegendItems().map((item, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded" style={{ backgroundColor: item.color }}></div>
+                      <span>{item.label}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             ) : (
@@ -701,16 +779,21 @@ const BookingPage: React.FC = () => {
               <div className="mb-6">
                 <div className="w-full h-px border-t-2 border-dashed mb-4" style={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}></div>
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm font-semibold">
-                    <span>Hàng</span>
-                    <span>Ghế</span>
-                    <span>Giá</span>
+                  <div className="flex text-sm font-semibold">
+                    <span className="w-12 text-center">Hàng</span>
+                    <span className="flex-1 text-center">Ghế</span>
+                    <span className="w-20 text-right">Giá</span>
                   </div>
                   {selectedSeats.length > 0 ? selectedSeats.map((seat) => (
-                    <div key={seat.id} className="flex justify-between text-sm">
-                      <span>{seat.seatNumber.charAt(0)}</span>
-                      <span>{seat.seatNumber.slice(1)}</span>
-                      <span>{getSeatPrice(seat.seatType).toLocaleString('vi-VN')}đ</span>
+                    <div key={seat.id} className="flex text-sm">
+                      <span className="w-12 text-center">{seat.seatNumber.charAt(0)}</span>
+                      <span className="flex-1 text-center">
+                        {seat.seatNumber.includes('+') 
+                          ? seat.seatNumber.replace(/[A-Z]/g, '').replace('+', '-')
+                          : seat.seatNumber.slice(1)
+                        }
+                      </span>
+                      <span className="w-20 text-right">{getSeatPrice(seat.seatType || 'Standard', seat.price).toLocaleString('vi-VN')}đ</span>
                     </div>
                   )) : (
                     <div className="text-center py-4" style={{ color: 'var(--color-primary)' }}>

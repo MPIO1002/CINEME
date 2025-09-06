@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTimes, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { faFacebook, faGoogle } from "@fortawesome/free-brands-svg-icons";
@@ -22,6 +23,7 @@ interface RegisterData {
 }
 
 interface UserData {
+  id: string;
   email: string;
   fullName: string;
   accessToken: string;
@@ -30,6 +32,7 @@ interface UserData {
 
 const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
   const { showToast } = useToast();
+  const location = useLocation();
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,6 +56,140 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
     phone: '',
     password: ''
   });
+
+  // Handle Google OAuth callback when component mounts or URL changes
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const paramsString = location.search; // Get everything after ?
+    
+    // Check if this is a Google OAuth callback (has state, code, and scope parameters)
+    if (paramsString && urlParams.get('state') && urlParams.get('code') && urlParams.get('scope')) {
+      // Create a simple hash from state and first 10 chars of code for tracking
+      const state = urlParams.get('state') || '';
+      const code = urlParams.get('code') || '';
+      const processedKey = `oauth_${state.slice(0, 10)}_${code.slice(0, 10)}`;
+      
+      // Check if already processed and not too old (5 minutes)
+      const existingTimestamp = localStorage.getItem(processedKey);
+      if (existingTimestamp) {
+        const age = Date.now() - parseInt(existingTimestamp);
+        if (age < 5 * 60 * 1000) { // 5 minutes
+          console.log('OAuth callback already processed recently, skipping...', processedKey, 'Age:', age, 'ms');
+          window.history.replaceState({}, document.title, window.location.pathname);
+          return;
+        } else {
+          console.log('OAuth callback processed key is old, clearing...', processedKey);
+          localStorage.removeItem(processedKey);
+        }
+      }
+      
+      // Mark this OAuth callback as being processed
+      localStorage.setItem(processedKey, Date.now().toString());
+      console.log('Marking OAuth as processing:', processedKey);
+      
+      console.log('Google OAuth callback detected');
+      console.log('Full callback URL:', window.location.href);
+      console.log('Params string:', paramsString);
+      
+      // Call backend OAuth callback endpoint with the URL params
+      const backendCallbackUrl = `http://localhost:8080/oauth2/callback${paramsString}`;
+      console.log('About to call backend:', backendCallbackUrl);
+      
+      // Debug: Test if we can reach the backend
+      console.log('Testing backend connectivity...');
+      
+      handleOAuthCallback(backendCallbackUrl, processedKey);
+    }
+  }, [location.search]);
+
+  const handleOAuthCallback = async (callbackUrl: string, processedKey?: string) => {
+    try {
+      console.log('Calling backend OAuth callback:', callbackUrl);
+      
+      const response = await fetch(callbackUrl, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('Backend response status:', response.status);
+      console.log('Backend response ok:', response.ok);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('Backend response data:', result);
+      
+      if (result.statusCode === 200 && result.data) {
+        console.log('OAuth login successful, user data:', result.data);
+        
+        // Save user data to localStorage
+        localStorage.setItem('accessToken', result.data.accessToken);
+        localStorage.setItem('refreshToken', result.data.refreshToken);
+        localStorage.setItem('userData', JSON.stringify(result.data));
+        
+        console.log('User data saved to localStorage');
+        
+        // Call onLoginSuccess callback
+        onLoginSuccess?.(result.data);
+        
+        showToast('success', result.message || 'Đăng nhập thành công!');
+        
+        // Get the original URL to redirect to
+        const returnUrl = localStorage.getItem('oauthReturnUrl') || '/';
+        localStorage.removeItem('oauthReturnUrl');
+        
+        console.log('Redirecting back to:', returnUrl);
+        
+        // Clean URL by removing OAuth parameters
+        const cleanUrl = window.location.origin + returnUrl;
+        window.history.replaceState({}, document.title, cleanUrl);
+        
+        // Close the modal if it's open
+        onClose();
+        
+        // Clean up the processed marker after successful login
+        if (processedKey) {
+          setTimeout(() => {
+            localStorage.removeItem(processedKey);
+          }, 5000); // Remove after 5 seconds
+        }
+      } else {
+        console.error('OAuth login failed:', result);
+        showToast('error', result.message || 'Đăng nhập Google thất bại');
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // Remove the processed marker on failure so user can retry
+        if (processedKey) {
+          localStorage.removeItem(processedKey);
+        }
+      }
+    } catch (error) {
+      console.error('OAuth callback error:', error);
+      
+      // If it's a network error, it might be CORS - try alternative approach
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        console.log('Network error detected, trying alternative approach...');
+        showToast('error', 'Lỗi kết nối mạng. Vui lòng thử lại.');
+      } else {
+        showToast('error', 'Có lỗi xảy ra trong quá trình đăng nhập');
+      }
+      
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      // Remove the processed marker on error so user can retry
+      if (processedKey) {
+        localStorage.removeItem(processedKey);
+        console.log('Removed processed key due to error:', processedKey);
+      }
+    }
+  };
 
   // Validation functions
   const validateEmail = (email: string): string => {
@@ -196,7 +333,7 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
         console.log('Login successful:', result);
         
         if (result.statusCode === 200 && result.data) {
-          // Lưu tokens vào localStorage
+          // Lưu tokens và user data vào localStorage
           localStorage.setItem('accessToken', result.data.accessToken);
           localStorage.setItem('refreshToken', result.data.refreshToken);
           localStorage.setItem('userData', JSON.stringify(result.data));
@@ -225,6 +362,7 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
     // Lưu URL hiện tại để redirect về sau khi đăng nhập
     localStorage.setItem('oauthReturnUrl', window.location.pathname + window.location.search);
     
+    // Redirect to backend Google OAuth endpoint
     window.location.href = 'http://localhost:8080/oauth2/authorization/google';
   };
 
