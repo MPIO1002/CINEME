@@ -16,46 +16,13 @@ import {
     Volume2
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { type Room as ApiRoom, roomApiService } from '../../../services/roomApi';
+import { type Room as ApiRoom, type Room, roomApiService, type RoomLayout } from '../../../services/roomApi';
 import { Pagination } from "../components/pagination";
 import RoomModal from '../components/RoomModal.tsx';
 import type { Seat as DesignerSeat } from '../components/SeatLayoutDesigner';
 import type { Column } from "../components/tableProps";
 import { Table } from "../components/tableProps";
 
-// Create local interfaces that match the component needs while being compatible with API
-interface Seat {
-  id?: string;
-  row?: string; // Changed to string to match API
-  column?: number;
-  isSelected?: boolean;
-  isHovered?: boolean;
-  seatNumber: string;
-  seatType: 'STANDARD' | 'VIP' | 'COUPLE' | 'DISABLED';
-}
-
-interface Room {
-  id?: string;
-  name: string;
-  type: '2D' | '3D' | 'IMAX' | '4DX';
-  location?: string;
-  totalSeats?: number;
-  vipSeats?: number;
-  regularSeats?: number;
-  coupleSeats?: number;
-  status?: 'ACTIVE' | 'MAINTENANCE' | 'CLOSED';
-  screenSize?: string;
-  screenResolution?: string;
-  audioSystem?: string;
-  hasAirCondition?: boolean;
-  hasEmergencyExit?: boolean;
-  hasDolbyAtmos?: boolean;
-  has4K?: boolean;
-  description?: string;
-  utilization?: number;
-  monthlyRevenue?: number;
-  seatLayout?: Seat[];
-}
 
 // Adapter functions to convert between API and component types
 const convertApiRoomToLocal = (apiRoom: ApiRoom): Room => ({
@@ -119,42 +86,42 @@ interface ModalRoom {
 }
 
 // Convert local Room to Modal Room interface
-const convertToModalRoom = (room: Room): ModalRoom => ({
-  id: room.id, // Ensure ID is preserved
-  ...room,
-  totalSeats: room.totalSeats || 0,
-  vipSeats: room.vipSeats || 0,
-  regularSeats: room.regularSeats || 0,
-  status: room.status || 'ACTIVE',
-  screenSize: room.screenSize || '',
-  screenResolution: room.screenResolution || '',
-  audioSystem: room.audioSystem || '',
-  hasAirCondition: room.hasAirCondition || false,
-  hasEmergencyExit: room.hasEmergencyExit || false,
-  hasDolbyAtmos: room.hasDolbyAtmos || false,
-  has4K: room.has4K || false,
-  seatLayout: room.seatLayout?.map(seat => {
-    // Map component seatType to modal type
-    const getModalTypeFromComponent = (componentType: string): 'regular' | 'vip' | 'couple' | 'disabled' | 'blocked' => {
-      switch (componentType.toUpperCase()) {
-        case 'VIP': return 'vip';
-        case 'COUPLE': return 'couple';
-        case 'DISABLED': return 'disabled';
-        case 'STANDARD': 
-        default: return 'regular';
-      }
-    };
+// const convertToModalRoom = (room: Room): ModalRoom => ({
+//   id: room.id, // Ensure ID is preserved
+//   ...room,
+//   totalSeats: room.totalSeats || 0,
+//   vipSeats: room.vipSeats || 0,
+//   regularSeats: room.regularSeats || 0,
+//   status: room.status || 'ACTIVE',
+//   screenSize: room.screenSize || '',
+//   screenResolution: room.screenResolution || '',
+//   audioSystem: room.audioSystem || '',
+//   hasAirCondition: room.hasAirCondition || false,
+//   hasEmergencyExit: room.hasEmergencyExit || false,
+//   hasDolbyAtmos: room.hasDolbyAtmos || false,
+//   has4K: room.has4K || false,
+//   seatLayout: room.seatLayout?.map(seat => {
+//     // Map component seatType to modal type
+//     const getModalTypeFromComponent = (componentType: string): 'regular' | 'vip' | 'couple' | 'disabled' | 'blocked' => {
+//       switch (componentType.toUpperCase()) {
+//         case 'VIP': return 'vip';
+//         case 'COUPLE': return 'couple';
+//         case 'DISABLED': return 'disabled';
+//         case 'STANDARD': 
+//         default: return 'regular';
+//       }
+//     };
     
-    return {
-      id: seat.id || `${seat.row}-${seat.column}`,
-      row: parseInt(seat.row || '1'),
-      column: seat.column || 1,
-      type: getModalTypeFromComponent(seat.seatType || 'STANDARD'),
-      label: seat.seatNumber,
-      isAvailable: true
-    };
-  })
-});
+//     return {
+//       id: seat.id || `${seat.row}-${seat.column}`,
+//       row: parseInt(seat.row || '1'),
+//       column: seat.column || 1,
+//       type: getModalTypeFromComponent(seat.seatType || 'STANDARD'),
+//       label: seat.seatNumber,
+//       isAvailable: true
+//     };
+//   })
+// });
 
 // Convert Modal Room to local Room interface  
 const convertFromModalRoom = (modalRoom: unknown): Room => {
@@ -239,39 +206,43 @@ const RoomManagement: React.FC = () => {
     setLoading(false);
   };
 
-  const handleSaveRoom = async (modalRoom: unknown) => {
-    setLoading(true);
-    
-    console.log('Saving room:', modalRoom);
-    
-    try {
-      const room = convertFromModalRoom(modalRoom);
-      
-      if (modalMode === "add") {
-        // Create new room
-        const apiRoom = convertLocalRoomToApi(room);
-        const newRoom = await roomApiService.createRoom(apiRoom);
-        const localRoom = convertApiRoomToLocal(newRoom);
-        setRooms(prev => [...prev, {...localRoom, utilization: 0, monthlyRevenue: 0}]);
-        alert('Thêm phòng chiếu thành công!');
-      } else if (modalMode === "edit" && room.id) {
-        // Update existing room
-        const apiRoom = convertLocalRoomToApi(room);
-        const updatedRoom = await roomApiService.updateRoom(room.id, apiRoom);
-        const localUpdatedRoom = convertApiRoomToLocal(updatedRoom);
-        setRooms(prev => prev.map(r => 
-          r.id === room.id ? { ...r, ...localUpdatedRoom } : r
-        ));
-        alert('Cập nhật phòng chiếu thành công!');
-      }
-    } catch (error) {
-      console.error('Error saving room:', error);
-      alert('Có lỗi xảy ra khi lưu phòng chiếu. Vui lòng thử lại!');
-    }
-    
-    setModalOpen(false);
-    setLoading(false);
-  };
+    const handleSaveRoom = async (modalRoom: Room, roomLayout?: RoomLayout) => {
+        setLoading(true);
+        
+        
+        try {
+            // const room = convertFromModalRoom(modalRoom);
+            
+            if (modalMode === "add") {
+                console.log('Saving room:', modalRoom);
+                // Create new room
+                // const apiRoom = convertLocalRoomToApi(room);
+                const newRoom = await roomApiService.createRoom(modalRoom.theaterId, modalRoom);
+                const localRoom = convertApiRoomToLocal(newRoom);
+                setRooms(prev => [...prev, {...localRoom, utilization: 0, monthlyRevenue: 0}]);
+                alert('Thêm phòng chiếu thành công!');
+            } else if (modalMode === "edit" && modalRoom.id) {
+                console.log('Updating room:', modalRoom, roomLayout);
+                // Update existing room
+                // const apiRoom = convertLocalRoomToApi(room);
+                // const updatedRoom = await roomApiService.updateRoom(room.id, apiRoom);
+                if (roomLayout) {
+                    console.log('Sending roomLayout to backend:', roomLayout);
+                    await roomApiService.updateRoomSeats(modalRoom.id, roomLayout);
+                }
+                // const localUpdatedRoom = convertApiRoomToLocal(createSeats);
+                // setRooms(prev => prev.map(r => 
+                //   r.id === room.id ? { ...r, ...localUpdatedRoom } : r
+                // ));
+                alert('Cập nhật phòng chiếu thành công!');
+            }
+        } catch (error) {
+            console.error('Error saving room:', error);
+            alert('Có lỗi xảy ra khi lưu phòng chiếu. Vui lòng thử lại!');
+        }
+        setModalOpen(false);
+        setLoading(false);
+    };
 
   const handleDeleteRoom = async (roomId: string) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa phòng chiếu này?')) {
@@ -827,7 +798,7 @@ const RoomManagement: React.FC = () => {
         <RoomModal
           open={modalOpen}
           mode={modalMode}
-          room={selectedRoom ? convertToModalRoom(selectedRoom) : undefined}
+          room={selectedRoom}
           onClose={() => setModalOpen(false)}
           onSubmit={handleSaveRoom}
         />

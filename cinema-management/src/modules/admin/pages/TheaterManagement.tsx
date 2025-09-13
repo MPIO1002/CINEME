@@ -48,7 +48,7 @@ const TheaterManagement: React.FC = () => {
     setLoading(true);
     try {
       // Add a small delay to show loading state (remove in production)
-      await new Promise(resolve => setTimeout(resolve, 800));
+    //   await new Promise(resolve => setTimeout(resolve, 800));
       
       const result = await theaterApi.getAllTheaters();
       
