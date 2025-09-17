@@ -12,7 +12,7 @@ import {
     X
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { type Room, roomApiService, type RoomLayout, type Seat } from '../../../services/roomApi';
+import { type Room, roomApiService, type RoomLayout, type Seat } from '../../../../../services/roomApi';
 import SeatLayoutDesigner from './SeatLayoutDesigner';
 
 interface RoomModalProps {

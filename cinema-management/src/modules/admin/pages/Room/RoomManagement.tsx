@@ -16,12 +16,13 @@ import {
     Volume2
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { type Room as ApiRoom, type Room, roomApiService, type RoomLayout } from '../../../services/roomApi';
-import { Pagination } from "../components/pagination";
-import RoomModal from '../components/RoomModal.tsx';
-import type { Seat as DesignerSeat } from '../components/SeatLayoutDesigner';
-import type { Column } from "../components/tableProps";
-import { Table } from "../components/tableProps";
+import { type Room as ApiRoom, type Room, roomApiService, type RoomLayout } from '../../../../services/roomApi.ts';
+import { Pagination } from "../../components/pagination.tsx";
+import RoomModal from './components/RoomModal.tsx';
+import type { Seat as DesignerSeat } from './components/SeatLayoutDesigner.tsx';
+import type { Column } from "../../components/tableProps.tsx";
+import { Table } from "../../components/tableProps.tsx";
+import { hasPermission } from "../../utils/authUtils.ts";
 
 
 // Adapter functions to convert between API and component types
@@ -414,36 +415,42 @@ const RoomManagement: React.FC = () => {
       title: 'Thao tác',
       render: (_, room) => (
         <div className="flex items-center space-x-2">
-          <button
-            onClick={() => {
-              setSelectedRoom(room);
-              setModalMode("view");
-              setModalOpen(true);
-            }}
-            className="text-blue-600 hover:text-blue-900 transition-colors"
-            title="Xem chi tiết"
-          >
-            <Eye size={16} />
-          </button>
-          <button
-            onClick={() => {
-              setSelectedRoom(room);
-              setModalMode("edit");
-              setModalOpen(true);
-            }}
-            className="text-green-600 hover:text-green-900 transition-colors"
-            title="Chỉnh sửa"
-          >
-            <Edit size={16} />
-          </button>
-          <button
-            onClick={() => room.id && handleDeleteRoom(room.id)}
-            className="text-red-600 hover:text-red-900 transition-colors"
-            title="Xóa"
-            disabled={!room.id}
-          >
-            <Trash2 size={16} />
-          </button>
+          {hasPermission("room.view") && (
+            <button
+              onClick={() => {
+                setSelectedRoom(room);
+                setModalMode("view");
+                setModalOpen(true);
+              }}
+              className="text-blue-600 hover:text-blue-900 transition-colors"
+              title="Xem chi tiết"
+            >
+              <Eye size={16} />
+            </button>
+          )}
+          {hasPermission("room.update") && (
+            <button
+              onClick={() => {
+                setSelectedRoom(room);
+                setModalMode("edit");
+                setModalOpen(true);
+              }}
+              className="text-green-600 hover:text-green-900 transition-colors"
+              title="Chỉnh sửa"
+            >
+              <Edit size={16} />
+            </button>
+          )}
+          {hasPermission("room.delete") && (
+            <button
+              onClick={() => room.id && handleDeleteRoom(room.id)}
+              className="text-red-600 hover:text-red-900 transition-colors"
+              title="Xóa"
+              disabled={!room.id}
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
         </div>
       )
     }
@@ -490,17 +497,19 @@ const RoomManagement: React.FC = () => {
             </div>
 
             {/* Add Button */}
-            <button
-              className="text-blue-600 hover:text-blue-900 transition-colors flex items-center space-x-2 px-4 py-2 border border-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer"
-              onClick={() => {
-                setModalMode("add");
-                setSelectedRoom(undefined);
-                setModalOpen(true);
-              }}
-            >
-              <HousePlus size={16} />
-              <span>Thêm phòng mới</span>
-            </button>
+            {hasPermission("room.create") && (
+              <button
+                className="text-blue-600 hover:text-blue-900 transition-colors flex items-center space-x-2 px-4 py-2 border border-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer"
+                onClick={() => {
+                  setModalMode("add");
+                  setSelectedRoom(undefined);
+                  setModalOpen(true);
+                }}
+              >
+                <HousePlus size={16} />
+                <span>Thêm phòng mới</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -659,24 +668,28 @@ const RoomManagement: React.FC = () => {
                                 <h3 className="text-lg font-semibold text-gray-900">{room.name}</h3>
                             </div>
                             <div className="flex space-x-1">
-                                <button
-                                onClick={() => {
-                                    setSelectedRoom(room);
-                                    setModalMode("edit");
-                                    setModalOpen(true);
-                                }}
-                                className=" text-gray-400 hover:text-blue-600 transition-colors cursor-pointer p-2 rounded-lg hover:bg-blue-100"
-                                title="Chỉnh sửa"
-                                >
-                                <Edit size={14} />
-                                </button>
-                                <button
-                                onClick={() => room.id && handleDeleteRoom(room.id)}
-                                className="p-2 text-gray-400 hover:text-red-600 transition-colors cursor-pointer rounded-lg hover:bg-red-100"
-                                title="Xóa"
-                                >
-                                <Trash2 size={14} />
-                                </button>
+                                { hasPermission("room.update") && (
+                                    <button
+                                        onClick={() => {
+                                            setSelectedRoom(room);
+                                            setModalMode("edit");
+                                            setModalOpen(true);
+                                        }}
+                                        className=" text-gray-400 hover:text-blue-600 transition-colors cursor-pointer p-2 rounded-lg hover:bg-blue-100"
+                                        title="Chỉnh sửa"
+                                    >
+                                        <Edit size={14} />
+                                    </button>
+                                )}
+                                { hasPermission("room.delete") && (
+                                    <button
+                                        onClick={() => room.id && handleDeleteRoom(room.id)}
+                                        className="p-2 text-gray-400 hover:text-red-600 transition-colors cursor-pointer rounded-lg hover:bg-red-100"
+                                        title="Xóa"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                )}
                             </div>
                             </div>
                             <div className="flex items-center justify-between">

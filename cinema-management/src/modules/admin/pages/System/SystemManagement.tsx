@@ -6,6 +6,19 @@ import { Edit, Flag, Languages, Plus, Settings, Tags, Trash2, Users, Video } fro
 import React, { useEffect, useState } from "react";
 
 const SystemManagement: React.FC = () => {
+//   if (!hasPermission("system.view")) {
+//     return (
+//       <div className="h-full bg-gray-50">
+//         <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+//           <div className="text-center py-12">
+//             <h2 className="text-2xl font-bold text-gray-900 mb-2">Không có quyền truy cập</h2>
+//             <p className="text-gray-600">Bạn không có quyền xem trang này.</p>
+//           </div>
+//         </div>
+//       </div>
+//     );
+//   }
+
   const [activeTab, setActiveTab] = useState("countries");
   const [languages, setLanguages] = useState<Language[]>([]);
   const [formats, setFormats] = useState<Format[]>([]);

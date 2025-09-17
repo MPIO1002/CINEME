@@ -1,6 +1,6 @@
 import { Calendar, Edit3, Eye, FileText, Film, Plus, Star, User, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { actorApiService, type Actor } from '../../../services/actorApi';
+import { actorApiService, type Actor } from '../../../../../services/actorApi';
 
 interface ActorModalProps {
   open: boolean;

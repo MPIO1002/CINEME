@@ -1,6 +1,6 @@
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Film } from 'lucide-react';
 import React, { useState } from 'react';
-import { type Showtime } from '../../../services/showtimeApi';
+import { type Showtime } from '../../../../../services/showtimeApi';
 
 interface ShowtimeCalendarProps {
   showtimes: Showtime[];
