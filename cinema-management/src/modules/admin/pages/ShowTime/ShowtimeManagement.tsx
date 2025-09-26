@@ -1,14 +1,15 @@
 import { Calendar, CalendarClock, Clock, ClockPlus, Edit, Eye, Film, Filter, List, MapPin, Search, Trash2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { movieApiService, type Movie } from '../../../services/movieApi';
-import { type Room } from '../../../services/roomApi';
-import { createShowtime, deleteShowtime, getAllShowtimes, updateShowtime, validateShowtimeEdit, type Showtime } from '../../../services/showtimeApi';
-import { theaterApi, type Theater } from '../../../services/theaterApi';
-import { Pagination } from "../components/pagination";
-import ShowtimeCalendar from "../components/ShowtimeCalendar";
-import ShowtimeModal from "../components/ShowtimeModal";
-import type { Column } from "../components/tableProps";
-import { Table } from "../components/tableProps";
+import { movieApiService, type Movie } from '../../../../services/movieApi';
+import { type Room } from '../../../../services/roomApi';
+import { createShowtime, deleteShowtime, getAllShowtimes, updateShowtime, validateShowtimeEdit, type Showtime } from '../../../../services/showtimeApi';
+import { theaterApi, type Theater } from '../../../../services/theaterApi';
+import { Pagination } from "../../components/pagination";
+import ShowtimeCalendar from "./components/ShowtimeCalendar";
+import ShowtimeModal from "./components/ShowtimeModal";
+import type { Column } from "../../components/tableProps";
+import { Table } from "../../components/tableProps";
+import { hasPermission } from "../../utils/authUtils";
 
 const ShowtimeManagement: React.FC = () => {
 const [searchTerm, setSearchTerm] = useState('');
@@ -453,7 +454,8 @@ const columns: Column<Showtime>[] = [
     title: 'Thao tác',
     render: (_, showtime) => (
         <div className="flex items-center space-x-1">
-        <button
+        {hasPermission("showtime.view") && (
+          <button
             onClick={() => {
             setSelectedShowtime(showtime);
             setModalMode("view");
@@ -461,10 +463,12 @@ const columns: Column<Showtime>[] = [
             }}
             className="text-blue-600 hover:text-blue-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-blue-100"
             title="Xem chi tiết"
-        >
+          >
             <Eye size={16} />
-        </button>
-        <button
+          </button>
+        )}
+        {hasPermission("showtime.update") && (
+          <button
             onClick={() => {
             setSelectedShowtime(showtime);
             setModalMode("edit");
@@ -472,17 +476,20 @@ const columns: Column<Showtime>[] = [
             }}
             className="text-green-600 hover:text-green-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-green-100"
             title="Chỉnh sửa"
-        >
+          >
             <Edit size={16} />
-        </button>
-        <button
+          </button>
+        )}
+        {hasPermission("showtime.delete") && (
+          <button
             onClick={() => showtime.id && handleDeleteShowtime(showtime.id)}
             className="text-red-600 hover:text-red-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-red-100"
             title="Xóa"
             disabled={!showtime.id}
-        >
+          >
             <Trash2 size={16} />
-        </button>
+          </button>
+        )}
         </div>
     )
     }
@@ -529,21 +536,23 @@ return (
             </div>
 
             {/* Add Button */}
-            <button
-            className="text-blue-600 hover:text-blue-900 transition-colors flex items-center space-x-2 px-4 py-2 border border-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer"
-            onClick={() => {
-                setModalMode("add");
-                setSelectedShowtime(undefined);
-                // Load all rooms for modal when adding new showtime
-                if (theaters.length > 0) {
-                    setRooms([]); // Reset rooms to allow user to select theater first
-                }
-                setModalOpen(true);
-            }}
-            >
-            <ClockPlus size={16} />
-            <span>Thêm suất chiếu</span>
-            </button>
+            {hasPermission("showtime.create") && (
+              <button
+                className="text-blue-600 hover:text-blue-900 transition-colors flex items-center space-x-2 px-4 py-2 border border-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer"
+                onClick={() => {
+                    setModalMode("add");
+                    setSelectedShowtime(undefined);
+                    // Load all rooms for modal when adding new showtime
+                    if (theaters.length > 0) {
+                        setRooms([]); // Reset rooms to allow user to select theater first
+                    }
+                    setModalOpen(true);
+                }}
+              >
+                <ClockPlus size={16} />
+                <span>Thêm suất chiếu</span>
+              </button>
+            )}
         </div>
         </div>
 

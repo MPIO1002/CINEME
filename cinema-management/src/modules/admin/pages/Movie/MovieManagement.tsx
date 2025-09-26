@@ -3,10 +3,11 @@ import AlertTitle from '@mui/material/AlertTitle';
 import axios from 'axios';
 import { Edit, Eye, Filter, Popcorn, Search, TicketPlus, Trash2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { movieApiService, type Movie } from '../../../services/movieApi';
-import MovieModal from "../components/MovieModal";
-import { Pagination } from "../components/pagination";
-import { Table, type Column } from "../components/tableProps";
+import { movieApiService, type Movie } from '../../../../services/movieApi';
+import { Pagination } from "../../components/pagination";
+import { Table, type Column } from "../../components/tableProps";
+import { hasPermission } from '../../utils/authUtils';
+import MovieModal from "./components/MovieModal";
 
 // Main Movie Management Component
 const MovieManagement: React.FC = () => {
@@ -93,6 +94,10 @@ useEffect(() => {
 }, [movies]);
 
 const fetchMovies = async () => {
+    if(!hasPermission('movie.view')) {
+        showAlert('error', 'Lỗi phân quyền', 'Bạn không có quyền xem danh sách phim.');
+        return;
+    }
     setLoading(true);
     try {
         const moviesData = await movieApiService.getAllMovies();
@@ -108,214 +113,214 @@ const fetchMovies = async () => {
 };
 
 const handleSaveMovie = async (movie: Movie) => {
-setLoading(true);
-try {
-    console.log('Movie data to save:', movie);
-    console.log('Modal mode:', modalMode);
-    console.log('Selected movie:', selectedMovie);
-
-    // Validate required fields before sending
-    const requiredFields = ['nameVn', 'director', 'countryId', 'limitageId', 'releaseDate', 'endDate'];
-    const missingFields = requiredFields.filter(field => !movie[field as keyof Movie]);
-    
-    // Special validation for listActor - commented out for now since it might not be required
-    // if (!movie.listActor || movie.listActor.length === 0) {
-    //     missingFields.push('listActor');
-    // }
-    
-    if (missingFields.length > 0) {
-    showAlert('error', 'Lỗi xác thực', `Thiếu các trường bắt buộc: ${missingFields.join(', ')}`);
-    return;
-    }
-
-    // Validate UUID format for foreign keys
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    const uuidFields = ['countryId', 'limitageId'];
-    
-    for (const field of uuidFields) {
-    const value = movie[field as keyof Movie] as string;
-    if (value && !uuidRegex.test(value)) {
-        showAlert('error', 'Lỗi xác thực', `${field} không đúng định dạng UUID`);
-        return;
-    }
-    }
-
-    // Format dates for Java LocalDateTime (without timezone)
-    const formatDateTimeForBackend = (dateString: string) => {
-    if (!dateString) return '';
-    
+    setLoading(true);
     try {
-        const date = new Date(dateString);
+        console.log('Movie data to save:', movie);
+        console.log('Modal mode:', modalMode);
+        console.log('Selected movie:', selectedMovie);
+
+        // Validate required fields before sending
+        const requiredFields = ['nameVn', 'director', 'countryId', 'limitageId', 'releaseDate', 'endDate'];
+        const missingFields = requiredFields.filter(field => !movie[field as keyof Movie]);
         
-        // Check if date is valid
-        if (isNaN(date.getTime())) {
-        console.error('Invalid date:', dateString);
-        return '';
+        // Special validation for listActor - commented out for now since it might not be required
+        // if (!movie.listActor || movie.listActor.length === 0) {
+        //     missingFields.push('listActor');
+        // }
+        
+        if (missingFields.length > 0) {
+        showAlert('error', 'Lỗi xác thực', `Thiếu các trường bắt buộc: ${missingFields.join(', ')}`);
+        return;
+        }
+
+        // Validate UUID format for foreign keys
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        const uuidFields = ['countryId', 'limitageId'];
+        
+        for (const field of uuidFields) {
+        const value = movie[field as keyof Movie] as string;
+        if (value && !uuidRegex.test(value)) {
+            showAlert('error', 'Lỗi xác thực', `${field} không đúng định dạng UUID`);
+            return;
+        }
+        }
+
+        // Format dates for Java LocalDateTime (without timezone)
+        const formatDateTimeForBackend = (dateString: string) => {
+        if (!dateString) return '';
+        
+        try {
+            const date = new Date(dateString);
+            
+            // Check if date is valid
+            if (isNaN(date.getTime())) {
+            console.error('Invalid date:', dateString);
+            return '';
+            }
+            
+            // Format as YYYY-MM-DDTHH:mm:ss (without timezone)
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            
+            return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+        } catch (error) {
+            console.error('Error formatting date:', error);
+            return '';
+        }
+        };
+
+        const formattedReleaseDate = formatDateTimeForBackend(movie.releaseDate);
+        const formattedEndDate = formatDateTimeForBackend(movie.endDate);
+        
+        if (!formattedReleaseDate || !formattedEndDate) {
+        showAlert('error', 'Lỗi xác thực', 'Định dạng ngày không hợp lệ. Vui lòng kiểm tra lại ngày phát hành và ngày kết thúc.');
+        return;
+        }
+
+        // Check file sizes before processing (only for new files)
+        const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+        const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
+        
+        if (movie.image instanceof File) {
+        if (!movie.image.type.startsWith('image/')) {
+            showAlert('error', 'Lỗi tập tin', 'File ảnh không hợp lệ. Chỉ chấp nhận file ảnh.');
+            return;
+        }
+        if (movie.image.size > MAX_IMAGE_SIZE) {
+            showAlert('error', 'Lỗi tập tin', `File ảnh quá lớn (${(movie.image.size / 1024 / 1024).toFixed(2)}MB). Giới hạn tối đa là 10MB.`);
+            return;
+        }
+        } else if (modalMode === "add") {
+        // Chỉ bắt buộc file khi thêm mới
+        showAlert('error', 'Thiếu tập tin', 'Vui lòng chọn file ảnh để upload');
+        return;
         }
         
-        // Format as YYYY-MM-DDTHH:mm:ss (without timezone)
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        const seconds = String(date.getSeconds()).padStart(2, '0');
-        
-        return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-    } catch (error) {
-        console.error('Error formatting date:', error);
-        return '';
-    }
-    };
-
-    const formattedReleaseDate = formatDateTimeForBackend(movie.releaseDate);
-    const formattedEndDate = formatDateTimeForBackend(movie.endDate);
-    
-    if (!formattedReleaseDate || !formattedEndDate) {
-    showAlert('error', 'Lỗi xác thực', 'Định dạng ngày không hợp lệ. Vui lòng kiểm tra lại ngày phát hành và ngày kết thúc.');
-    return;
-    }
-
-    // Check file sizes before processing (only for new files)
-    const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
-    const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
-    
-    if (movie.image instanceof File) {
-    if (!movie.image.type.startsWith('image/')) {
-        showAlert('error', 'Lỗi tập tin', 'File ảnh không hợp lệ. Chỉ chấp nhận file ảnh.');
-        return;
-    }
-    if (movie.image.size > MAX_IMAGE_SIZE) {
-        showAlert('error', 'Lỗi tập tin', `File ảnh quá lớn (${(movie.image.size / 1024 / 1024).toFixed(2)}MB). Giới hạn tối đa là 10MB.`);
-        return;
-    }
-    } else if (modalMode === "add") {
-    // Chỉ bắt buộc file khi thêm mới
-    showAlert('error', 'Thiếu tập tin', 'Vui lòng chọn file ảnh để upload');
-    return;
-    }
-    
-    if (movie.trailer instanceof File) {
-    if (!movie.trailer.type.startsWith('video/')) {
-        alert('File trailer không hợp lệ. Chỉ chấp nhận file video.');
-        return;
-    }
-    if (movie.trailer.size > MAX_VIDEO_SIZE) {
-        alert(`File trailer quá lớn (${(movie.trailer.size / 1024 / 1024).toFixed(2)}MB). Giới hạn tối đa là 100MB.`);
-        return;
-    }
-    } else if (modalMode === "add") {
-    // Chỉ bắt buộc file khi thêm mới
-    alert('Vui lòng chọn file trailer để upload');
-    return;
-    }
-
-    // Use FormData exactly matching SwaggerUI structure
-    const formData = new FormData();
-    
-    // Add all fields as shown in SwaggerUI (in same order for consistency)
-    formData.append('nameVn', movie.nameVn?.trim() || '');
-    formData.append('nameEn', movie.nameEn?.trim() || '');
-    formData.append('director', movie.director?.trim() || '');
-    formData.append('countryId', movie.countryId || '');
-    formData.append('releaseDate', formattedReleaseDate);
-    formData.append('endDate', formattedEndDate);
-    formData.append('briefVn', movie.briefVn?.trim() || '');
-    formData.append('briefEn', movie.briefEn?.trim() || '');
-    // image and trailer will be added below as files
-    formData.append('time', Math.max(1, movie.time || 90).toString());
-    formData.append('limitageId', movie.limitageId || '');
-    formData.append('ratings', movie.ratings?.trim() || '0'); // Default to 0 if not provided
-    // Note: status is now calculated automatically based on releaseDate and endDate
-    
-    // Backend expects listActorId (array of UUIDs), not listActor (array of Actor objects)
-    const actorIds = (movie.listActor || []).map(actor => actor.id).filter(id => id !== undefined);
-    console.log('Actor IDs to send:', actorIds);
-    
-    // For FormData with @ModelAttribute, send each UUID separately with the same field name
-    // This allows Spring Boot to automatically convert to List<UUID>
-    if (actorIds.length > 0) {
-        actorIds.forEach(actorId => {
-            if (actorId) {
-                formData.append('listActorId', actorId);
-            }
-        });
-    } else {
-        // Send empty array - some backends require at least one entry
-        // We'll send an empty string that backend can handle
-        console.log('No actors selected, sending empty listActorId');
-        // Actually don't append anything for empty list - let backend handle missing field
-    }
-    // Handle image field - smart upload logic
-    if (modalMode === "add") {
-    // Khi thêm mới: bắt buộc phải có file
-    if (movie.image instanceof File) {
-        console.log('Adding new image file to FormData:', movie.image.name);
-        formData.append('image', movie.image);
-    } else {
-        console.error('Image must be a File object when adding new movie');
-        alert('Vui lòng chọn file ảnh để upload');
-        return;
-    }
-    } else if (modalMode === "edit") {
-    // Khi sửa: chỉ upload nếu user chọn file mới
-    if (movie.image instanceof File) {
-        console.log('Adding new image file to FormData for update:', movie.image.name);
-        formData.append('image', movie.image);
-    } else {
-        console.log('Keeping existing image (no new file selected)');
-        // Không append image vào FormData - backend sẽ giữ nguyên file cũ
-    }
-    }
-
-    // Handle trailer field - smart upload logic
-    if (modalMode === "add") {
-    // Khi thêm mới: bắt buộc phải có file
-    if (movie.trailer instanceof File) {
-        console.log('Adding new trailer file to FormData:', movie.trailer.name);
-        formData.append('trailer', movie.trailer);
-    } else {
-        console.error('Trailer must be a File object when adding new movie');
+        if (movie.trailer instanceof File) {
+        if (!movie.trailer.type.startsWith('video/')) {
+            alert('File trailer không hợp lệ. Chỉ chấp nhận file video.');
+            return;
+        }
+        if (movie.trailer.size > MAX_VIDEO_SIZE) {
+            alert(`File trailer quá lớn (${(movie.trailer.size / 1024 / 1024).toFixed(2)}MB). Giới hạn tối đa là 100MB.`);
+            return;
+        }
+        } else if (modalMode === "add") {
+        // Chỉ bắt buộc file khi thêm mới
         alert('Vui lòng chọn file trailer để upload');
         return;
-    }
-    } else if (modalMode === "edit") {
-    // Khi sửa: chỉ upload nếu user chọn file mới
-    if (movie.trailer instanceof File) {
-        console.log('Adding new trailer file to FormData for update:', movie.trailer.name);
-        formData.append('trailer', movie.trailer);
-    } else {
-        console.log('Keeping existing trailer (no new file selected)');
-        // Không append trailer vào FormData - backend sẽ giữ nguyên file cũ
-    }
-    }
+        }
 
-    let response;
-    if (modalMode === "add") {
-    console.log('Making POST request to add movie');
-    response = await movieApiService.createMovie(formData);
-    } else if (modalMode === "edit" && selectedMovie?.id) {
-    console.log(`Making PUT request to edit movie, ID: ${selectedMovie.id}`);
-    response = await movieApiService.updateMovie(selectedMovie.id, formData);
-    } else {
-    throw new Error('Invalid operation mode or missing movie ID for edit');
-    }
+        // Use FormData exactly matching SwaggerUI structure
+        const formData = new FormData();
+        
+        // Add all fields as shown in SwaggerUI (in same order for consistency)
+        formData.append('nameVn', movie.nameVn?.trim() || '');
+        formData.append('nameEn', movie.nameEn?.trim() || '');
+        formData.append('director', movie.director?.trim() || '');
+        formData.append('countryId', movie.countryId || '');
+        formData.append('releaseDate', formattedReleaseDate);
+        formData.append('endDate', formattedEndDate);
+        formData.append('briefVn', movie.briefVn?.trim() || '');
+        formData.append('briefEn', movie.briefEn?.trim() || '');
+        // image and trailer will be added below as files
+        formData.append('time', Math.max(1, movie.time || 90).toString());
+        formData.append('limitageId', movie.limitageId || '');
+        formData.append('ratings', movie.ratings?.trim() || '0'); // Default to 0 if not provided
+        // Note: status is now calculated automatically based on releaseDate and endDate
+        
+        // Backend expects listActorId (array of UUIDs), not listActor (array of Actor objects)
+        const actorIds = (movie.listActor || []).map(actor => actor.id).filter(id => id !== undefined);
+        console.log('Actor IDs to send:', actorIds);
+        
+        // For FormData with @ModelAttribute, send each UUID separately with the same field name
+        // This allows Spring Boot to automatically convert to List<UUID>
+        if (actorIds.length > 0) {
+            actorIds.forEach(actorId => {
+                if (actorId) {
+                    formData.append('listActorId', actorId);
+                }
+            });
+        } else {
+            // Send empty array - some backends require at least one entry
+            // We'll send an empty string that backend can handle
+            console.log('No actors selected, sending empty listActorId');
+            // Actually don't append anything for empty list - let backend handle missing field
+        }
+        // Handle image field - smart upload logic
+        if (modalMode === "add") {
+        // Khi thêm mới: bắt buộc phải có file
+        if (movie.image instanceof File) {
+            console.log('Adding new image file to FormData:', movie.image.name);
+            formData.append('image', movie.image);
+        } else {
+            console.error('Image must be a File object when adding new movie');
+            alert('Vui lòng chọn file ảnh để upload');
+            return;
+        }
+        } else if (modalMode === "edit") {
+        // Khi sửa: chỉ upload nếu user chọn file mới
+        if (movie.image instanceof File) {
+            console.log('Adding new image file to FormData for update:', movie.image.name);
+            formData.append('image', movie.image);
+        } else {
+            console.log('Keeping existing image (no new file selected)');
+            // Không append image vào FormData - backend sẽ giữ nguyên file cũ
+        }
+        }
 
-    console.log('API Response:', response);
-    
-    // Success feedback
-    alert(modalMode === "add" ? "Thêm phim thành công!" : "Cập nhật phim thành công!");
-    
-    // Refresh data and close modal
-    await fetchMovies();
-    setModalOpen(false);
-    
-} catch (error) {
-    console.error("Error saving movie:", error);
-    alert("Có lỗi không xác định xảy ra. Vui lòng kiểm tra console và thử lại.");
-} finally {
-    setLoading(false);
-}
+        // Handle trailer field - smart upload logic
+        if (modalMode === "add") {
+        // Khi thêm mới: bắt buộc phải có file
+        if (movie.trailer instanceof File) {
+            console.log('Adding new trailer file to FormData:', movie.trailer.name);
+            formData.append('trailer', movie.trailer);
+        } else {
+            console.error('Trailer must be a File object when adding new movie');
+            alert('Vui lòng chọn file trailer để upload');
+            return;
+        }
+        } else if (modalMode === "edit") {
+        // Khi sửa: chỉ upload nếu user chọn file mới
+        if (movie.trailer instanceof File) {
+            console.log('Adding new trailer file to FormData for update:', movie.trailer.name);
+            formData.append('trailer', movie.trailer);
+        } else {
+            console.log('Keeping existing trailer (no new file selected)');
+            // Không append trailer vào FormData - backend sẽ giữ nguyên file cũ
+        }
+        }
+
+        let response;
+        if (modalMode === "add") {
+        console.log('Making POST request to add movie');
+        response = await movieApiService.createMovie(formData);
+        } else if (modalMode === "edit" && selectedMovie?.id) {
+        console.log(`Making PUT request to edit movie, ID: ${selectedMovie.id}`);
+        response = await movieApiService.updateMovie(selectedMovie.id, formData);
+        } else {
+        throw new Error('Invalid operation mode or missing movie ID for edit');
+        }
+
+        console.log('API Response:', response);
+        
+        // Success feedback
+        alert(modalMode === "add" ? "Thêm phim thành công!" : "Cập nhật phim thành công!");
+        
+        // Refresh data and close modal
+        await fetchMovies();
+        setModalOpen(false);
+        
+    } catch (error) {
+        console.error("Error saving movie:", error);
+        alert("Có lỗi không xác định xảy ra. Vui lòng kiểm tra console và thử lại.");
+    } finally {
+        setLoading(false);
+    }
 };
 
 const getRatingStars = (rating: string) => {
@@ -548,27 +553,33 @@ const columns: Column<Movie>[] = [
     title: 'Hành động',
     render: (_, movie) => (
         <div className="flex items-center space-x-1">
-            <button 
+            {hasPermission("movie.view") && (
+              <button 
                 className="text-blue-600 hover:text-blue-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-blue-100" 
                 title="Xem chi tiết"
                 onClick={() => { setModalMode("view"); setSelectedMovie(movie); setModalOpen(true); }}
-            >
+              >
                 <Eye size={16} />
-            </button>
-            <button 
+              </button>
+            )}
+            {hasPermission("movie.update") && (
+              <button 
                 className="text-green-600 hover:text-green-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-green-100" 
                 title="Chỉnh sửa"
                 onClick={() => { setModalMode("edit"); setSelectedMovie(movie); setModalOpen(true); }}
-            >
+              >
                 <Edit size={16} />
-            </button>
-            <button 
+              </button>
+            )}
+            {hasPermission("movie.delete") && (
+              <button 
                 className="text-red-600 hover:text-red-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-red-100" 
                 title="Xóa"
                 onClick={() => handleDelete(movie)}
-            >
+              >
                 <Trash2 size={16} />
-            </button>
+              </button>
+            )}
         </div>
     )
     }
@@ -600,12 +611,14 @@ return (
                     <p className="text-slate-600">Quản lý phim trong hệ thống rạp chiếu phim</p>
                 </div>
             </div>
-            <button 
-            className="text-blue-600 hover:text-blue-900 transition-colors flex items-center justify-center space-x-2 px-4 py-2 border border-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer"
-            onClick={() => { setModalMode("add"); setSelectedMovie(undefined); setModalOpen(true); }}
-            >
-            <TicketPlus size={16} /> <span>Thêm phim</span>
-            </button>
+            {hasPermission("movie.create") && (
+              <button 
+                className="text-blue-600 hover:text-blue-900 transition-colors flex items-center justify-center space-x-2 px-4 py-2 border border-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer"
+                onClick={() => { setModalMode("add"); setSelectedMovie(undefined); setModalOpen(true); }}
+              >
+                <TicketPlus size={16} /> <span>Thêm phim</span>
+              </button>
+            )}
         </div>
 
         {/* Search and Filter */}

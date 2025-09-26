@@ -1,108 +1,85 @@
 import {
     AlertTriangle,
+    CheckCircle,
+    Clock,
     Crown,
-    Info,
+    Film,
     RotateCcw,
     Save,
     Settings,
     Shield,
+    Ticket,
     User,
-    Users
+    Users,
+    Video
 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import rolePermissionApiService, { type Role, type Permission, type ApiPermission, type ApiRole } from '@/services/rolePermissionApi';
 
-interface Permission {
-  key: string;
-  label: string;
-  description: string;
-  category: 'USER' | 'CONTENT' | 'SYSTEM' | 'REPORTS';
-  critical?: boolean;
-}
 
-interface Role {
-  key: string;
-  label: string;
-  description: string;
-  icon: React.ReactNode;
-  color: string;
-  permissions: string[];
-  userCount: number;
-}
+const inferCategory = (key: string): 'USER' | 'MOVIE' | 'SHOWTIME' | 'ROOM' | 'THEATER' | 'SYSTEM' | 'BOOKING' | 'ACTOR' => {
+    if (key.startsWith('user.')) return 'USER';
+    if (key.startsWith('movie.')) return 'MOVIE';
+    if (key.startsWith('showtime.')) return 'SHOWTIME';
+    if (key.startsWith('room.')) return 'ROOM';
+    if (key.startsWith('theater.')) return 'THEATER';
+    if (key.startsWith('system.')) return 'SYSTEM';
+    if (key.startsWith('actor.')) return 'ACTOR';
+    return 'BOOKING';
+};
 
-const PERMISSIONS: Permission[] = [
-  // User Management
-  { key: 'USER_VIEW', label: 'Xem danh sách người dùng', description: 'Xem thông tin người dùng', category: 'USER' },
-  { key: 'USER_CREATE', label: 'Tạo người dùng mới', description: 'Thêm tài khoản người dùng', category: 'USER' },
-  { key: 'USER_EDIT', label: 'Chỉnh sửa người dùng', description: 'Cập nhật thông tin người dùng', category: 'USER' },
-  { key: 'USER_DELETE', label: 'Xóa người dùng', description: 'Xóa tài khoản người dùng', category: 'USER', critical: true },
-  { key: 'USER_BAN', label: 'Khóa/Mở khóa tài khoản', description: 'Khóa hoặc mở khóa tài khoản', category: 'USER', critical: true },
-  { key: 'ROLE_MANAGE', label: 'Quản lý phân quyền', description: 'Thay đổi vai trò và quyền hạn', category: 'USER', critical: true },
-  
-  // Content Management
-  { key: 'MOVIE_VIEW', label: 'Xem danh sách phim', description: 'Xem thông tin phim', category: 'CONTENT' },
-  { key: 'MOVIE_CREATE', label: 'Thêm phim mới', description: 'Tạo phim và upload nội dung', category: 'CONTENT' },
-  { key: 'MOVIE_EDIT', label: 'Chỉnh sửa phim', description: 'Cập nhật thông tin phim', category: 'CONTENT' },
-  { key: 'MOVIE_DELETE', label: 'Xóa phim', description: 'Xóa phim khỏi hệ thống', category: 'CONTENT', critical: true },
-  
-  { key: 'ROOM_VIEW', label: 'Xem danh sách phòng', description: 'Xem thông tin phòng chiếu', category: 'CONTENT' },
-  { key: 'ROOM_CREATE', label: 'Tạo phòng chiếu', description: 'Thêm phòng chiếu mới', category: 'CONTENT' },
-  { key: 'ROOM_EDIT', label: 'Chỉnh sửa phòng', description: 'Cập nhật cấu hình phòng', category: 'CONTENT' },
-  { key: 'ROOM_DELETE', label: 'Xóa phòng chiếu', description: 'Xóa phòng khỏi hệ thống', category: 'CONTENT', critical: true },
-  
-  { key: 'SHOWTIME_VIEW', label: 'Xem lịch chiếu', description: 'Xem danh sách suất chiếu', category: 'CONTENT' },
-  { key: 'SHOWTIME_CREATE', label: 'Tạo suất chiếu', description: 'Thêm suất chiếu mới', category: 'CONTENT' },
-  { key: 'SHOWTIME_EDIT', label: 'Chỉnh sửa suất chiếu', description: 'Cập nhật thông tin suất chiếu', category: 'CONTENT' },
-  { key: 'SHOWTIME_DELETE', label: 'Xóa suất chiếu', description: 'Hủy suất chiếu', category: 'CONTENT', critical: true },
-  
-  { key: 'BOOKING_VIEW', label: 'Xem đặt vé', description: 'Xem danh sách đặt vé', category: 'CONTENT' },
-  { key: 'BOOKING_MANAGE', label: 'Quản lý đặt vé', description: 'Xử lý đặt vé và hoàn tiền', category: 'CONTENT' },
-  
-  // System Management
-  { key: 'SYSTEM_CONFIG', label: 'Cấu hình hệ thống', description: 'Thay đổi cài đặt hệ thống', category: 'SYSTEM', critical: true },
-  { key: 'BACKUP_RESTORE', label: 'Sao lưu & Phục hồi', description: 'Quản lý backup dữ liệu', category: 'SYSTEM', critical: true },
-  { key: 'AUDIT_LOG', label: 'Nhật ký hệ thống', description: 'Xem log hoạt động hệ thống', category: 'SYSTEM' },
-  
-  // Reports
-  { key: 'REPORTS_VIEW', label: 'Xem báo cáo', description: 'Xem các báo cáo thống kê', category: 'REPORTS' },
-  { key: 'REPORTS_EXPORT', label: 'Xuất báo cáo', description: 'Xuất báo cáo ra file', category: 'REPORTS' },
-  { key: 'ANALYTICS_VIEW', label: 'Xem phân tích', description: 'Xem dashboard analytics', category: 'REPORTS' },
-];
+const mapApiPermissionToPermission = (apiPerm: ApiPermission): Permission => ({
+  key: apiPerm.key,
+  label: apiPerm.name,
+  description: `Cho phép ${apiPerm.name.toLowerCase()}`,
+  category: inferCategory(apiPerm.key),
+  critical: apiPerm.key.includes('.delete') || apiPerm.key === 'user.editPermission'
+});
 
-const DEFAULT_ROLES: Role[] = [
-  {
-    key: 'ADMIN',
-    label: 'Quản trị viên',
-    description: 'Quyền cao nhất, có thể truy cập tất cả tính năng',
-    icon: <Crown className="w-5 h-5" />,
-    color: 'red',
-    permissions: PERMISSIONS.map(p => p.key), // All permissions
-    userCount: 3
-  },
-  {
-    key: 'STAFF',
-    label: 'Nhân viên',
-    description: 'Quản lý nội dung và đặt vé, không có quyền quản trị',
-    icon: <Shield className="w-5 h-5" />,
-    color: 'blue',
-    permissions: [
-      'USER_VIEW', 'MOVIE_VIEW', 'MOVIE_CREATE', 'MOVIE_EDIT',
-      'ROOM_VIEW', 'ROOM_CREATE', 'ROOM_EDIT',
-      'SHOWTIME_VIEW', 'SHOWTIME_CREATE', 'SHOWTIME_EDIT',
-      'BOOKING_VIEW', 'BOOKING_MANAGE',
-      'REPORTS_VIEW'
-    ],
-    userCount: 8
-  },
-  {
-    key: 'CUSTOMER',
-    label: 'Khách hàng',
-    description: 'Chỉ có thể xem và đặt vé',
-    icon: <User className="w-5 h-5" />,
-    color: 'green',
-    permissions: [], // No admin permissions
-    userCount: 1247
-  }
-];
+const mapApiRoleToRole = (apiRole: ApiRole, index: number): Role => {
+  const roleConfigs = [
+    {
+      key: 'ADMIN',
+      label: 'Quản trị viên',
+      description: 'Quyền cao nhất, có thể truy cập tất cả tính năng',
+      icon: <Crown className="w-5 h-5" />,
+      color: 'red',
+      userCount: 3
+    },
+    {
+      key: 'STAFF',
+      label: 'Nhân viên',
+      description: 'Quản lý nội dung và đặt vé, không có quyền quản trị',
+      icon: <Shield className="w-5 h-5" />,
+      color: 'blue',
+      userCount: 8
+    },
+    {
+      key: 'CUSTOMER',
+      label: 'Khách hàng',
+      description: 'Chỉ có thể xem và đặt vé',
+      icon: <User className="w-5 h-5" />,
+      color: 'green',
+      userCount: 1247
+    },
+    {
+      key: 'MANAGER',
+      label: 'Quản lý',
+      description: 'Quản lý nội dung và một số quyền hệ thống',
+      icon: <Settings className="w-5 h-5" />,
+      color: 'purple',
+      userCount: 5
+    }
+  ];
+  
+  const config = roleConfigs.find(c => c.label.toLowerCase() === apiRole.name.toLowerCase()) || roleConfigs[index % roleConfigs.length];
+  
+  return {
+    ...config,
+    key: apiRole.name.toUpperCase(),
+    permissions: apiRole.permissions || (apiRole.name.toLowerCase() === 'admin' ? [] : []),
+  };
+};
 
 interface RolePermissionManagerProps {
   open: boolean;
@@ -115,16 +92,44 @@ const RolePermissionManager: React.FC<RolePermissionManagerProps> = ({
   onClose,
   onSave,
 }) => {
-  const [roles, setRoles] = useState<Role[]>(DEFAULT_ROLES);
-  const [selectedRole, setSelectedRole] = useState<string>('ADMIN');
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [selectedRole, setSelectedRole] = useState<string>('');
   const [hasChanges, setHasChanges] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [permResponse, roleResponse] = await Promise.all([
+            rolePermissionApiService.getAllPermissions(),
+            rolePermissionApiService.getAllRoles()
+        ]);
+        const mappedPermissions = permResponse.map(mapApiPermissionToPermission);
+        setPermissions(mappedPermissions);
+        const mappedRoles = roleResponse.map((role: ApiRole, index: number) => mapApiRoleToRole(role, index));
+        setRoles(mappedRoles);
+        setSelectedRole(mappedRoles[0]?.key || '');
+      } catch (err) {
+        setError('Không thể tải dữ liệu: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (open) {
+      fetchData();
+    }
+  }, [open]);
 
   if (!open) return null;
 
   const currentRole = roles.find(r => r.key === selectedRole);
 
   const getPermissionsByCategory = (category: string) => {
-    return PERMISSIONS.filter(p => p.category === category);
+    return permissions.filter(p => p.category === category);
   };
 
   const isPermissionChecked = (permissionKey: string) => {
@@ -157,10 +162,8 @@ const RolePermissionManager: React.FC<RolePermissionManagerProps> = ({
       if (role.key === selectedRole) {
         let newPermissions;
         if (checked) {
-          // Add all category permissions
           newPermissions = [...new Set([...role.permissions, ...categoryPermissions])];
         } else {
-          // Remove all category permissions
           newPermissions = role.permissions.filter(p => !categoryPermissions.includes(p));
         }
         
@@ -183,15 +186,44 @@ const RolePermissionManager: React.FC<RolePermissionManagerProps> = ({
     return checkedCount > 0 && checkedCount < categoryPermissions.length;
   };
 
-  const handleSave = () => {
-    onSave(roles);
-    setHasChanges(false);
-    onClose();
+  const handleSave = async () => {
+    try {
+      // Assuming a POST endpoint to save roles; adjust URL/method as needed
+      const response = await fetch('http://localhost:8080/api/v1/roles/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(roles.map(role => ({
+          name: role.label,
+          permissions: role.permissions
+        })))
+      });
+      const result = await response.json();
+      if (result.statusCode === 200) {
+        onSave(roles);
+        setHasChanges(false);
+        onClose();
+      } else {
+        throw new Error(result.message || 'Failed to save roles');
+      }
+    } catch (err) {
+      setError('Không thể lưu thay đổi: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
   };
 
-  const handleReset = () => {
-    setRoles(DEFAULT_ROLES);
-    setHasChanges(false);
+  const handleReset = async () => {
+    try {
+      const roleResponse = await fetch('http://localhost:8080/api/v1/roles');
+      const roleData = await roleResponse.json();
+      if (roleData.statusCode === 200) {
+        const mappedRoles = roleData.data.map((role: ApiRole, index: number) => mapApiRoleToRole(role, index));
+        setRoles(mappedRoles);
+        setHasChanges(false);
+      } else {
+        throw new Error(roleData.message || 'Failed to reset roles');
+      }
+    } catch (err) {
+      setError('Không thể đặt lại: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
   };
 
   const getRoleColor = (color: string) => {
@@ -199,29 +231,79 @@ const RolePermissionManager: React.FC<RolePermissionManagerProps> = ({
       red: 'bg-red-50 border-red-200 text-red-700',
       blue: 'bg-blue-50 border-blue-200 text-blue-700',
       green: 'bg-green-50 border-green-200 text-green-700',
+      purple: 'bg-purple-50 border-purple-200 text-purple-700'
     };
     return colors[color as keyof typeof colors] || colors.blue;
   };
 
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'USER': return <Users className="w-4 h-4" />;
-      case 'CONTENT': return <Settings className="w-4 h-4" />;
-      case 'SYSTEM': return <Shield className="w-4 h-4" />;
-      case 'REPORTS': return <Info className="w-4 h-4" />;
-      default: return <Settings className="w-4 h-4" />;
-    }
-  };
+    const getCategoryIcon = (category: string) => {
+        switch (category) {
+        case 'USER': return <Users className="w-4 h-4" />;
+        case 'MOVIE': return <Video className="w-4 h-4" />;
+        case 'SHOWTIME': return <Clock className="w-4 h-4" />;
+        case 'ROOM': return <CheckCircle className="w-4 h-4" />;
+        case 'THEATER': return <Film className="w-4 h-4" />;
+        case 'SYSTEM': return <Shield className="w-4 h-4" />;
+        case 'BOOKING': return <Ticket className="w-4 h-4" />;
+        case 'ACTOR': return <User className="w-4 h-4" />;
+        default: return <Settings className="w-4 h-4" />;
+        }
+    };
 
-  const getCategoryName = (category: string) => {
-    switch (category) {
-      case 'USER': return 'Quản lý người dùng';
-      case 'CONTENT': return 'Quản lý nội dung';
-      case 'SYSTEM': return 'Quản trị hệ thống';
-      case 'REPORTS': return 'Báo cáo & Thống kê';
-      default: return category;
-    }
-  };
+    const getCategoryName = (category: string) => {
+        switch (category) {
+        case 'USER': return 'Quản lý người dùng';
+        case 'MOVIE': return 'Quản lý phim';
+        case 'SHOWTIME': return 'Quản lý lịch chiếu';
+        case 'ROOM': return 'Quản lý phòng chiếu';
+        case 'THEATER': return 'Quản lý rạp chiếu';
+        case 'SYSTEM': return 'Quản trị hệ thống';
+        case 'BOOKING': return 'Quản lý bán vé';
+        case 'ACTOR': return 'Quản lý diễn viên';
+        default: return category;
+        }
+    };
+
+    const handleAddRole = () => {
+      const newRole: Role = {
+        key: `role_${Date.now()}`,
+        label: 'New Role',
+        description: 'Description for new role',
+        icon: <Shield className="w-4 h-4" />,
+        color: 'blue',
+        permissions: [],
+        userCount: 0
+      };
+      setRoles((prevRoles) => [...prevRoles, newRole]);
+      setSelectedRole(newRole.key);
+    //   setHasChanges(true);
+    };
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] p-6">
+          <p className="text-gray-600">Đang tải dữ liệu...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] p-6">
+          <p className="text-red-600">{error}</p>
+          <button
+            onClick={onClose}
+            className="mt-4 px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            Đóng
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -261,10 +343,14 @@ const RolePermissionManager: React.FC<RolePermissionManagerProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex h-[calc(95vh-140px)]">
+        <div className="flex h-[calc(93vh-140px)]">
           {/* Role List */}
           <div className="w-80 bg-gray-50 border-r border-gray-200 overflow-y-auto">
             <div className="p-4">
+                <button
+                  onClick={handleAddRole}
+                  className='bg-purple-500 rounded-lg text-white px-4 py-2 mb-4 border-white border-2 hover:text-purple-700 hover:border-purple-600 hover:bg-white transition-colors duration-200 w-full flex items-center justify-center gap-2'
+                >Thêm</button>
               <h3 className="font-semibold text-gray-700 mb-4">Danh sách vai trò</h3>
               <div className="space-y-2">
                 {roles.map((role) => (
@@ -314,7 +400,7 @@ const RolePermissionManager: React.FC<RolePermissionManagerProps> = ({
 
                 {/* Permission Categories */}
                 <div className="space-y-6">
-                  {['USER', 'CONTENT', 'SYSTEM', 'REPORTS'].map((category) => {
+                  {[ 'MOVIE', 'SHOWTIME', 'ACTOR', 'ROOM', 'THEATER', 'USER', 'SYSTEM', 'BOOKING'].map((category) => {
                     const categoryPermissions = getPermissionsByCategory(category);
                     const isFullyChecked = isCategoryFullyChecked(category);
                     const isPartiallyChecked = isCategoryPartiallyChecked(category);

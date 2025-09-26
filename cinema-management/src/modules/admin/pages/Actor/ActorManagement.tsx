@@ -1,9 +1,10 @@
 import { Calendar, Edit, Eye, Search, Star, Trash2, UserPlus } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { actorApiService, type Actor } from '../../../services/actorApi';
-import ActorModal from '../components/ActorModal';
-import { Pagination } from "../components/pagination";
-import { Table, type Column } from "../components/tableProps";
+import { actorApiService, type Actor } from '../../../../services/actorApi';
+import ActorModal from './components/ActorModal';
+import { Pagination } from "../../components/pagination";
+import { Table, type Column } from "../../components/tableProps";
+import { hasPermission } from "../../utils/authUtils";
 
 const ActorManagement: React.FC = () => {
   const [actors, setActors] = useState<Actor[]>([]);
@@ -190,27 +191,33 @@ const ActorManagement: React.FC = () => {
       title: 'Hành động',
       render: (_, actor) => (
         <div className="flex items-center space-x-1">
-          <button 
-            className="text-blue-600 hover:text-blue-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-blue-100" 
-            title="Xem chi tiết"
-            onClick={() => handleViewActor(actor.id || '')}
-          >
-            <Eye size={16} />
-          </button>
-          <button 
-            className="text-green-600 hover:text-green-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-green-100" 
-            title="Chỉnh sửa"
-            onClick={() => handleEditActor(actor.id || '')}
-          >
-            <Edit size={16} />
-          </button>
-          <button 
-            className="text-red-600 hover:text-red-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-red-100" 
-            title="Xóa"
-            onClick={() => handleDeleteActor(actor.id || '')}
-          >
-            <Trash2 size={16} />
-          </button>
+          {hasPermission("actor.view") && (
+            <button 
+              className="text-blue-600 hover:text-blue-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-blue-100" 
+              title="Xem chi tiết"
+              onClick={() => handleViewActor(actor.id || '')}
+            >
+              <Eye size={16} />
+            </button>
+          )}
+          {hasPermission("actor.update") && (
+            <button 
+              className="text-green-600 hover:text-green-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-green-100" 
+              title="Chỉnh sửa"
+              onClick={() => handleEditActor(actor.id || '')}
+            >
+              <Edit size={16} />
+            </button>
+          )}
+          {hasPermission("actor.delete") && (
+            <button 
+              className="text-red-600 hover:text-red-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-red-100" 
+              title="Xóa"
+              onClick={() => handleDeleteActor(actor.id || '')}
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
         </div>
       )
     }
@@ -230,13 +237,15 @@ const ActorManagement: React.FC = () => {
                     <p className="text-slate-600">Quản lý diễn viên trong hệ thống rạp chiếu phim</p>
                 </div>
             </div>
-          <button
-            onClick={handleAddActor}
-            className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-xl font-semibold hover:from-green-700 hover:to-green-800 transition-all duration-200 flex items-center gap-2 shadow-lg"
-          >
-            <UserPlus className="w-5 h-5" />
-            Thêm diễn viên
-          </button>
+          {hasPermission("actor.create") && (
+            <button
+              onClick={handleAddActor}
+              className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-xl font-semibold hover:from-green-700 hover:to-green-800 transition-all duration-200 flex items-center gap-2 shadow-lg"
+            >
+              <UserPlus className="w-5 h-5" />
+              Thêm diễn viên
+            </button>
+          )}
         </div>
 
 

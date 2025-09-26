@@ -5,44 +5,46 @@ const API_BASE_URL = 'http://localhost:8080/api/v1';
 
 // Room interface matching the API response
 export interface Room {
-  id?: string;
-  name: string;
-  type: string; // "Standard" from API
-  location?: string;
-  totalSeats?: number;
-  vipSeats?: number;
-  regularSeats?: number;
-  coupleSeats?: number;
-  status?: 'ACTIVE' | 'MAINTENANCE' | 'CLOSED';
-  screenSize?: string;
-  screenResolution?: string;
-  audioSystem?: string;
-  hasAirCondition?: boolean;
-  hasEmergencyExit?: boolean;
-  hasDolbyAtmos?: boolean;
-  has4K?: boolean;
-  description?: string;
-  utilization?: number;
-  monthlyRevenue?: number;
-  seatLayout?: Seat[];
+    id?: string;
+    name: string;
+    type: string; // "Standard" from API
+    location?: string;
+    theaterId: string;
+    totalSeats?: number;
+    vipSeats?: number;
+    standardSeats?: number;
+    coupleSeats?: number;
+    status?: 'ACTIVE' | 'MAINTENANCE' | 'CLOSED';
+    utilization?: number;
+    monthlyRevenue?: number;
+    seatLayout?: Seat[];
 }
 
 // Seat interface matching the API response
 export interface Seat {
-  id?: string;
-  seatNumber: string;
-  seatType: 'STANDARD' | 'VIP' | 'COUPLE' | 'DISABLED';
-  row?: string;
-  column?: number;
-  status?: 'AVAILABLE' | 'OCCUPIED' | 'BLOCKED';
-  type?: 'regular' | 'vip' | 'couple' | 'disabled'; // For frontend mapping
+    color: string;
+    id: string;
+    seatNumber: string;
+    seatType: string;
+    row?: number;
+    column?: number;
+    status?: 'AVAILABLE' | 'OCCUPIED' | 'BLOCKED';
+    isCouplePart?: boolean | undefined;
+    couplePart?: number | undefined;
 }
 
+export interface RoomLayout {
+    col: number;
+    row: number;
+    specialSeats: { [key: string]: string };
+    walkways: { columnIndex: number; rowIndex: number }[];
+    coupleSeatQuantity: number;
+}
 // API Response interface
 interface ApiResponse<T> {
-  statusCode: number;
-  message: string;
-  data: T;
+    statusCode: number;
+    message: string;
+    data: T;
 }
 
 // Room API Service
@@ -56,20 +58,11 @@ export const roomApiService = {
         // Transform API data to match frontend interface
         return response.data.data.map(room => ({
           ...room,
-          // Map API type to frontend type
-          type: mapRoomTypeFromApi(room.type),
           // Set default values for properties not in API
           status: 'ACTIVE' as const,
-          screenSize: '15m x 8m',
-          screenResolution: '4K',
-          audioSystem: 'Dolby Digital',
-          hasAirCondition: true,
-          hasEmergencyExit: true,
-          hasDolbyAtmos: false,
-          has4K: true,
           totalSeats: 0, // Will be calculated from seats
           vipSeats: 0,
-          regularSeats: 0,
+          standardSeats: 0,
           coupleSeats: 0,
           utilization: Math.floor(Math.random() * 100), // Mock data
           monthlyRevenue: Math.floor(Math.random() * 500000000), // Mock data
@@ -89,16 +82,14 @@ export const roomApiService = {
   // Get seats for a room
   getRoomSeats: async (roomId: string): Promise<Seat[]> => {
     try {
-      const response = await axios.get<ApiResponse<Seat[]>>(`${API_BASE_URL}/rooms/${roomId}/seats`);
+      const response = await axios.get<ApiResponse<Seat[]>>(`${API_BASE_URL}/rooms/${roomId}`);
       
       if (response.data.statusCode === 200) {
         return response.data.data.map(seat => ({
           ...seat,
-          // Map API seatType to frontend type
-          type: mapSeatTypeFromApi(seat.seatType),
           status: 'AVAILABLE' as const,
-          // Extract row and column from seatNumber (e.g., "A1" -> row: "A", column: 1)
-          row: seat.seatNumber.charAt(0),
+          // Extract row and column from seatNumber (e.g., "A1" -> row: 1, column: 1)
+          row: parseInt(seat.seatNumber.charAt(0)),
           column: parseInt(seat.seatNumber.slice(1)),
         }));
       } else {
@@ -114,38 +105,53 @@ export const roomApiService = {
   },
 
   // Create new room
-  createRoom: async (roomData: Partial<Room>): Promise<Room> => {
+  createRoom: async (theaterId: string, roomData: Partial<Room>): Promise<Room> => {
     try {
-      const response = await axios.post<ApiResponse<Room>>(`${API_BASE_URL}/rooms`, {
-        name: roomData.name,
-        type: mapRoomTypeToApi(roomData.type || '2D')
-      });
+      const response = await axios.post<ApiResponse<Room>>(`${API_BASE_URL}/theaters/${theaterId}/rooms`, roomData);
       
       if (response.data.statusCode === 200 || response.data.statusCode === 201) {
-        return {
-          ...response.data.data,
-          type: mapRoomTypeFromApi(response.data.data.type),
-          status: roomData.status || 'ACTIVE',
-          screenSize: roomData.screenSize || '15m x 8m',
-          screenResolution: roomData.screenResolution || '4K',
-          audioSystem: roomData.audioSystem || 'Dolby Digital',
-          hasAirCondition: roomData.hasAirCondition || true,
-          hasEmergencyExit: roomData.hasEmergencyExit || true,
-          hasDolbyAtmos: roomData.hasDolbyAtmos || false,
-          has4K: roomData.has4K || true,
-          description: roomData.description,
-          totalSeats: roomData.totalSeats || 0,
-          vipSeats: roomData.vipSeats || 0,
-          regularSeats: roomData.regularSeats || 0,
-          coupleSeats: roomData.coupleSeats || 0,
-          utilization: 0,
-          monthlyRevenue: 0,
-        };
+        return response.data.data;
       } else {
         throw new Error(response.data.message || 'Failed to create room');
       }
     } catch (error) {
       console.error('Error creating room:', error);
+      if (axios.isAxiosError(error)) {
+        throw new Error(error.response?.data?.message || error.message);
+      }
+      throw error;
+    }
+  },
+
+  createRoomSeats: async (roomId: string, roomlayout: RoomLayout): Promise<Seat[]> => {
+    try {
+      const response = await axios.post<ApiResponse<Seat[]>>(`${API_BASE_URL}/rooms/${roomId}/seats`, roomlayout);
+
+      if (response.data.statusCode === 200 || response.data.statusCode === 201) {
+        return response.data.data;
+      } else {
+        throw new Error(response.data.message || 'Failed to create seats');
+      }
+    } catch (error) {
+      console.error('Error creating seats:', error);
+      if (axios.isAxiosError(error)) {
+        throw new Error(error.response?.data?.message || error.message);
+      }
+      throw error;
+    }
+  },
+
+  updateRoomSeats: async (roomId: string, roomlayout: RoomLayout): Promise<Seat[]> => {
+    try {
+      const response = await axios.post<ApiResponse<Seat[]>>(`${API_BASE_URL}/rooms/${roomId}/seats`, roomlayout);
+
+      if (response.data.statusCode === 200 || response.data.statusCode === 201) {
+        return response.data.data;
+      } else {
+        throw new Error(response.data.message || 'Failed to update seats');
+      }
+    } catch (error) {
+      console.error('Error updating seats:', error);
       if (axios.isAxiosError(error)) {
         throw new Error(error.response?.data?.message || error.message);
       }
@@ -166,17 +172,9 @@ export const roomApiService = {
           ...response.data.data,
           type: mapRoomTypeFromApi(response.data.data.type),
           status: roomData.status || 'ACTIVE',
-          screenSize: roomData.screenSize || '15m x 8m',
-          screenResolution: roomData.screenResolution || '4K',
-          audioSystem: roomData.audioSystem || 'Dolby Digital',
-          hasAirCondition: roomData.hasAirCondition || true,
-          hasEmergencyExit: roomData.hasEmergencyExit || true,
-          hasDolbyAtmos: roomData.hasDolbyAtmos || false,
-          has4K: roomData.has4K || true,
-          description: roomData.description,
           totalSeats: roomData.totalSeats || 0,
           vipSeats: roomData.vipSeats || 0,
-          regularSeats: roomData.regularSeats || 0,
+          standardSeats: roomData.standardSeats || 0,
           coupleSeats: roomData.coupleSeats || 0,
           utilization: roomData.utilization || 0,
           monthlyRevenue: roomData.monthlyRevenue || 0,
@@ -240,21 +238,6 @@ function mapRoomTypeToApi(frontendType: string): string {
       return '4DX';
     default:
       return 'Standard';
-  }
-}
-
-function mapSeatTypeFromApi(apiSeatType: string): 'regular' | 'vip' | 'couple' | 'disabled' {
-  switch (apiSeatType.toUpperCase()) {
-    case 'STANDARD':
-      return 'regular';
-    case 'VIP':
-      return 'vip';
-    case 'COUPLE':
-      return 'couple';
-    case 'DISABLED':
-      return 'disabled';
-    default:
-      return 'regular';
   }
 }
 

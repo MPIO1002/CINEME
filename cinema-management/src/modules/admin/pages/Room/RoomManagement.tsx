@@ -16,46 +16,14 @@ import {
     Volume2
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { type Room as ApiRoom, roomApiService } from '../../../services/roomApi';
-import { Pagination } from "../components/pagination";
-import RoomModal from '../components/RoomModal.tsx';
-import type { Seat as DesignerSeat } from '../components/SeatLayoutDesigner';
-import type { Column } from "../components/tableProps";
-import { Table } from "../components/tableProps";
+import { type Room as ApiRoom, type Room, roomApiService, type RoomLayout } from '../../../../services/roomApi.ts';
+import { Pagination } from "../../components/pagination.tsx";
+import RoomModal from './components/RoomModal.tsx';
+import type { Seat as DesignerSeat } from './components/SeatLayoutDesigner.tsx';
+import type { Column } from "../../components/tableProps.tsx";
+import { Table } from "../../components/tableProps.tsx";
+import { hasPermission } from "../../utils/authUtils.ts";
 
-// Create local interfaces that match the component needs while being compatible with API
-interface Seat {
-  id?: string;
-  row?: string; // Changed to string to match API
-  column?: number;
-  isSelected?: boolean;
-  isHovered?: boolean;
-  seatNumber: string;
-  seatType: 'STANDARD' | 'VIP' | 'COUPLE' | 'DISABLED';
-}
-
-interface Room {
-  id?: string;
-  name: string;
-  type: '2D' | '3D' | 'IMAX' | '4DX';
-  location?: string;
-  totalSeats?: number;
-  vipSeats?: number;
-  regularSeats?: number;
-  coupleSeats?: number;
-  status?: 'ACTIVE' | 'MAINTENANCE' | 'CLOSED';
-  screenSize?: string;
-  screenResolution?: string;
-  audioSystem?: string;
-  hasAirCondition?: boolean;
-  hasEmergencyExit?: boolean;
-  hasDolbyAtmos?: boolean;
-  has4K?: boolean;
-  description?: string;
-  utilization?: number;
-  monthlyRevenue?: number;
-  seatLayout?: Seat[];
-}
 
 // Adapter functions to convert between API and component types
 const convertApiRoomToLocal = (apiRoom: ApiRoom): Room => ({
@@ -119,42 +87,42 @@ interface ModalRoom {
 }
 
 // Convert local Room to Modal Room interface
-const convertToModalRoom = (room: Room): ModalRoom => ({
-  id: room.id, // Ensure ID is preserved
-  ...room,
-  totalSeats: room.totalSeats || 0,
-  vipSeats: room.vipSeats || 0,
-  regularSeats: room.regularSeats || 0,
-  status: room.status || 'ACTIVE',
-  screenSize: room.screenSize || '',
-  screenResolution: room.screenResolution || '',
-  audioSystem: room.audioSystem || '',
-  hasAirCondition: room.hasAirCondition || false,
-  hasEmergencyExit: room.hasEmergencyExit || false,
-  hasDolbyAtmos: room.hasDolbyAtmos || false,
-  has4K: room.has4K || false,
-  seatLayout: room.seatLayout?.map(seat => {
-    // Map component seatType to modal type
-    const getModalTypeFromComponent = (componentType: string): 'regular' | 'vip' | 'couple' | 'disabled' | 'blocked' => {
-      switch (componentType.toUpperCase()) {
-        case 'VIP': return 'vip';
-        case 'COUPLE': return 'couple';
-        case 'DISABLED': return 'disabled';
-        case 'STANDARD': 
-        default: return 'regular';
-      }
-    };
+// const convertToModalRoom = (room: Room): ModalRoom => ({
+//   id: room.id, // Ensure ID is preserved
+//   ...room,
+//   totalSeats: room.totalSeats || 0,
+//   vipSeats: room.vipSeats || 0,
+//   regularSeats: room.regularSeats || 0,
+//   status: room.status || 'ACTIVE',
+//   screenSize: room.screenSize || '',
+//   screenResolution: room.screenResolution || '',
+//   audioSystem: room.audioSystem || '',
+//   hasAirCondition: room.hasAirCondition || false,
+//   hasEmergencyExit: room.hasEmergencyExit || false,
+//   hasDolbyAtmos: room.hasDolbyAtmos || false,
+//   has4K: room.has4K || false,
+//   seatLayout: room.seatLayout?.map(seat => {
+//     // Map component seatType to modal type
+//     const getModalTypeFromComponent = (componentType: string): 'regular' | 'vip' | 'couple' | 'disabled' | 'blocked' => {
+//       switch (componentType.toUpperCase()) {
+//         case 'VIP': return 'vip';
+//         case 'COUPLE': return 'couple';
+//         case 'DISABLED': return 'disabled';
+//         case 'STANDARD': 
+//         default: return 'regular';
+//       }
+//     };
     
-    return {
-      id: seat.id || `${seat.row}-${seat.column}`,
-      row: parseInt(seat.row || '1'),
-      column: seat.column || 1,
-      type: getModalTypeFromComponent(seat.seatType || 'STANDARD'),
-      label: seat.seatNumber,
-      isAvailable: true
-    };
-  })
-});
+//     return {
+//       id: seat.id || `${seat.row}-${seat.column}`,
+//       row: parseInt(seat.row || '1'),
+//       column: seat.column || 1,
+//       type: getModalTypeFromComponent(seat.seatType || 'STANDARD'),
+//       label: seat.seatNumber,
+//       isAvailable: true
+//     };
+//   })
+// });
 
 // Convert Modal Room to local Room interface  
 const convertFromModalRoom = (modalRoom: unknown): Room => {
@@ -239,39 +207,43 @@ const RoomManagement: React.FC = () => {
     setLoading(false);
   };
 
-  const handleSaveRoom = async (modalRoom: unknown) => {
-    setLoading(true);
-    
-    console.log('Saving room:', modalRoom);
-    
-    try {
-      const room = convertFromModalRoom(modalRoom);
-      
-      if (modalMode === "add") {
-        // Create new room
-        const apiRoom = convertLocalRoomToApi(room);
-        const newRoom = await roomApiService.createRoom(apiRoom);
-        const localRoom = convertApiRoomToLocal(newRoom);
-        setRooms(prev => [...prev, {...localRoom, utilization: 0, monthlyRevenue: 0}]);
-        alert('Thêm phòng chiếu thành công!');
-      } else if (modalMode === "edit" && room.id) {
-        // Update existing room
-        const apiRoom = convertLocalRoomToApi(room);
-        const updatedRoom = await roomApiService.updateRoom(room.id, apiRoom);
-        const localUpdatedRoom = convertApiRoomToLocal(updatedRoom);
-        setRooms(prev => prev.map(r => 
-          r.id === room.id ? { ...r, ...localUpdatedRoom } : r
-        ));
-        alert('Cập nhật phòng chiếu thành công!');
-      }
-    } catch (error) {
-      console.error('Error saving room:', error);
-      alert('Có lỗi xảy ra khi lưu phòng chiếu. Vui lòng thử lại!');
-    }
-    
-    setModalOpen(false);
-    setLoading(false);
-  };
+    const handleSaveRoom = async (modalRoom: Room, roomLayout?: RoomLayout) => {
+        setLoading(true);
+        
+        
+        try {
+            // const room = convertFromModalRoom(modalRoom);
+            
+            if (modalMode === "add") {
+                console.log('Saving room:', modalRoom);
+                // Create new room
+                // const apiRoom = convertLocalRoomToApi(room);
+                const newRoom = await roomApiService.createRoom(modalRoom.theaterId, modalRoom);
+                const localRoom = convertApiRoomToLocal(newRoom);
+                setRooms(prev => [...prev, {...localRoom, utilization: 0, monthlyRevenue: 0}]);
+                alert('Thêm phòng chiếu thành công!');
+            } else if (modalMode === "edit" && modalRoom.id) {
+                console.log('Updating room:', modalRoom, roomLayout);
+                // Update existing room
+                // const apiRoom = convertLocalRoomToApi(room);
+                // const updatedRoom = await roomApiService.updateRoom(room.id, apiRoom);
+                if (roomLayout) {
+                    console.log('Sending roomLayout to backend:', roomLayout);
+                    await roomApiService.updateRoomSeats(modalRoom.id, roomLayout);
+                }
+                // const localUpdatedRoom = convertApiRoomToLocal(createSeats);
+                // setRooms(prev => prev.map(r => 
+                //   r.id === room.id ? { ...r, ...localUpdatedRoom } : r
+                // ));
+                alert('Cập nhật phòng chiếu thành công!');
+            }
+        } catch (error) {
+            console.error('Error saving room:', error);
+            alert('Có lỗi xảy ra khi lưu phòng chiếu. Vui lòng thử lại!');
+        }
+        setModalOpen(false);
+        setLoading(false);
+    };
 
   const handleDeleteRoom = async (roomId: string) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa phòng chiếu này?')) {
@@ -443,36 +415,42 @@ const RoomManagement: React.FC = () => {
       title: 'Thao tác',
       render: (_, room) => (
         <div className="flex items-center space-x-2">
-          <button
-            onClick={() => {
-              setSelectedRoom(room);
-              setModalMode("view");
-              setModalOpen(true);
-            }}
-            className="text-blue-600 hover:text-blue-900 transition-colors"
-            title="Xem chi tiết"
-          >
-            <Eye size={16} />
-          </button>
-          <button
-            onClick={() => {
-              setSelectedRoom(room);
-              setModalMode("edit");
-              setModalOpen(true);
-            }}
-            className="text-green-600 hover:text-green-900 transition-colors"
-            title="Chỉnh sửa"
-          >
-            <Edit size={16} />
-          </button>
-          <button
-            onClick={() => room.id && handleDeleteRoom(room.id)}
-            className="text-red-600 hover:text-red-900 transition-colors"
-            title="Xóa"
-            disabled={!room.id}
-          >
-            <Trash2 size={16} />
-          </button>
+          {hasPermission("room.view") && (
+            <button
+              onClick={() => {
+                setSelectedRoom(room);
+                setModalMode("view");
+                setModalOpen(true);
+              }}
+              className="text-blue-600 hover:text-blue-900 transition-colors"
+              title="Xem chi tiết"
+            >
+              <Eye size={16} />
+            </button>
+          )}
+          {hasPermission("room.update") && (
+            <button
+              onClick={() => {
+                setSelectedRoom(room);
+                setModalMode("edit");
+                setModalOpen(true);
+              }}
+              className="text-green-600 hover:text-green-900 transition-colors"
+              title="Chỉnh sửa"
+            >
+              <Edit size={16} />
+            </button>
+          )}
+          {hasPermission("room.delete") && (
+            <button
+              onClick={() => room.id && handleDeleteRoom(room.id)}
+              className="text-red-600 hover:text-red-900 transition-colors"
+              title="Xóa"
+              disabled={!room.id}
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
         </div>
       )
     }
@@ -519,17 +497,19 @@ const RoomManagement: React.FC = () => {
             </div>
 
             {/* Add Button */}
-            <button
-              className="text-blue-600 hover:text-blue-900 transition-colors flex items-center space-x-2 px-4 py-2 border border-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer"
-              onClick={() => {
-                setModalMode("add");
-                setSelectedRoom(undefined);
-                setModalOpen(true);
-              }}
-            >
-              <HousePlus size={16} />
-              <span>Thêm phòng mới</span>
-            </button>
+            {hasPermission("room.create") && (
+              <button
+                className="text-blue-600 hover:text-blue-900 transition-colors flex items-center space-x-2 px-4 py-2 border border-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer"
+                onClick={() => {
+                  setModalMode("add");
+                  setSelectedRoom(undefined);
+                  setModalOpen(true);
+                }}
+              >
+                <HousePlus size={16} />
+                <span>Thêm phòng mới</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -688,24 +668,28 @@ const RoomManagement: React.FC = () => {
                                 <h3 className="text-lg font-semibold text-gray-900">{room.name}</h3>
                             </div>
                             <div className="flex space-x-1">
-                                <button
-                                onClick={() => {
-                                    setSelectedRoom(room);
-                                    setModalMode("edit");
-                                    setModalOpen(true);
-                                }}
-                                className=" text-gray-400 hover:text-blue-600 transition-colors cursor-pointer p-2 rounded-lg hover:bg-blue-100"
-                                title="Chỉnh sửa"
-                                >
-                                <Edit size={14} />
-                                </button>
-                                <button
-                                onClick={() => room.id && handleDeleteRoom(room.id)}
-                                className="p-2 text-gray-400 hover:text-red-600 transition-colors cursor-pointer rounded-lg hover:bg-red-100"
-                                title="Xóa"
-                                >
-                                <Trash2 size={14} />
-                                </button>
+                                { hasPermission("room.update") && (
+                                    <button
+                                        onClick={() => {
+                                            setSelectedRoom(room);
+                                            setModalMode("edit");
+                                            setModalOpen(true);
+                                        }}
+                                        className=" text-gray-400 hover:text-blue-600 transition-colors cursor-pointer p-2 rounded-lg hover:bg-blue-100"
+                                        title="Chỉnh sửa"
+                                    >
+                                        <Edit size={14} />
+                                    </button>
+                                )}
+                                { hasPermission("room.delete") && (
+                                    <button
+                                        onClick={() => room.id && handleDeleteRoom(room.id)}
+                                        className="p-2 text-gray-400 hover:text-red-600 transition-colors cursor-pointer rounded-lg hover:bg-red-100"
+                                        title="Xóa"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                )}
                             </div>
                             </div>
                             <div className="flex items-center justify-between">
@@ -827,7 +811,7 @@ const RoomManagement: React.FC = () => {
         <RoomModal
           open={modalOpen}
           mode={modalMode}
-          room={selectedRoom ? convertToModalRoom(selectedRoom) : undefined}
+          room={selectedRoom}
           onClose={() => setModalOpen(false)}
           onSubmit={handleSaveRoom}
         />

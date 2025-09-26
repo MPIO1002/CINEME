@@ -15,11 +15,12 @@ import {
     Users
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { theaterApi, type Theater } from '../../../services/theaterApi';
-import { Pagination } from "../components/pagination";
-import type { Column } from "../components/tableProps";
-import { Table } from "../components/tableProps";
-import TheaterModal from '../components/TheaterModal';
+import { theaterApi, type Theater } from '../../../../services/theaterApi';
+import { Pagination } from "../../components/pagination";
+import type { Column } from "../../components/tableProps";
+import { Table } from "../../components/tableProps";
+import TheaterModal from './components/TheaterModal';
+import { hasPermission } from "../../utils/authUtils";
 
 const TheaterManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -48,7 +49,7 @@ const TheaterManagement: React.FC = () => {
     setLoading(true);
     try {
       // Add a small delay to show loading state (remove in production)
-      await new Promise(resolve => setTimeout(resolve, 800));
+    //   await new Promise(resolve => setTimeout(resolve, 800));
       
       const result = await theaterApi.getAllTheaters();
       
@@ -322,36 +323,42 @@ const TheaterManagement: React.FC = () => {
       title: 'Thao tác',
       render: (_, theater) => (
         <div className="flex items-center space-x-2">
-          <button
-            onClick={() => {
-              setSelectedTheater(theater);
-              setModalMode("view");
-              setModalOpen(true);
-            }}
-            className="text-blue-600 hover:text-blue-900 transition-colors"
-            title="Xem chi tiết"
-          >
-            <Eye size={16} />
-          </button>
-          <button
-            onClick={() => {
-              setSelectedTheater(theater);
-              setModalMode("edit");
-              setModalOpen(true);
-            }}
-            className="text-green-600 hover:text-green-900 transition-colors"
-            title="Chỉnh sửa"
-          >
-            <Edit size={16} />
-          </button>
-          <button
-            onClick={() => theater.id && handleDeleteTheater(theater.id)}
-            className="text-red-600 hover:text-red-900 transition-colors"
-            title="Xóa"
-            disabled={!theater.id}
-          >
-            <Trash2 size={16} />
-          </button>
+          {hasPermission("theater.view") && (
+            <button
+              onClick={() => {
+                setSelectedTheater(theater);
+                setModalMode("view");
+                setModalOpen(true);
+              }}
+              className="text-blue-600 hover:text-blue-900 transition-colors"
+              title="Xem chi tiết"
+            >
+              <Eye size={16} />
+            </button>
+          )}
+          {hasPermission("theater.update") && (
+            <button
+              onClick={() => {
+                setSelectedTheater(theater);
+                setModalMode("edit");
+                setModalOpen(true);
+              }}
+              className="text-green-600 hover:text-green-900 transition-colors"
+              title="Chỉnh sửa"
+            >
+              <Edit size={16} />
+            </button>
+          )}
+          {hasPermission("theater.delete") && (
+            <button
+              onClick={() => theater.id && handleDeleteTheater(theater.id)}
+              className="text-red-600 hover:text-red-900 transition-colors"
+              title="Xóa"
+              disabled={!theater.id}
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
         </div>
       )
     }
@@ -398,17 +405,19 @@ const TheaterManagement: React.FC = () => {
             </div>
 
             {/* Add Button */}
-            <button
-              className="text-blue-600 hover:text-blue-900 transition-colors flex items-center space-x-2 px-4 py-2 border border-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer"
-              onClick={() => {
-                setModalMode("add");
-                setSelectedTheater(undefined);
-                setModalOpen(true);
-              }}
-            >
-              <Plus size={16} />
-              <span>Thêm rạp mới</span>
-            </button>
+            {hasPermission("theater.create") && (
+              <button
+                className="text-blue-600 hover:text-blue-900 transition-colors flex items-center space-x-2 px-4 py-2 border border-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer"
+                onClick={() => {
+                  setModalMode("add");
+                  setSelectedTheater(undefined);
+                  setModalOpen(true);
+                }}
+              >
+                <Plus size={16} />
+                <span>Thêm rạp mới</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -558,24 +567,29 @@ const TheaterManagement: React.FC = () => {
                                     {theater.nameEn}
                                     </span>
                                 <div className="flex space-x-1">
-                                    <button
-                                    onClick={() => {
-                                        setSelectedTheater(theater);
-                                        setModalMode("edit");
-                                        setModalOpen(true);
-                                    }}
-                                    className="p-1 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
-                                    title="Chỉnh sửa"
-                                    >
-                                    <Edit size={14} />
-                                    </button>
-                                    <button
-                                    onClick={() => theater.id && handleDeleteTheater(theater.id)}
-                                    className="p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
-                                    title="Xóa"
-                                    >
-                                    <Trash2 size={14} />
-                                    </button>
+                                    { hasPermission("theater.update") && (
+                                        <button
+                                            onClick={() => {
+                                                setSelectedTheater(theater);
+                                                setModalMode("edit");
+                                                setModalOpen(true);
+                                            }}
+                                            className="p-1 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
+                                            title="Chỉnh sửa"
+                                            >
+                                            <Edit size={14} />
+                                        </button>
+                                    )}
+                                    
+                                    { hasPermission("theater.delete") && 
+                                        (<button
+                                            onClick={() => theater.id && handleDeleteTheater(theater.id)}
+                                            className="p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
+                                            title="Xóa"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                             <span className={`inline-flex mt-3 px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(theater.status)}`}>

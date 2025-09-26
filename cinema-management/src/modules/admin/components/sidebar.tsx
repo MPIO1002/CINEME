@@ -7,12 +7,12 @@ import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
-import SecurityIcon from '@mui/icons-material/Security';
 import SettingsIcon from '@mui/icons-material/Settings';
 import TheatersIcon from '@mui/icons-material/Theaters';
-import { CalendarRange, EllipsisVertical, Film, Star } from "lucide-react";
+import { CalendarRange, Film, Star } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { hasPermission } from "../utils/authUtils";
 
 const Sidebar = () => {
     const [isOpen, setIsOpen] = useState(true);
@@ -38,9 +38,9 @@ const Sidebar = () => {
             icon: <Film className="w-5 h-5" />,
             type: 'group',
             children: [
-                { label: "Quản lý phim", path: "/admin/movies", icon: <DvrIcon /> },
-                { label: "Quản lý diễn viên", path: "/admin/actors", icon: <Star className="w-5 h-5" /> },
-                { label: "Quản lý suất chiếu", path: "/admin/showtimes", icon: <CalendarRange className="w-5 h-5" /> },
+                { label: "Quản lý phim", path: "/admin/movies", icon: <DvrIcon />, permission: "movie.view" },
+                { label: "Quản lý diễn viên", path: "/admin/actors", icon: <Star className="w-5 h-5" />, permission: "actor.view" },
+                { label: "Quản lý suất chiếu", path: "/admin/showtimes", icon: <CalendarRange className="w-5 h-5" />, permission: "showtime.view" },
             ]
         },
         {
@@ -49,8 +49,8 @@ const Sidebar = () => {
             icon: <TheatersIcon />,
             type: 'group',
             children: [
-                { label: "Quản lý rạp", path: "/admin/theaters", icon: <TheatersIcon /> },
-                { label: "Quản lý phòng", path: "/admin/rooms", icon: <MeetingRoomIcon /> },
+                { label: "Quản lý rạp", path: "/admin/theaters", icon: <TheatersIcon />, permission: "theater.view" },
+                { label: "Quản lý phòng", path: "/admin/rooms", icon: <MeetingRoomIcon />, permission: "room.view" },
             ]
         },
         {
@@ -59,8 +59,8 @@ const Sidebar = () => {
             icon: <LocalOfferIcon />,
             type: 'group',
             children: [
-                { label: "Quản lý người dùng", path: "/admin/users", icon: <GroupsIcon /> },
-                { label: "Khuyến mãi", path: "/admin/promotions", icon: <LocalOfferIcon /> },
+                { label: "Quản lý người dùng", path: "/admin/users", icon: <GroupsIcon />, permission: "user.view" },
+                { label: "Khuyến mãi", path: "/admin/promotions", icon: <LocalOfferIcon />, permission: "promotion.view" },
             ]
         },
         {
@@ -68,16 +68,43 @@ const Sidebar = () => {
             label: 'Hệ thống & Cấu hình',
             icon: <SettingsIcon />,
             path: '/admin/system',
-            type: 'single'
+            type: 'single',
+            permission: 'system.view'
         },
-        // {
-        //     id: 'security',
-        //     label: 'Bảo mật & Phân quyền',
-        //     icon: <SecurityIcon />,
-        //     path: '/admin/security',
-        //     type: 'single'
-        // }
+        {
+            id: 'security',
+            label: 'Bảo mật & Phân quyền',
+            icon: <SettingsIcon />,
+            path: '/admin/security',
+            type: 'single'
+        }
     ];
+
+    // Filter menu groups based on permissions
+    const filteredMenuGroups = menuGroups
+        .map(group => {
+            if (group.type === 'single') {
+                // For single items, check permission if exists
+                if (group.permission && !hasPermission(group.permission)) {
+                    return null;
+                }
+                return group;
+            } else {
+                // For groups, filter children based on permissions
+                const filteredChildren = group.children?.filter(child => 
+                    !child.permission || hasPermission(child.permission)
+                ) || [];
+                // Only include group if it has children after filtering
+                if (filteredChildren.length === 0) {
+                    return null;
+                }
+                return {
+                    ...group,
+                    children: filteredChildren
+                };
+            }
+        })
+        .filter(group => group !== null);
 
     const toggleMenu = (menuId: string) => {
         setExpandedMenus(prev => 
@@ -105,7 +132,7 @@ const Sidebar = () => {
             </button>
             
             <nav className="flex flex-col gap-1 overflow-visible px-2 ">
-                {menuGroups.map(group => {
+                {filteredMenuGroups.map(group => {
                     if (group.type === 'single') {
                         return (
                             <div key={group.path} className="relative group">

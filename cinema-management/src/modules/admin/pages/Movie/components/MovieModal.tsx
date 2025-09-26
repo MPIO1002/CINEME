@@ -1,8 +1,8 @@
 import { Calendar, CheckCircle, Clock, Edit3, Eye, FileText, Film, Image, Plus, Star, User, UserPlus, X } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
-import { actorApiService, type Actor } from '../../../services/actorApi';
-import { movieApiService, type Movie, type MovieDetail } from '../../../services/movieApi';
-import ActorModal from './ActorModal';
+import { actorApiService, type Actor } from '../../../../../services/actorApi';
+import { movieApiService, type Movie, type MovieDetail } from '../../../../../services/movieApi';
+import ActorModal from '../../Actor/components/ActorModal';
 
 import { countryApiService } from "@/services/countryApi";
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
@@ -683,6 +683,7 @@ const MovieModal: React.FC<MovieModalProps> = ({
                     name="releaseDate"
                     value={formatDateForInput(form.releaseDate)}
                     onChange={handleChange}
+                    onClick={() => console.log('Release date clicked', form.releaseDate, formatDateForInput(form.releaseDate))}
                     disabled={isView}
                     className={`w-full border rounded-lg px-4 py-3 transition-all duration-200 ${
                       isView 

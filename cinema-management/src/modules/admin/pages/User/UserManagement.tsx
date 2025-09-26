@@ -8,7 +8,6 @@ import {
     DollarSign,
     Edit,
     Eye,
-    EyeClosed,
     EyeOffIcon,
     Filter,
     Phone,
@@ -22,10 +21,11 @@ import {
     XCircle
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { userApiService, type User } from '../../../services/userApi';
-import { Pagination } from "../components/pagination";
-import RolePermissionManager from '../components/RolePermissionManager';
-import UserModal from '../components/UserModal';
+import { userApiService, type User } from '../../../../services/userApi';
+import { Pagination } from "../../components/pagination";
+import RolePermissionManager from './components/RolePermissionManager';
+import UserModal from './components/UserModal';
+import { hasPermission } from "../../utils/authUtils";
 
 const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -276,20 +276,24 @@ const UserManagement: React.FC = () => {
                     </div>
                 </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => setRolePermissionOpen(true)}
-                  className="px-4 py-2 bg-purple-50 border border-purple-600 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors flex items-center gap-2 cursor-pointer"
-                >
-                  <Settings className="w-4 h-4" />
-                  Quản lý phân quyền
-                </button>
-                <button
-                  onClick={handleAddUser}
-                  className="text-blue-600 bg-blue-50 hover:text-blue-900 transition-colors flex items-center justify-center space-x-2 px-4 py-2 border border-blue-600 rounded-lg hover:bg-blue-100 cursor-pointer gap-2"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  Thêm người dùng
-                </button>
+                {hasPermission("user.editPermission") && (
+                  <button
+                    onClick={() => setRolePermissionOpen(true)}
+                    className="px-4 py-2 bg-purple-50 border border-purple-600 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors flex items-center gap-2 cursor-pointer"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Quản lý phân quyền
+                  </button>
+                )}
+                {hasPermission("user.create") && (
+                  <button
+                    onClick={handleAddUser}
+                    className="text-blue-600 bg-blue-50 hover:text-blue-900 transition-colors flex items-center justify-center space-x-2 px-4 py-2 border border-blue-600 rounded-lg hover:bg-blue-100 cursor-pointer gap-2"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    Thêm người dùng
+                  </button>
+                )}
               </div>
             </div>
 
@@ -561,28 +565,34 @@ const UserManagement: React.FC = () => {
                     </div>
                   {/* Actions */}
                   <div className="flex items-center gap-2 h-1/12">
-                    <button
-                      onClick={() => handleViewUser(user)}
-                      className="flex-1 py-2 px-3 text-purple-600 border border-purple-600 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors text-sm font-medium cursor-pointer"
-                    >
-                      <Eye className="w-4 h-4 mx-auto" />
-                    </button>
-                    <button
-                      onClick={() => handleEditUser(user)}
-                      className="flex-1 py-2 px-3 text-blue-600 border border-blue-600 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors text-sm font-medium cursor-pointer"
-                    >
-                      <Edit className="w-4 h-4 mx-auto" />
-                    </button>
-                    <button
-                      onClick={() => handleBanUser(user.id)}
-                      className={`flex-1 py-2 px-3 border rounded-lg transition-colors text-sm font-medium cursor-pointer ${
-                        user.status === 'BANNED' 
-                          ? 'text-green-600 border-green-600 bg-green-50 hover:bg-green-100' 
-                          : 'text-red-600 border-red-600 bg-red-50 hover:bg-red-100'
-                      }`}
-                    >
-                      <Ban className="w-4 h-4 mx-auto" />
-                    </button>
+                    {hasPermission("user.view") && (
+                      <button
+                        onClick={() => handleViewUser(user)}
+                        className="flex-1 py-2 px-3 text-purple-600 border border-purple-600 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors text-sm font-medium cursor-pointer"
+                      >
+                        <Eye className="w-4 h-4 mx-auto" />
+                      </button>
+                    )}
+                    {hasPermission("user.update") && (
+                      <button
+                        onClick={() => handleEditUser(user)}
+                        className="flex-1 py-2 px-3 text-blue-600 border border-blue-600 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors text-sm font-medium cursor-pointer"
+                      >
+                        <Edit className="w-4 h-4 mx-auto" />
+                      </button>
+                    )}
+                    {hasPermission("user.delete") && (
+                      <button
+                        onClick={() => handleBanUser(user.id)}
+                        className={`flex-1 py-2 px-3 border rounded-lg transition-colors text-sm font-medium cursor-pointer ${
+                          user.status === 'BANNED' 
+                            ? 'text-green-600 border-green-600 bg-green-50 hover:bg-green-100' 
+                            : 'text-red-600 border-red-600 bg-red-50 hover:bg-red-100'
+                        }`}
+                      >
+                        <Ban className="w-4 h-4 mx-auto" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))
