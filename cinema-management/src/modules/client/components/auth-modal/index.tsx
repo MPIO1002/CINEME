@@ -33,7 +33,7 @@ interface UserData {
 const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
   const { showToast } = useToast();
   const location = useLocation();
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'forgot' | 'verify-otp' | 'reset-password'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -49,147 +49,89 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
     fullName: '',
     phone: ''
   });
+
+  // Forgot password states
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   
   // Validation errors
   const [errors, setErrors] = useState({
     email: '',
     phone: '',
-    password: ''
+    password: '',
+    confirmPassword: '',
+    otp: ''
   });
 
-  // Handle Google OAuth callback when component mounts or URL changes
+  // Handle OAuth callback
   useEffect(() => {
-    const urlParams = new URLSearchParams(location.search);
-    const paramsString = location.search; // Get everything after ?
-    
-    // Check if this is a Google OAuth callback (has state, code, and scope parameters)
-    if (paramsString && urlParams.get('state') && urlParams.get('code') && urlParams.get('scope')) {
-      // Create a simple hash from state and first 10 chars of code for tracking
-      const state = urlParams.get('state') || '';
-      const code = urlParams.get('code') || '';
-      const processedKey = `oauth_${state.slice(0, 10)}_${code.slice(0, 10)}`;
+    const handleOAuthCallback = async () => {
+      const urlParams = new URLSearchParams(location.search);
+      const state = urlParams.get('state');
       
-      // Check if already processed and not too old (5 minutes)
-      const existingTimestamp = localStorage.getItem(processedKey);
-      if (existingTimestamp) {
-        const age = Date.now() - parseInt(existingTimestamp);
-        if (age < 5 * 60 * 1000) { // 5 minutes
-          console.log('OAuth callback already processed recently, skipping...', processedKey, 'Age:', age, 'ms');
+      if (state && isOpen) {
+        setIsLoading(true);
+        try {
+          const response = await fetch(`${API_BASE_URL}/auth/extract?state=${state}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (response.ok) {
+            const result: { statusCode: number; message: string; data: UserData } = await response.json();
+            console.log('OAuth login successful:', result);
+            
+            if (result.statusCode === 200 && result.data) {
+              // Lưu tokens và user data vào localStorage
+              localStorage.setItem('accessToken', result.data.accessToken);
+              localStorage.setItem('refreshToken', result.data.refreshToken);
+              localStorage.setItem('userData', JSON.stringify(result.data));
+              
+              // Gọi callback để cập nhật UI
+              onLoginSuccess?.(result.data);
+              
+              showToast('success', 'Đăng nhập Google thành công!');
+              
+              // Clear URL parameters ngay lập tức để tránh loop
+              window.history.replaceState({}, document.title, window.location.pathname);
+              
+              // Đóng modal
+              onClose();
+              
+              // Clear return URL
+              const returnUrl = localStorage.getItem('oauthReturnUrl') || '/';
+              localStorage.removeItem('oauthReturnUrl');
+              if (returnUrl !== '/') {
+                window.location.href = returnUrl;
+              }
+            }
+          } else {
+            const error = await response.json();
+            console.error('OAuth extraction failed:', error);
+            showToast('error', 'Đăng nhập Google thất bại: ' + (error.message || 'Lỗi không xác định'));
+            // Clear invalid state from URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        } catch (error) {
+          console.error('OAuth extraction error:', error);
+          showToast('error', 'Lỗi kết nối. Vui lòng thử lại.');
+          // Clear invalid state from URL
           window.history.replaceState({}, document.title, window.location.pathname);
-          return;
-        } else {
-          console.log('OAuth callback processed key is old, clearing...', processedKey);
-          localStorage.removeItem(processedKey);
+        } finally {
+          setIsLoading(false);
         }
       }
-      
-      // Mark this OAuth callback as being processed
-      localStorage.setItem(processedKey, Date.now().toString());
-      console.log('Marking OAuth as processing:', processedKey);
-      
-      console.log('Google OAuth callback detected');
-      console.log('Full callback URL:', window.location.href);
-      console.log('Params string:', paramsString);
-      
-      // Call backend OAuth callback endpoint with the URL params
-      const backendCallbackUrl = `http://localhost:8080/oauth2/callback${paramsString}`;
-      console.log('About to call backend:', backendCallbackUrl);
-      
-      // Debug: Test if we can reach the backend
-      console.log('Testing backend connectivity...');
-      
-      handleOAuthCallback(backendCallbackUrl, processedKey);
+    };
+
+    // Chỉ chạy khi modal đang mở và có state trong URL
+    if (isOpen) {
+      handleOAuthCallback();
     }
-  }, [location.search]);
-
-  const handleOAuthCallback = async (callbackUrl: string, processedKey?: string) => {
-    try {
-      console.log('Calling backend OAuth callback:', callbackUrl);
-      
-      const response = await fetch(callbackUrl, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      console.log('Backend response status:', response.status);
-      console.log('Backend response ok:', response.ok);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log('Backend response data:', result);
-      
-      if (result.statusCode === 200 && result.data) {
-        console.log('OAuth login successful, user data:', result.data);
-        
-        // Save user data to localStorage
-        localStorage.setItem('accessToken', result.data.accessToken);
-        localStorage.setItem('refreshToken', result.data.refreshToken);
-        localStorage.setItem('userData', JSON.stringify(result.data));
-        
-        console.log('User data saved to localStorage');
-        
-        // Call onLoginSuccess callback
-        onLoginSuccess?.(result.data);
-        
-        showToast('success', result.message || 'Đăng nhập thành công!');
-        
-        // Get the original URL to redirect to
-        const returnUrl = localStorage.getItem('oauthReturnUrl') || '/';
-        localStorage.removeItem('oauthReturnUrl');
-        
-        console.log('Redirecting back to:', returnUrl);
-        
-        // Clean URL by removing OAuth parameters
-        const cleanUrl = window.location.origin + returnUrl;
-        window.history.replaceState({}, document.title, cleanUrl);
-        
-        // Close the modal if it's open
-        onClose();
-        
-        // Clean up the processed marker after successful login
-        if (processedKey) {
-          setTimeout(() => {
-            localStorage.removeItem(processedKey);
-          }, 5000); // Remove after 5 seconds
-        }
-      } else {
-        console.error('OAuth login failed:', result);
-        showToast('error', result.message || 'Đăng nhập Google thất bại');
-        // Clean URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-        
-        // Remove the processed marker on failure so user can retry
-        if (processedKey) {
-          localStorage.removeItem(processedKey);
-        }
-      }
-    } catch (error) {
-      console.error('OAuth callback error:', error);
-      
-      // If it's a network error, it might be CORS - try alternative approach
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        console.log('Network error detected, trying alternative approach...');
-        showToast('error', 'Lỗi kết nối mạng. Vui lòng thử lại.');
-      } else {
-        showToast('error', 'Có lỗi xảy ra trong quá trình đăng nhập');
-      }
-      
-      // Clean URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-      
-      // Remove the processed marker on error so user can retry
-      if (processedKey) {
-        localStorage.removeItem(processedKey);
-        console.log('Removed processed key due to error:', processedKey);
-      }
-    }
-  };
+  }, [isOpen, location.search]);
 
   // Validation functions
   const validateEmail = (email: string): string => {
@@ -229,7 +171,9 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
     setErrors({
       email: '',
       phone: '',
-      password: ''
+      password: '',
+      confirmPassword: '',
+      otp: ''
     });
   };
 
@@ -239,6 +183,11 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
     // Reset forms and errors when closing
     setLoginForm({ email: '', password: '' });
     setRegisterForm({ email: '', password: '', fullName: '', phone: '' });
+    setForgotPasswordEmail('');
+    setOtpCode(['', '', '', '', '', '']);
+    setNewPassword('');
+    setConfirmPassword('');
+    setAuthMode('login');
     clearErrors();
     setShowPassword(false);
   };
@@ -255,7 +204,9 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
     setErrors({
       email: emailError,
       phone: phoneError,
-      password: passwordError
+      password: passwordError,
+      confirmPassword: '',
+      otp: ''
     });
     
     // If there are errors, don't submit
@@ -309,7 +260,9 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
     setErrors({
       email: emailError,
       phone: '',
-      password: passwordError
+      password: passwordError,
+      confirmPassword: '',
+      otp: ''
     });
     
     // If there are errors, don't submit
@@ -354,6 +307,169 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
       showToast('error', 'Lỗi kết nối. Vui lòng thử lại.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Handle forgot password
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const emailError = validateEmail(forgotPasswordEmail);
+    setErrors(prev => ({ ...prev, email: emailError }));
+    
+    if (emailError) return;
+    
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: forgotPasswordEmail }),
+      });
+
+      if (response.ok) {
+        showToast('success', 'Mã OTP đã được gửi đến email của bạn!');
+        setAuthMode('verify-otp');
+      } else {
+        const error = await response.json();
+        showToast('error', 'Gửi email thất bại: ' + (error.message || 'Email không tồn tại'));
+      }
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      showToast('error', 'Lỗi kết nối. Vui lòng thử lại.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle verify OTP
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const otp = otpCode.join('');
+    if (otp.length !== 6) {
+      setErrors(prev => ({ ...prev, otp: 'Vui lòng nhập đầy đủ 6 số OTP' }));
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: forgotPasswordEmail, otp }),
+      });
+
+      if (response.ok) {
+        showToast('success', 'Xác thực OTP thành công!');
+        setAuthMode('reset-password');
+      } else {
+        const error = await response.json();
+        setErrors(prev => ({ ...prev, otp: 'Mã OTP không đúng hoặc đã hết hạn' }));
+        showToast('error', 'Xác thực OTP thất bại: ' + (error.message || 'Mã OTP không đúng'));
+      }
+    } catch (error) {
+      console.error('Verify OTP error:', error);
+      showToast('error', 'Lỗi kết nối. Vui lòng thử lại.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle reset password
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const passwordError = validatePassword(newPassword);
+    const confirmError = newPassword !== confirmPassword ? 'Mật khẩu xác nhận không khớp' : '';
+    
+    setErrors(prev => ({ 
+      ...prev, 
+      password: passwordError, 
+      confirmPassword: confirmError 
+    }));
+    
+    if (passwordError || confirmError) return;
+    
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          email: forgotPasswordEmail, 
+          newPassword 
+        }),
+      });
+
+      if (response.ok) {
+        showToast('success', 'Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại.');
+        setAuthMode('login');
+        // Reset form states
+        setForgotPasswordEmail('');
+        setOtpCode(['', '', '', '', '', '']);
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        const error = await response.json();
+        showToast('error', 'Đặt lại mật khẩu thất bại: ' + (error.message || 'Lỗi không xác định'));
+      }
+    } catch (error) {
+      console.error('Reset password error:', error);
+      showToast('error', 'Lỗi kết nối. Vui lòng thử lại.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle OTP input change
+  const handleOTPChange = (index: number, value: string) => {
+    if (value.length > 1) return; // Only allow single digit
+    if (!/^\d*$/.test(value)) return; // Only allow digits
+    
+    const newOtpCode = [...otpCode];
+    newOtpCode[index] = value;
+    setOtpCode(newOtpCode);
+    
+    // Auto focus next input
+    if (value && index < 5) {
+      const nextInput = document.getElementById(`otp-${index + 1}`);
+      nextInput?.focus();
+    }
+    
+    // Clear error when user starts typing
+    if (errors.otp) {
+      setErrors(prev => ({ ...prev, otp: '' }));
+    }
+    
+    // Auto submit when all 6 digits are filled
+    const isComplete = newOtpCode.every(digit => digit !== '');
+    if (isComplete && value) {
+      // Small delay to ensure state update
+      setTimeout(() => {
+        const form = document.getElementById('otp-form');
+        if (form) {
+          const event = new Event('submit', { bubbles: true, cancelable: true });
+          form.dispatchEvent(event);
+        }
+      }, 100);
+    }
+  };
+
+  // Handle OTP backspace
+  const handleOTPKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !otpCode[index] && index > 0) {
+      const prevInput = document.getElementById(`otp-${index - 1}`);
+      prevInput?.focus();
     }
   };
 
@@ -417,7 +533,11 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
 
         {/* Form Container with Smooth Transition */}
         <div className="relative overflow-hidden transition-all duration-500 ease-in-out" style={{
-          height: authMode === 'login' ? '360px' : '550px'
+          height: authMode === 'login' ? '400px' : 
+                  authMode === 'register' ? '550px' : 
+                  authMode === 'forgot' ? '300px' :
+                  authMode === 'verify-otp' ? '350px' : 
+                  authMode === 'reset-password' ? '400px' : '360px'
         }}>
           {/* Login Form */}
           <div 
@@ -487,6 +607,17 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
                 {errors.password && (
                   <p className="text-red-500 text-sm mt-1">{errors.password}</p>
                 )}
+              </div>
+
+              {/* Forgot password link */}
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('forgot')}
+                  className="text-sm text-[var(--color-accent)] hover:text-[var(--color-secondary)] transition cursor-pointer"
+                >
+                  Quên mật khẩu?
+                </button>
               </div>
 
               <button
@@ -676,6 +807,222 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
                   </button>
                 </div>
               </div>
+            </form>
+          </div>
+
+          {/* Forgot Password Form */}
+          <div 
+            className={`transition-all duration-500 ease-in-out transform ${
+              authMode === 'forgot' 
+                ? 'translate-x-0 opacity-100' 
+                : 'translate-x-full opacity-0 absolute top-0 left-0 w-full'
+            }`}
+          >
+            <div className="mb-4">
+              <button
+                onClick={() => setAuthMode('login')}
+                className="text-sm text-gray-400 hover:text-white transition cursor-pointer flex items-center gap-2"
+              >
+                ← Quay lại đăng nhập
+              </button>
+            </div>
+            
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="text-center mb-6">
+                <h3 className="text-lg font-semibold text-white mb-2">Quên mật khẩu</h3>
+                <p className="text-sm text-gray-400">Nhập email để nhận mã OTP đặt lại mật khẩu</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={forgotPasswordEmail}
+                  onChange={(e) => {
+                    setForgotPasswordEmail(e.target.value);
+                    if (errors.email) {
+                      setErrors(prev => ({ ...prev, email: '' }));
+                    }
+                  }}
+                  className={`w-full p-3 bg-[var(--color-background)] border rounded-lg text-white placeholder-gray-400 focus:outline-none ${
+                    errors.email 
+                      ? 'border-red-500 focus:border-red-500' 
+                      : 'border-gray-400/30 focus:border-[var(--color-accent)]'
+                  }`}
+                  placeholder="Nhập email của bạn"
+                  required
+                />
+                {errors.email && (
+                  <p className="text-red-500 text-sm mt-1">{errors.email}</p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-[var(--color-secondary)] to-[var(--color-accent)] hover:from-[var(--color-accent)] hover:to-[var(--color-secondary)] text-white font-bold py-3 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-lg"
+              >
+                {isLoading ? 'Đang gửi...' : 'Gửi mã OTP'}
+              </button>
+            </form>
+          </div>
+
+          {/* OTP Verification Form */}
+          <div 
+            className={`transition-all duration-500 ease-in-out transform ${
+              authMode === 'verify-otp' 
+                ? 'translate-x-0 opacity-100' 
+                : 'translate-x-full opacity-0 absolute top-0 left-0 w-full'
+            }`}
+          >
+            <div className="mb-4">
+              <button
+                onClick={() => setAuthMode('forgot')}
+                className="text-sm text-gray-400 hover:text-white transition cursor-pointer flex items-center gap-2"
+              >
+                ← Quay lại
+              </button>
+            </div>
+            
+            <form id="otp-form" onSubmit={handleVerifyOTP} className="space-y-4">
+              <div className="text-center mb-6">
+                <h3 className="text-lg font-semibold text-white mb-2">Nhập mã OTP</h3>
+                <p className="text-sm text-gray-400">
+                  Mã OTP đã được gửi đến email <span className="text-[var(--color-accent)]">{forgotPasswordEmail}</span>
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-3">
+                  Mã OTP (6 số)
+                </label>
+                <div className="flex gap-2 justify-center">
+                  {otpCode.map((digit, index) => (
+                    <input
+                      key={index}
+                      id={`otp-${index}`}
+                      type="text"
+                      value={digit}
+                      onChange={(e) => handleOTPChange(index, e.target.value)}
+                      onKeyDown={(e) => handleOTPKeyDown(index, e)}
+                      className={`w-12 h-12 text-center text-lg font-semibold bg-[var(--color-background)] border rounded-lg text-white focus:outline-none ${
+                        errors.otp 
+                          ? 'border-red-500 focus:border-red-500' 
+                          : 'border-gray-400/30 focus:border-[var(--color-accent)]'
+                      }`}
+                      maxLength={1}
+                    />
+                  ))}
+                </div>
+                {errors.otp && (
+                  <p className="text-red-500 text-sm mt-2 text-center">{errors.otp}</p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-[var(--color-secondary)] to-[var(--color-accent)] hover:from-[var(--color-accent)] hover:to-[var(--color-secondary)] text-white font-bold py-3 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-lg"
+              >
+                {isLoading ? 'Đang xác thực...' : 'Xác thực OTP'}
+              </button>
+
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('forgot')}
+                  className="text-sm text-[var(--color-accent)] hover:text-[var(--color-secondary)] transition cursor-pointer"
+                >
+                  Gửi lại mã OTP
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Reset Password Form */}
+          <div 
+            className={`transition-all duration-500 ease-in-out transform ${
+              authMode === 'reset-password' 
+                ? 'translate-x-0 opacity-100' 
+                : 'translate-x-full opacity-0 absolute top-0 left-0 w-full'
+            }`}
+          >
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div className="text-center mb-6">
+                <h3 className="text-lg font-semibold text-white mb-2">Đặt lại mật khẩu</h3>
+                <p className="text-sm text-gray-400">Nhập mật khẩu mới cho tài khoản của bạn</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Mật khẩu mới
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => {
+                      setNewPassword(e.target.value);
+                      if (errors.password) {
+                        setErrors(prev => ({ ...prev, password: '' }));
+                      }
+                    }}
+                    className={`w-full p-3 bg-[var(--color-background)] border rounded-lg text-white placeholder-gray-400 focus:outline-none pr-12 ${
+                      errors.password 
+                        ? 'border-red-500 focus:border-red-500' 
+                        : 'border-gray-400/30 focus:border-[var(--color-accent)]'
+                    }`}
+                    placeholder="Nhập mật khẩu mới"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                  >
+                    <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} className="w-4 h-4" />
+                  </button>
+                </div>
+                {errors.password && (
+                  <p className="text-red-500 text-sm mt-1">{errors.password}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Xác nhận mật khẩu
+                </label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    if (errors.confirmPassword) {
+                      setErrors(prev => ({ ...prev, confirmPassword: '' }));
+                    }
+                  }}
+                  className={`w-full p-3 bg-[var(--color-background)] border rounded-lg text-white placeholder-gray-400 focus:outline-none ${
+                    errors.confirmPassword 
+                      ? 'border-red-500 focus:border-red-500' 
+                      : 'border-gray-400/30 focus:border-[var(--color-accent)]'
+                  }`}
+                  placeholder="Nhập lại mật khẩu mới"
+                  required
+                />
+                {errors.confirmPassword && (
+                  <p className="text-red-500 text-sm mt-1">{errors.confirmPassword}</p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-[var(--color-secondary)] to-[var(--color-accent)] hover:from-[var(--color-accent)] hover:to-[var(--color-secondary)] text-white font-bold py-3 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-lg"
+              >
+                {isLoading ? 'Đang cập nhật...' : 'Đặt lại mật khẩu'}
+              </button>
             </form>
           </div>
         </div>

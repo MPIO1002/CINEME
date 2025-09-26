@@ -18,6 +18,7 @@ import BookingPage from "../pages/booking";
 import PaymentResult from "../pages/payment-result";
 import ShowtimesPage from "../pages/showtimes";
 import Profile from "../pages/profile";
+import ShowtimeAdminPage from "../pages/showtime-admin";
 
 // Giả lập kiểm tra đăng nhập admin (bạn nên thay bằng logic thực tế)
 const isAdminAuthenticated = () => {
@@ -42,6 +43,7 @@ const Routers = () => {
           <Route path="/booking/:id" element={<BookingPage />} />
           <Route path="/payment-result" element={<PaymentResult />} />
           <Route path="/showtimes" element={<ShowtimesPage />} />
+          <Route path="/showtime-admin" element={<ShowtimeAdminPage />} />
           <Route path="/profile" element={<Profile />} />
         </Route>
 

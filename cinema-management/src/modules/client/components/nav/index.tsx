@@ -5,6 +5,7 @@ import { faUser, faGear, faChevronDown, faSignOutAlt, faUserCircle } from "@fort
 import { API_BASE_URL } from "../../../../components/api-config";
 import AuthModal from "../auth-modal";
 import { useToast } from "../../../../hooks/useToast";
+import { handleLogoutAPI } from "../../../../utils/auth";
 
 const LANGUAGES = [
   { code: "vi", label: "VIE", flag: "/VN.webp" },
@@ -153,14 +154,10 @@ const Nav = ({
   };
 
   // Handle logout
-  const handleLogout = () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('userData');
+  const handleLogout = async () => {
     setUser(null);
     setShowUserDropdown(false);
-    showToast('success', 'Đăng xuất thành công!');
-    navigate('/');
+    await handleLogoutAPI('client', showToast, navigate);
   };
 
   // Fetch movies function

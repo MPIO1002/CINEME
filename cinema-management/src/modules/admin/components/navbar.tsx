@@ -7,9 +7,28 @@ const Navbar = () => {
         <p>Xin chao {JSON.parse(localStorage.getItem("admin_token") || "{}").email}</p>
         <button
           className="text-indigo-700 hover:underline"
-          onClick={() => {
-            localStorage.removeItem("admin_token");
-            window.location.href = "/admin/login";
+          onClick={async () => {
+            try {
+              const adminToken = localStorage.getItem("admin_token");
+              
+              // Call logout API if admin is authenticated
+              if (adminToken) {
+                const tokenData = JSON.parse(adminToken);
+                await fetch('http://localhost:8080/api/v1/auth/logout', {
+                  method: 'GET',
+                  headers: {
+                    'Authorization': `Bearer ${tokenData.accessToken || tokenData.token}`,
+                  },
+                });
+              }
+            } catch (error) {
+              console.error('Admin logout API error:', error);
+              // Continue with logout even if API fails
+            } finally {
+              // Always clear local storage and redirect
+              localStorage.removeItem("admin_token");
+              window.location.href = "/admin/login";
+            }
           }}
         >
           Đăng xuất

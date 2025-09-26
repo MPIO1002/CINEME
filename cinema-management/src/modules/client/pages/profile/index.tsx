@@ -4,6 +4,7 @@ import { Star, Eye, MessageSquare, Badge } from 'lucide-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTicket } from '@fortawesome/free-solid-svg-icons';
 import { useToast } from '../../../../hooks/useToast';
+import { API_BASE_URL } from '../../../../components/api-config';
 
 interface UserProfile {
   id: string;
@@ -66,7 +67,7 @@ const Profile: React.FC = () => {
 
         // Fetch user profile
         const response = await fetch(
-          `http://localhost:8080/api/v1/users/${id}/info`,
+          `${API_BASE_URL}/users/${id}/info`,
           {
             method: 'GET',
             headers: {
@@ -111,7 +112,7 @@ const Profile: React.FC = () => {
         const { id, refreshToken } = user;
 
         const response = await fetch(
-          `http://localhost:8080/api/v1/bookings/${id}/history`,
+          `${API_BASE_URL}/bookings/${id}/history`,
           {
             method: 'GET',
             headers: {

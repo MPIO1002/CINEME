@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { XCircle, Home } from 'lucide-react';
 import { useToast } from '../../../../hooks/useToast';
+import { API_BASE_URL } from '../../../../components/api-config';
 
 
 interface PaymentResultData {
@@ -50,7 +51,7 @@ const PaymentResult: React.FC = () => {
         if (status === 'success' && bookingId) {
           // Call API to get booking information
           const response = await fetch(
-            `http://localhost:8080/api/v1/bookings/${bookingId}/info`,
+            `${API_BASE_URL}/bookings/${bookingId}/info`,
             {
               method: 'GET',
               headers: {
