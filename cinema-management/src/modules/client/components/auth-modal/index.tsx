@@ -333,7 +333,8 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
     
     try {
       // Some backends expect the email as a query param even for POST (curl used -X POST '...forgot-password?email=...')
-      const url = `${API_BASE_URL}/auth/forgot-password?email=${encodeURIComponent(forgotPasswordEmail)}`;
+      const emailParam = encodeURIComponent(forgotPasswordEmail.trim());
+      const url = `${API_BASE_URL}/auth/forgot-password?email=${emailParam}`;
       console.log('Forgot password POST (query param)', url);
 
       // Send POST with empty body to match curl/Postman (-d '') behavior
@@ -345,17 +346,31 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
         body: ''
       });
 
-      if (response.ok) {
-        let body: any = null;
-        try { body = await response.json(); } catch (e) { body = await response.text(); }
+      // Try to parse response body for diagnostics (may be JSON or text)
+      let parsedBody: any = null;
+      try {
+        parsedBody = await response.json();
+      } catch (e) {
+        try { parsedBody = await response.text(); } catch (e2) { parsedBody = null; }
+      }
+
+      console.log('Forgot password response', { status: response.status, ok: response.ok, body: parsedBody });
+
+      // If server responded OK but indicates an internal failure (e.g. failed to send email), treat as error
+      const bodyString = parsedBody ? (typeof parsedBody === 'string' ? parsedBody : JSON.stringify(parsedBody)) : '';
+      const sendFailure = /failed to send email|failed to send|cannot find template|template/i.test(bodyString);
+
+      if (response.ok && !sendFailure) {
         showToast('success', 'Mã OTP đã được gửi đến email của bạn!');
         setAuthMode('verify-otp');
       } else {
-        let errorBody: any = null;
-        try { errorBody = await response.json(); } catch (e) { errorBody = await response.text(); }
-        showToast('error', 'Gửi email thất bại: ' + (errorBody?.message || errorBody || 'Email không tồn tại'));
+        // Prefer server-provided message when available
+        const serverMsg = parsedBody && typeof parsedBody === 'object' ? (parsedBody.message || parsedBody.msg || JSON.stringify(parsedBody)) : parsedBody;
+        console.error('Forgot password failed or email not sent:', { status: response.status, body: parsedBody });
+        showToast('error', 'Gửi email thất bại: ' + (serverMsg || 'Không thể gửi mã OTP. Vui lòng thử lại hoặc kiểm tra mail rác.'));
       }
     } catch (error) {
+      console.error('Forgot password error:', error);
       showToast('error', 'Lỗi kết nối. Vui lòng thử lại.');
     } finally {
       setIsLoading(false);
@@ -375,21 +390,31 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
     setIsLoading(true);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
+      const emailParam = encodeURIComponent(forgotPasswordEmail.trim());
+      const otpParam = encodeURIComponent(otp);
+      const url = `${API_BASE_URL}/auth/verify-otp?email=${emailParam}&otp=${otpParam}`;
+      console.log('Verify OTP POST (query params)', url);
+
+      // Send POST with empty body to match backend expectation
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
-        body: JSON.stringify({ email: forgotPasswordEmail, otp }),
+        body: ''
       });
+
+      let parsedBody: any = null;
+      try { parsedBody = await response.json(); } catch (e) { try { parsedBody = await response.text(); } catch (e2) { parsedBody = null; } }
+      console.log('Verify OTP response', { status: response.status, ok: response.ok, body: parsedBody });
 
       if (response.ok) {
         showToast('success', 'Xác thực OTP thành công!');
         setAuthMode('reset-password');
       } else {
-        const error = await response.json();
         setErrors(prev => ({ ...prev, otp: 'Mã OTP không đúng hoặc đã hết hạn' }));
-        showToast('error', 'Xác thực OTP thất bại: ' + (error.message || 'Mã OTP không đúng'));
+        const serverMsg = parsedBody && typeof parsedBody === 'object' ? (parsedBody.message || parsedBody.msg) : parsedBody;
+        showToast('error', 'Xác thực OTP thất bại: ' + (serverMsg || 'Mã OTP không đúng'));
       }
     } catch (error) {
       console.error('Verify OTP error:', error);
