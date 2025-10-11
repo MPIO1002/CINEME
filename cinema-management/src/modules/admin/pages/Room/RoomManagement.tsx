@@ -16,19 +16,39 @@ import {
     Volume2
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { type Room as ApiRoom, type Room, roomApiService, type RoomLayout } from '../../../../services/roomApi.ts';
+import { type Room as ApiRoom, type Seat as ApiSeat, roomApiService, type RoomLayout } from '../../../../services/roomApi.ts';
 import { Pagination } from "../../components/pagination.tsx";
 import RoomModal from './components/RoomModal.tsx';
-import type { Seat as DesignerSeat } from './components/SeatLayoutDesigner.tsx';
 import type { Column } from "../../components/tableProps.tsx";
 import { Table } from "../../components/tableProps.tsx";
 import { hasPermission } from "../../utils/authUtils.ts";
 
+// Extended local interfaces
+interface LocalSeat extends ApiSeat {
+  row: number;
+  column: number;
+  seatType: 'STANDARD' | 'VIP' | 'COUPLE' | 'DISABLED';
+  isSelected?: boolean;
+  isHovered?: boolean;
+}
+
+interface Room extends ApiRoom {
+  type: '2D' | '3D' | 'IMAX' | '4DX';
+  regularSeats?: number;
+  screenSize?: string;
+  audioSystem?: string;
+  has4K?: boolean;
+  hasDolbyAtmos?: boolean;
+  hasAirCondition?: boolean;
+  hasEmergencyExit?: boolean;
+  seatLayout?: LocalSeat[];
+}
 
 // Adapter functions to convert between API and component types
 const convertApiRoomToLocal = (apiRoom: ApiRoom): Room => ({
   ...apiRoom,
   type: (apiRoom.type as '2D' | '3D' | 'IMAX' | '4DX') || '2D',
+  regularSeats: apiRoom.standardSeats,
   seatLayout: apiRoom.seatLayout?.map(apiSeat => {
     // Map API seatType to component type
     const getTypeFromAPI = (apiType: string): 'STANDARD' | 'VIP' | 'COUPLE' | 'DISABLED' => {
@@ -43,7 +63,7 @@ const convertApiRoomToLocal = (apiRoom: ApiRoom): Room => ({
     
     return {
       ...apiSeat,
-      row: apiSeat.row || '',
+      row: typeof apiSeat.row === 'string' ? parseInt(apiSeat.row) || 0 : (apiSeat.row || 0),
       column: apiSeat.column || 0,
       seatType: getTypeFromAPI(apiSeat.seatType || 'STANDARD'),
       isSelected: false,
@@ -52,39 +72,7 @@ const convertApiRoomToLocal = (apiRoom: ApiRoom): Room => ({
   })
 });
 
-const convertLocalRoomToApi = (room: Room): Partial<ApiRoom> => ({
-  ...room,
-  seatLayout: room.seatLayout?.map(seat => ({
-    ...seat,
-    row: seat.row || '',
-    seatNumber: seat.seatNumber,
-    seatType: seat.seatType
-  }))
-});
 
-// Interface for RoomModal component
-interface ModalRoom {
-  id?: string;
-  name: string;
-  type: '2D' | '3D' | 'IMAX' | '4DX';
-  location?: string;
-  totalSeats: number;
-  vipSeats: number;
-  regularSeats: number;
-  coupleSeats?: number;
-  status: 'ACTIVE' | 'MAINTENANCE' | 'CLOSED';
-  screenSize: string;
-  screenResolution: string;
-  audioSystem: string;
-  hasAirCondition: boolean;
-  hasEmergencyExit: boolean;
-  hasDolbyAtmos: boolean;
-  has4K: boolean;
-  description?: string;
-  utilization?: number;
-  monthlyRevenue?: number;
-  seatLayout?: DesignerSeat[];
-}
 
 // Convert local Room to Modal Room interface
 // const convertToModalRoom = (room: Room): ModalRoom => ({
@@ -122,37 +110,7 @@ interface ModalRoom {
 //       isAvailable: true
 //     };
 //   })
-// });
 
-// Convert Modal Room to local Room interface  
-const convertFromModalRoom = (modalRoom: unknown): Room => {
-  const room = modalRoom as ModalRoom;
-  return {
-    ...room,
-    utilization: room.utilization || 0,
-    monthlyRevenue: room.monthlyRevenue || 0,
-    seatLayout: room.seatLayout?.map(seat => {
-      // Map modal type back to API type
-      const getAPITypeFromModal = (modalType: string): 'STANDARD' | 'VIP' | 'COUPLE' | 'DISABLED' => {
-        switch (modalType.toLowerCase()) {
-          case 'vip': return 'VIP';
-          case 'couple': return 'COUPLE';
-          case 'disabled': return 'DISABLED';
-          case 'regular': 
-          default: return 'STANDARD';
-        }
-      };
-      
-      return {
-        id: seat.id,
-        row: seat.row.toString(),
-        column: seat.column,
-        seatNumber: seat.label,
-        seatType: getAPITypeFromModal(seat.type)
-      };
-    })
-  };
-};
 
 const RoomManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -207,7 +165,7 @@ const RoomManagement: React.FC = () => {
     setLoading(false);
   };
 
-    const handleSaveRoom = async (modalRoom: Room, roomLayout?: RoomLayout) => {
+    const handleSaveRoom = async (modalRoom: ApiRoom, roomLayout?: RoomLayout) => {
         setLoading(true);
         
         

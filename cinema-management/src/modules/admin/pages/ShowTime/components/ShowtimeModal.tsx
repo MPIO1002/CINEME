@@ -1,9 +1,9 @@
 import { AlertTriangle, Calendar, CheckCircle, Clock, Edit3, Eye, Film, MapPin, Plus, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { type Movie } from '../../../services/movieApi';
-import { type Room } from '../../../services/roomApi';
-import { type Showtime } from '../../../services/showtimeApi';
-import { type Theater } from '../../../services/theaterApi';
+import { type Movie } from '../../../../../services/movieApi';
+import { type Room } from '../../../../../services/roomApi';
+import { type Showtime } from '../../../../../services/showtimeApi';
+import { type Theater } from '../../../../../services/theaterApi';
 
 interface ShowtimeModalProps {
   open: boolean;
@@ -657,7 +657,9 @@ const ShowtimeModal: React.FC<ShowtimeModalProps> = ({
                 <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                   Định dạng phim *
                   {getFieldWarning('formatVn') && (
-                    <AlertTriangle className="w-4 h-4 text-amber-500" title={getFieldWarning('formatVn')} />
+                    <span title={getFieldWarning('formatVn')}>
+                      <AlertTriangle className="w-4 h-4 text-amber-500" />
+                    </span>
                   )}
                 </label>
                 {isView ? (
@@ -693,7 +695,7 @@ const ShowtimeModal: React.FC<ShowtimeModalProps> = ({
                 <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                   Ngôn ngữ *
                   {getFieldWarning('languageVn') && (
-                    <AlertTriangle className="w-4 h-4 text-amber-500" title={getFieldWarning('languageVn')} />
+                    <AlertTriangle className="w-4 h-4 text-amber-500" />
                   )}
                 </label>
                 {isView ? (

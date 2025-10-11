@@ -20,43 +20,42 @@ export interface UserData {
   refreshToken: string;
   permissions: string[];
 }
-export const checkPermission = (requiredPermission: string) => {
-  try {
-    const decoded: JWTPayload = jwtDecode(requiredPermission);
-    return decoded.permissions || [];
-  } catch {
-    return [];
-  }
-};
+// Các functions về permissions không cần thiết nữa - Backend handle authorization
+// export const checkPermission = (requiredPermission: string): boolean => {
+//   const permissions = getPermissions();
+//   return permissions.includes(requiredPermission);
+// };
 
-export const getPermissions = (): string[] => {
-  const token = localStorage.getItem("accessToken");
-  if (!token) return [];
-  try {
-    const decoded: JWTPayload = jwtDecode(token);
-    return decoded.permissions || [];
-  } catch {
-    return [];
-  }
-};
+// export const getPermissions = (): string[] => {
+//   const token = localStorage.getItem("accessToken");
+//   if (!token) return [];
+//   try {
+//     const decoded: JWTPayload = jwtDecode(token);
+//     return decoded.permissions || [];
+//   } catch {
+//     return [];
+//   }
+// };
 
 export const getUserData = (): UserData | null => {
   const token = localStorage.getItem("accessToken");
   if (!token) return null;
-  const permissions = getPermissions();
+  
+  // Đơn giản hóa - chỉ return basic info, không cần decode permissions
   return {
     id: '',
     email: '',
-    fullName: '',
+    fullName: localStorage.getItem("fullName") || '',
     accessToken: token,
     refreshToken: localStorage.getItem("refreshToken") || '',
-    permissions
+    permissions: [] // Không cần permissions nữa
   };
 };
 
-export const hasPermission = (permission: string): boolean => {
-  const userData = getUserData();
-  return userData?.permissions?.includes(permission) || false;
+export const hasPermission = (_permission: string): boolean => {
+  // Tạm thời return true - Backend sẽ handle authorization
+  // Các components cũ vẫn có thể hoạt động mà không bị lỗi
+  return true;
 };
 
 export const isTokenExpired = (token: string): boolean => {
@@ -78,8 +77,10 @@ export const isAuthenticated = (): boolean => {
 };
 
 export const hasAnyAdminPermission = (): boolean => {
-  const userData = getUserData();
-  return (userData?.permissions?.length ?? 0) > 0;
+  // Với logic backend mới: chỉ cần có valid token là có thể vào admin
+  // Backend sẽ handle authorization khi call API
+  const token = localStorage.getItem("accessToken");
+  return token !== null && !isTokenExpired(token);
 };
 
 export const logout = () => {

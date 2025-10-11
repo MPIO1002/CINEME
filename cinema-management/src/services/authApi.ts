@@ -46,6 +46,12 @@ authApi.interceptors.request.use(
   (config) => {
     console.log(`Making ${config.method?.toUpperCase()} request to ${config.url}`);
     
+    // Add Bearer token to requests (except login)
+    const token = localStorage.getItem('accessToken');
+    if (token && !config.url?.includes('/auth/login')) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
     // Add timestamp to bypass cache
     const separator = config.url?.includes('?') ? '&' : '?';
     config.url = `${config.url}${separator}_t=${Date.now()}`;
@@ -110,7 +116,7 @@ authApi.interceptors.response.use(
 
 export const authApiService = {
   login: (userData: Login): Promise<AxiosResponse<ApiResponse<UserData>>> => {
-    return authApi.post('/auth/login', userData);
+    return authApi.post('/auth/login-admin', userData);
   },
   register: (userData: Register): Promise<AxiosResponse<ApiResponse<null>>> => {
     return authApi.post('/auth/register', userData);

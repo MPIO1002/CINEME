@@ -14,13 +14,7 @@ import {
     X
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { type Theater } from '../../../services/theaterApi';
-
-interface Room {
-  id: string;
-  name: string;
-  type: string;
-}
+import { type Theater, type Room } from '../../../../../services/theaterApi';
 
 interface TheaterModalProps {
   open: boolean;
@@ -111,11 +105,11 @@ const TheaterModal: React.FC<TheaterModalProps> = ({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm((prev: Theater) => ({ ...prev, [name]: value }));
     
     // Clear error for this field when user starts typing
     if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: "" }));
+      setErrors((prev: Record<string, string>) => ({ ...prev, [name]: "" }));
     }
   };
 
@@ -385,7 +379,7 @@ const TheaterModal: React.FC<TheaterModalProps> = ({
                 </h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {form.rooms.map((room) => (
+                  {form.rooms.map((room: Room) => (
                     <div key={room.id} className="bg-white rounded-lg p-3 border border-slate-200">
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-slate-900">Phòng {room.name}</span>
@@ -405,25 +399,25 @@ const TheaterModal: React.FC<TheaterModalProps> = ({
                 <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div className="bg-white rounded-lg p-3 text-center">
                     <div className="text-2xl font-bold text-blue-600">
-                      {form.rooms.filter(r => r.type === 'Standard').length}
+                      {form.rooms.filter((r: Room) => r.type === 'Standard').length}
                     </div>
                     <div className="text-slate-600">Standard</div>
                   </div>
                   <div className="bg-white rounded-lg p-3 text-center">
                     <div className="text-2xl font-bold text-yellow-600">
-                      {form.rooms.filter(r => r.type === 'VIP').length}
+                      {form.rooms.filter((r: Room) => r.type === 'VIP').length}
                     </div>
                     <div className="text-slate-600">VIP</div>
                   </div>
                   <div className="bg-white rounded-lg p-3 text-center">
                     <div className="text-2xl font-bold text-purple-600">
-                      {form.rooms.filter(r => r.type === 'IMAX').length}
+                      {form.rooms.filter((r: Room) => r.type === 'IMAX').length}
                     </div>
                     <div className="text-slate-600">IMAX</div>
                   </div>
                   <div className="bg-white rounded-lg p-3 text-center">
                     <div className="text-2xl font-bold text-green-600">
-                      {form.rooms.filter(r => r.type === '4DX').length}
+                      {form.rooms.filter((r: Room) => r.type === '4DX').length}
                     </div>
                     <div className="text-slate-600">4DX</div>
                   </div>

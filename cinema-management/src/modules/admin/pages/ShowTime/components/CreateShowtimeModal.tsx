@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ChevronDown, Search } from 'lucide-react';
 import { useDebounce } from '../../../../../hooks/exports';
+import { API_BASE_URL } from '../../../../../components/api-config';
 
 // Custom scrollbar styles
 const scrollbarStyles = `
@@ -143,6 +144,56 @@ interface ApiResponse {
   data: Movie[];
 }
 
+interface Theater {
+  id: string;
+  nameEn: string;
+  nameVn: string;
+}
+
+interface TheaterApiResponse {
+  statusCode: number;
+  message: string;
+  data: Theater[];
+}
+
+// New interfaces for API request and response
+interface CreateShowtimeRequest {
+  openTime: string;
+  closeTime: string;
+  goldenTime: string;
+  startDate: string;
+  endDate: string;
+  hallId: string;
+  movies: Array<{
+    id: string;
+    duration: number;
+    rating: number;
+    type: number;
+    title: string;
+  }>;
+}
+
+interface ShowtimeMovie {
+  id: string;
+  name: string;
+  start_time: string;
+  end_time: string;
+}
+
+interface ShowtimeHall {
+  id: string;
+  name: string;
+  movies: ShowtimeMovie[];
+}
+
+interface ShowtimeDay {
+  date: string;
+  showtimes: ShowtimeHall[];
+}
+
+interface CreateShowtimeResponse extends Array<ShowtimeDay> {}
+
+// Original interface for backward compatibility
 interface Showtime {
   id: string;
   movieId: string;
@@ -168,15 +219,39 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
   const [selectedMovies, setSelectedMovies] = useState<Set<string>>(new Set());
   const [isLoadingMovies, setIsLoadingMovies] = useState(false);
   const [moviesError, setMoviesError] = useState<string | null>(null);
+  const [theaters, setTheaters] = useState<Theater[]>([]);
+  const [isLoadingTheaters, setIsLoadingTheaters] = useState(false);
+  const [theatersError, setTheatersError] = useState<string | null>(null);
   const [startTime, setStartTime] = useState('08:00');
   const [endTime, setEndTime] = useState('22:00');
-  const [showtimes, setShowtimes] = useState<Showtime[]>([]);
+  // const [showtimes, setShowtimes] = useState<Showtime[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // New states for creation process
+  const [isCreating, setIsCreating] = useState(false);
+  const [creationProgress, setCreationProgress] = useState(0);
+  const [createdShowtimes, setCreatedShowtimes] = useState<CreateShowtimeResponse>([]);
+  const [creationError, setCreationError] = useState<string | null>(null);
+  const [goldenTime, setGoldenTime] = useState('19:00');
   
   // Use debounce hook với delay 300ms
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-  const rooms = ['Phòng 1', 'Phòng 2', 'Phòng 3'];
+  // Get rooms from API response only
+  const getRoomsFromApiResponse = (): string[] => {
+    if (createdShowtimes.length > 0) {
+      const roomsSet = new Set<string>();
+      createdShowtimes.forEach(dayData => {
+        dayData.showtimes.forEach(hallData => {
+          roomsSet.add(hallData.name);
+        });
+      });
+      return Array.from(roomsSet).sort();
+    }
+    return []; // No default rooms, wait for API response
+  };
+
+  const rooms = getRoomsFromApiResponse();
 
   // Sample showtimes data
   const sampleShowtimes: Showtime[] = [
@@ -318,12 +393,43 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
     return Math.max(0, (offsetMinutes * 112) / 60); // convert to pixels
   };
 
+  // Convert API response to showtime format for rendering
+  const convertApiResponseToShowtimes = (apiResponse: CreateShowtimeResponse): Showtime[] => {
+    const convertedShowtimes: Showtime[] = [];
+    const colors = ['purple', 'green', 'blue', 'yellow', 'red', 'indigo'];
+    
+    apiResponse.forEach(dayData => {
+      dayData.showtimes.forEach(hallData => {
+        hallData.movies.forEach((movie, index) => {
+          convertedShowtimes.push({
+            id: `${dayData.date}-${hallData.id}-${movie.id}-${index}`,
+            movieId: movie.id,
+            movieName: movie.name,
+            startTime: movie.start_time,
+            endTime: movie.end_time,
+            date: dayData.date,
+            room: hallData.name,
+            color: colors[index % colors.length]
+          });
+        });
+      });
+    });
+    
+    return convertedShowtimes;
+  };
+
   const getShowtimesForSlot = (date: string, slotTime: string): Showtime[] => {
     const slotStartMinutes = timeToMinutes(slotTime + ':00');
     const slotEndMinutes = slotStartMinutes + 60; // 1 hour slot
     
-    return sampleShowtimes.filter(showtime => {
+    // Use API response data if available, otherwise use sample data
+    const showtimesToUse = createdShowtimes.length > 0 
+      ? convertApiResponseToShowtimes(createdShowtimes)
+      : sampleShowtimes;
+    
+    return showtimesToUse.filter(showtime => {
       if (showtime.date !== date) return false;
+      if (showtime.room !== selectedRoom) return false; // Filter by selected room
       
       const showStartMinutes = timeToMinutes(showtime.startTime);
       
@@ -345,10 +451,55 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
     return colorMap[color as keyof typeof colorMap] || colorMap.purple;
   };
 
-  // Initialize showtimes with sample data
+  // Initialize showtimes with sample data (now using API response)
   React.useEffect(() => {
-    setShowtimes(sampleShowtimes);
+    // Sample data is now replaced by API response in getShowtimesForSlot function
   }, []);
+
+  // Fetch theaters from API
+  const fetchTheaters = async () => {
+    try {
+      setIsLoadingTheaters(true);
+      setTheatersError(null);
+      
+      const response = await fetch(`${API_BASE_URL}/theaters`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result: TheaterApiResponse = await response.json();
+      
+      if (result.statusCode === 200) {
+        setTheaters(result.data);
+      } else {
+        throw new Error(result.message || 'Failed to fetch theaters');
+      }
+    } catch (error) {
+      let errorMessage = 'An error occurred while fetching theaters';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to fetch')) {
+          errorMessage = 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng hoặc server có đang chạy không.';
+        } else if (error.message.includes('CORS')) {
+          errorMessage = 'Lỗi CORS: Server cần được cấu hình để cho phép truy cập từ ứng dụng này.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      setTheatersError(errorMessage);
+      console.error('Error fetching theaters:', error);
+    } finally {
+      setIsLoadingTheaters(false);
+    }
+  };
 
   // Fetch movies from API
   const fetchMovies = async () => {
@@ -356,7 +507,7 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
       setIsLoadingMovies(true);
       setMoviesError(null);
       
-      const response = await fetch('http://localhost:8080/api/v1/movies', {
+      const response = await fetch(`${API_BASE_URL}/movies`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -410,13 +561,13 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
   };
 
   // Handle select all movies
-  const handleSelectAllMovies = (isSelected: boolean) => {
-    if (isSelected) {
-      setSelectedMovies(new Set(movies.map(movie => movie.id)));
-    } else {
-      setSelectedMovies(new Set());
-    }
-  };
+  // const handleSelectAllMovies = (isSelected: boolean) => {
+  //   if (isSelected) {
+  //     setSelectedMovies(new Set(movies.map(movie => movie.id)));
+  //   } else {
+  //     setSelectedMovies(new Set());
+  //   }
+  // };
 
   // Handle select all filtered movies
   const handleSelectAllFilteredMovies = (isSelected: boolean) => {
@@ -436,16 +587,131 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
   };
 
   // Check if all movies are selected
-  const isAllMoviesSelected = movies.length > 0 && selectedMovies.size === movies.length;
+  // const isAllMoviesSelected = movies.length > 0 && selectedMovies.size === movies.length;
 
   // Check if all filtered movies are selected
   const isAllFilteredMoviesSelected = filteredMovies.length > 0 && 
     filteredMovies.every(movie => selectedMovies.has(movie.id));
 
-  // Fetch movies when modal opens
+  // Function to create showtimes with progress simulation
+  const handleCreateShowtimes = async () => {
+    // Validation
+    if (!selectedDate || !selectedTheater || selectedMovies.size === 0) {
+      alert('Vui lòng chọn đầy đủ thông tin: ngày, rạp chiếu và ít nhất một phim');
+      return;
+    }
+
+    try {
+      setIsCreating(true);
+      setCreationProgress(0);
+      setCreationError(null);
+
+      // Prepare request data
+      const selectedMoviesList = movies.filter(movie => selectedMovies.has(movie.id));
+      const requestData: CreateShowtimeRequest = {
+        openTime: startTime,
+        closeTime: endTime,
+        goldenTime: goldenTime,
+        startDate: selectedDate,
+        endDate: endDate || selectedDate,
+        hallId: selectedTheater,
+        movies: selectedMoviesList.map(movie => ({
+          id: movie.id,
+          duration: movie.time,
+          rating: movie.ratings ? parseFloat(movie.ratings) : (Math.random() * 25 + 1), // Use actual rating or random between 1-26
+          type: Math.floor(Math.random() * 2), // Random 0 or 1
+          title: movie.nameVn
+        }))
+      };
+
+      console.log('=== DỮ LIỆU TRUYỀN VÀO API /convert ===');
+      console.log('Request URL:', 'http://127.0.0.1:8000/convert');
+      console.log('Request Method:', 'POST');
+      console.log('Request Headers:', {
+        'Content-Type': 'application/json'
+      });
+      console.log('Request Body:', JSON.stringify(requestData, null, 2));
+      console.log('Raw Request Data Object:', requestData);
+      console.log('Selected Movies Details:', selectedMoviesList);
+      console.log('Selected Theater ID:', selectedTheater);
+      console.log('Date Range:', `${selectedDate} → ${endDate || selectedDate}`);
+      console.log('Time Range:', `${startTime} → ${endTime}`);
+      console.log('Golden Time:', goldenTime);
+      console.log('Total Movies Selected:', selectedMoviesList.length);
+      console.log('=====================================');
+
+      // Simulate progress during API call (7-20 seconds)
+      const progressInterval = setInterval(() => {
+        setCreationProgress(prev => {
+          if (prev >= 95) {
+            clearInterval(progressInterval);
+            return 95;
+          }
+          return prev + Math.random() * 15;
+        });
+      }, 800);
+
+      // Make API call
+      const response = await fetch('http://127.0.0.1:8000/convert', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      });
+
+      clearInterval(progressInterval);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result: CreateShowtimeResponse = await response.json();
+      setCreationProgress(100);
+      setCreatedShowtimes(result);
+      
+      console.log('Showtimes created successfully:', result);
+      
+      // Show success message and reset progress
+      setTimeout(() => {
+        setCreationProgress(0);
+        setIsCreating(false);
+      }, 2000);
+
+    } catch (error) {
+      let errorMessage = 'Có lỗi xảy ra khi tạo suất chiếu';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to fetch')) {
+          errorMessage = 'Không thể kết nối đến server AI. Vui lòng kiểm tra kết nối mạng hoặc server có đang chạy không.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      setCreationError(errorMessage);
+      setCreationProgress(0);
+      setIsCreating(false);
+      console.error('Error creating showtimes:', error);
+    }
+  };
+
+  // Update selected room when API response changes
+  useEffect(() => {
+    if (createdShowtimes.length > 0) {
+      const availableRooms = getRoomsFromApiResponse();
+      if (availableRooms.length > 0) {
+        // Always set to first room from API response
+        setSelectedRoom(availableRooms[0]);
+      }
+    }
+  }, [createdShowtimes]);
+
+  // Fetch movies and theaters when modal opens
   useEffect(() => {
     if (isOpen) {
       fetchMovies();
+      fetchTheaters();
     }
   }, [isOpen]);
 
@@ -540,6 +806,15 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
                 />
                 <label className="absolute -top-2 left-2 bg-white px-1 text-xs text-gray-500">Giờ kết thúc</label>
               </div>
+              <div className="relative">
+                <input
+                  type="time"
+                  value={goldenTime}
+                  onChange={(e) => setGoldenTime(e.target.value)}
+                  className="px-3 py-2.5 border border-amber-300 rounded-lg bg-amber-50 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                />
+                <label className="absolute -top-2 left-2 bg-white px-1 text-xs text-amber-600">Giờ vàng</label>
+              </div>
             </div>
 
             {/* Third Row - Theater and Actions */}
@@ -549,20 +824,41 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
                 <select
                   value={selectedTheater}
                   onChange={(e) => setSelectedTheater(e.target.value)}
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg pr-10 appearance-none min-w-[180px] bg-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  disabled={isLoadingTheaters}
+                  className="px-4 py-2.5 border border-gray-300 rounded-lg pr-10 appearance-none min-w-[180px] bg-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
-                  <option value="">Chọn rạp chiếu</option>
-                  <option value="theater1">CGV Vincom</option>
-                  <option value="theater2">Lotte Cinema</option>
-                  <option value="theater3">Galaxy Cinema</option>
+                  <option value="">
+                    {isLoadingTheaters ? "Đang tải..." : theatersError ? "Lỗi tải dữ liệu" : "Chọn rạp chiếu"}
+                  </option>
+                  {theaters.map((theater) => (
+                    <option key={theater.id} value={theater.id}>
+                      {theater.nameVn}
+                    </option>
+                  ))}
                 </select>
                 <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-gray-400" />
+                {theatersError && (
+                  <div className="absolute top-full left-0 mt-1 p-2 bg-red-50 border border-red-200 rounded text-red-600 text-xs z-10 min-w-full">
+                    {theatersError}
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}
               <div className="flex gap-2">
-                <button className="px-4 py-2.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-all duration-300 font-medium">
-                  Tạo
+                <button 
+                  onClick={handleCreateShowtimes}
+                  disabled={isCreating || !selectedDate || !selectedTheater || selectedMovies.size === 0}
+                  className="px-4 py-2.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-all duration-300 font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isCreating ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Đang tạo...
+                    </>
+                  ) : (
+                    'Tạo'
+                  )}
                 </button>
                 <button className="px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all duration-300 font-medium">
                   Lưu
@@ -571,6 +867,46 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
             </div>
           </div>
         </div>
+
+        {/* Progress Bar for Creation Process */}
+        {isCreating && (
+          <div className="px-4 py-3 bg-amber-50 border-y border-amber-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-amber-800">
+                Đang tạo suất chiếu với AI...
+              </span>
+              <span className="text-sm font-bold text-amber-600">
+                {Math.round(creationProgress)}%
+              </span>
+            </div>
+            <div className="w-full bg-amber-200 rounded-full h-2">
+              <div 
+                className="bg-amber-600 h-2 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${creationProgress}%` }}
+              ></div>
+            </div>
+            <p className="text-xs text-amber-700 mt-1">
+              Quá trình này có thể mất 7-20 giây. Vui lòng đợi...
+            </p>
+          </div>
+        )}
+
+        {/* Error Display */}
+        {creationError && (
+          <div className="px-4 py-3 bg-red-50 border-y border-red-200">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 text-red-600">⚠️</div>
+              <span className="text-sm font-medium text-red-800">Lỗi tạo suất chiếu:</span>
+            </div>
+            <p className="text-sm text-red-700 mt-1">{creationError}</p>
+            <button 
+              onClick={() => setCreationError(null)}
+              className="text-xs text-red-600 underline mt-1 hover:text-red-800"
+            >
+              Đóng
+            </button>
+          </div>
+        )}
 
         {/* Main Content */}
         <div className="flex-1 flex bg-stone-50 rounded-b-lg overflow-hidden">
@@ -715,22 +1051,24 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
 
           {/* Right Panel - Schedule Grid */}
           <div className="flex-1 flex flex-col rounded-br-lg overflow-hidden">
-            {/* Room Tabs */}
-            <div className="flex items-center gap-px px-4 rounded-lg bg-gray-100 p-1 mb-0 w-fit">
-              {rooms.map((room) => (
-                <button
-                  key={room}
-                  onClick={() => setSelectedRoom(room)}
-                  className={`rounded-lg py-2.5 px-5 text-sm font-medium transition-all duration-300 ${
-                    selectedRoom === room
-                      ? 'text-indigo-600 bg-white'
-                      : 'text-gray-500 hover:bg-white hover:text-indigo-600'
-                  }`}
-                >
-                  {room}
-                </button>
-              ))}
-            </div>
+            {/* Room Tabs - Only show when we have API response data */}
+            {rooms.length > 0 && (
+              <div className="flex items-center gap-px px-4 rounded-lg bg-gray-100 p-1 mb-0 w-fit">
+                {rooms.map((room) => (
+                  <button
+                    key={room}
+                    onClick={() => setSelectedRoom(room)}
+                    className={`rounded-lg py-2.5 px-5 text-sm font-medium transition-all duration-300 ${
+                      selectedRoom === room
+                        ? 'text-indigo-600 bg-white'
+                        : 'text-gray-500 hover:bg-white hover:text-indigo-600'
+                    }`}
+                  >
+                    {room}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Schedule Calendar Grid */}
             <div className="flex-1 p-4">

@@ -35,56 +35,25 @@ const Routers = () => {
           <Route path="/booking/:id" element={<BookingPage />} />
           <Route path="/payment-result" element={<PaymentResult />} />
           <Route path="/showtimes" element={<ShowtimesPage />} />
-          <Route path="/showtime-admin" element={<ShowtimeAdminPage />} />
           <Route path="/profile" element={<Profile />} />
         </Route>
 
         {/* Admin routes */}
         <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin" element={<AdminPrivateRoute />}>
-          <Route element={<AdminMainLayout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="movies" element={
-              <AdminPrivateRoute requiredPermission="movie.view">
-                <MovieManagement />
-              </AdminPrivateRoute>
-            } />
-            <Route path="actors" element={
-              <AdminPrivateRoute requiredPermission="actor.view">
-                <ActorManagement />
-              </AdminPrivateRoute>
-            } />
-            <Route path="showtimes" element={
-              <AdminPrivateRoute requiredPermission="showtime.view">
-                <ShowtimeManagement />
-              </AdminPrivateRoute>
-            } />
-            <Route path="theaters" element={
-              <AdminPrivateRoute requiredPermission="theater.view">
-                <TheaterManagement />
-              </AdminPrivateRoute>
-            } />
-            <Route path="rooms" element={
-              <AdminPrivateRoute requiredPermission="room.view">
-                <RoomManagement />
-              </AdminPrivateRoute>
-            } />
-            <Route path="users" element={
-              <AdminPrivateRoute requiredPermission="user.view">
-                <UserManagement />
-              </AdminPrivateRoute>
-            } />
-            <Route path="system" element={
-              <AdminPrivateRoute requiredPermission="system.view">
-                <SystemManagement />
-              </AdminPrivateRoute>
-            } />
-            <Route path="security" element={
-            //   <AdminPrivateRoute requiredPermission="security.view">
-                <SecurityManagement />
-            //   </AdminPrivateRoute>
-            } />
-          </Route>
+        <Route path="/admin" element={
+          <AdminPrivateRoute>
+            <AdminMainLayout />
+          </AdminPrivateRoute>
+        }>
+          <Route index element={<Dashboard />} />
+          <Route path="movies" element={<MovieManagement />} />
+          <Route path="actors" element={<ActorManagement />} />
+          <Route path="showtimes" element={<ShowtimeManagement />} />
+          <Route path="theaters" element={<TheaterManagement />} />
+          <Route path="rooms" element={<RoomManagement />} />
+          <Route path="users" element={<UserManagement />} />
+          <Route path="system" element={<SystemManagement />} />
+          <Route path="security" element={<SecurityManagement />} />
         </Route>
       </Routes>
     </BrowserRouter>

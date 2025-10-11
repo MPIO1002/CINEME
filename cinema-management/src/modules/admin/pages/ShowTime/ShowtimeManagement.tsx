@@ -7,6 +7,7 @@ import { theaterApi, type Theater } from '../../../../services/theaterApi';
 import { Pagination } from "../../components/pagination";
 import ShowtimeCalendar from "./components/ShowtimeCalendar";
 import ShowtimeModal from "./components/ShowtimeModal";
+import CreateShowtimeModal from "./components/CreateShowtimeModal";
 import type { Column } from "../../components/tableProps";
 import { Table } from "../../components/tableProps";
 import { hasPermission } from "../../utils/authUtils";
@@ -22,6 +23,7 @@ const [theaters, setTheaters] = useState<Theater[]>([]);
 const [modalOpen, setModalOpen] = useState(false);
 const [modalMode, setModalMode] = useState<"add" | "edit" | "view">("add");
 const [selectedShowtime, setSelectedShowtime] = useState<Showtime | undefined>(undefined);
+const [createModalOpen, setCreateModalOpen] = useState(false);
 
 // View mode - 'list' or 'calendar'
 const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
@@ -88,11 +90,12 @@ const fetchRooms = async (theaterId: string) => {
         const response = await theaterApi.getTheaterRooms(theaterId);
         if (response.statusCode === 200) {
             // Transform API data to match UI interface
-            const transformedRooms: Room[] = response.data.map((apiRoom: { id: string; name: string; type: string; totalSeats?: number }) => ({
+            const transformedRooms: Room[] = response.data.map((apiRoom: { id: string; name: string; type: string; totalSeats?: number; theaterId?: string }) => ({
                 id: apiRoom.id || '',
                 name: apiRoom.name,
                 totalSeats: apiRoom.totalSeats || 0,
-                type: (apiRoom.type === 'Standard' ? '2D' : apiRoom.type) as '2D' | '3D' | 'IMAX'
+                type: (apiRoom.type === 'Standard' ? '2D' : apiRoom.type) as '2D' | '3D' | 'IMAX',
+                theaterId: apiRoom.theaterId || theaterId // Ensure theaterId is present
             }));
             setRooms(transformedRooms);
         }
@@ -540,13 +543,7 @@ return (
               <button
                 className="text-blue-600 hover:text-blue-900 transition-colors flex items-center space-x-2 px-4 py-2 border border-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer"
                 onClick={() => {
-                    setModalMode("add");
-                    setSelectedShowtime(undefined);
-                    // Load all rooms for modal when adding new showtime
-                    if (theaters.length > 0) {
-                        setRooms([]); // Reset rooms to allow user to select theater first
-                    }
-                    setModalOpen(true);
+                    setCreateModalOpen(true);
                 }}
               >
                 <ClockPlus size={16} />
@@ -736,6 +733,12 @@ return (
                 setRooms([]);
             }
         }}
+        />
+
+        {/* Create Showtime Modal */}
+        <CreateShowtimeModal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
         />
     </div>
 );

@@ -188,12 +188,7 @@ const Profile: React.FC = () => {
         {/* Profile Card */}
         <div 
           className="rounded-3xl p-8 mb-8 relative overflow-hidden"
-          style={{ 
-            backgroundImage: 'url(/gold.jpg)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat'
-          }}
+          style={{ backgroundColor: '#292722' }}
         >
           
           

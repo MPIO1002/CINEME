@@ -1,7 +1,6 @@
 import { authApiService, type UserData } from "@/services/authApi";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { checkPermission } from "../utils/authUtils";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -37,11 +36,6 @@ const Login = () => {
 
         if (response.data.statusCode === 200) {
           const userData: UserData = response.data.data;
-          console.log("userData:", checkPermission(userData.accessToken));
-          if (checkPermission(userData.accessToken).length === 0) {
-            alert("Tài khoản không có quyền truy cập hệ thống admin!");
-            return;
-          }
           // Lưu tokens vào localStorage
           localStorage.setItem("accessToken", userData.accessToken);
           localStorage.setItem("refreshToken", userData.refreshToken);
@@ -128,6 +122,7 @@ const Login = () => {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
             />
           </div>
           {errors.email && (
@@ -155,6 +150,7 @@ const Login = () => {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
             />
           </div>
           {errors.password && (

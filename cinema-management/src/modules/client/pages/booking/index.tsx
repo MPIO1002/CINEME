@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faClock, faMapMarkerAlt, faCreditCard, faCalendarAlt, faStar } from '@fortawesome/free-solid-svg-icons';
+import { faClock, faMapMarkerAlt, faCreditCard, faCalendarAlt, faStar, faTimes, faPlus, faMinus, faUtensils } from '@fortawesome/free-solid-svg-icons';
 import { API_BASE_URL, WEBSOCKET_URL } from '../../../../components/api-config';
 import ProgressBar from '../../components/progress-bar';
 import { useToast } from '../../../../hooks/useToast';
@@ -59,6 +59,24 @@ interface UserData {
   refreshToken: string;
 }
 
+interface ComboItem {
+  itemId: string;
+  itemName: string;
+  quantity: number;
+}
+
+interface Combo {
+  id: string;
+  name: string;
+  price: number;
+  img: string;
+  listItems: ComboItem[];
+}
+
+interface SelectedCombo extends Combo {
+  selectedQuantity: number;
+}
+
 const BookingPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -75,6 +93,10 @@ const BookingPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isBooking, setIsBooking] = useState(false);
   const [lockedSeats, setLockedSeats] = useState<string[]>([]);
+  const [combos, setCombos] = useState<Combo[]>([]);
+  const [selectedCombos, setSelectedCombos] = useState<SelectedCombo[]>([]);
+  const [showComboModal, setShowComboModal] = useState(false);
+  const [loadingCombos, setLoadingCombos] = useState(false);
   const wsRef = useRef<SocketIOClient.Socket | null>(null);
 
   // Generate next 7 days
@@ -221,7 +243,7 @@ const BookingPage: React.FC = () => {
 
   // WebSocket connection for real-time seat locking
   useEffect(() => {
-    if (!selectedShowtime) return; 
+    if (!selectedShowtime) return;
     wsRef.current = io(WEBSOCKET_URL, {
       reconnection: false,
       transports: ['polling', 'websocket'],
@@ -231,13 +253,13 @@ const BookingPage: React.FC = () => {
     });
 
 
-    wsRef.current.on('connect', () => { 
-    console.log('WebSocket connected for showtime:', selectedShowtime.id);
+    wsRef.current.on('connect', () => {
+      console.log('WebSocket connected for showtime:', selectedShowtime.id);
     });
 
 
     wsRef.current.on('disconnect', () => {
-    console.log('WebSocket disconnected');
+      console.log('WebSocket disconnected');
     });
 
     wsRef.current.on('seat_locked', (data: any) => {
@@ -253,7 +275,7 @@ const BookingPage: React.FC = () => {
   const handleSeatClick = (seat: Seat) => {
     // Can't click on walkway seats or seats that aren't available or locked
     if (seat.seatNumber.startsWith('W_') || seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) return;
-    
+
     const isSelected = selectedSeats.find(s => s.id === seat.id);
     if (isSelected) {
       setSelectedSeats(selectedSeats.filter(s => s.id !== seat.id));
@@ -267,26 +289,26 @@ const BookingPage: React.FC = () => {
     if (seat.seatNumber.startsWith('W_')) {
       return 'transparent';
     }
-    
+
     if (selectedSeats.find(s => s.id === seat.id)) {
       // Darken the color by 50% when selected
       const baseColor = seat.color || (seat.seatType === 'VIP' ? '#ff6b6b' : seat.seatType === 'Couple' ? '#9c27b0' : '#4CAF50');
-      
+
       // Convert hex to RGB, then darken by 50%
       const hex = baseColor.replace('#', '');
       const r = Math.floor(parseInt(hex.substr(0, 2), 16) * 0.5);
       const g = Math.floor(parseInt(hex.substr(2, 2), 16) * 0.5);
       const b = Math.floor(parseInt(hex.substr(4, 2), 16) * 0.5);
-      
+
       return `rgb(${r}, ${g}, ${b})`;
     }
-    
+
     if (lockedSeats.includes(seat.id)) return '#ff8c00'; // Orange for locked by others
     if (seat.status !== 'AVAILABLE') return '#666'; // Gray for booked/unavailable
-    
+
     // Use backend color if provided, otherwise fallback to old logic
     if (seat.color) return seat.color;
-    
+
     // Fallback colors based on seatType
     if (seat.seatType === 'VIP') return '#ff6b6b'; // Red for VIP
     if (seat.seatType === 'Couple') return '#9c27b0'; // Purple for couple
@@ -296,7 +318,7 @@ const BookingPage: React.FC = () => {
   const getSeatPrice = (seatType: string, price: number) => {
     // Use the price from backend if provided and not 0
     if (price > 0) return price;
-    
+
     // Fallback to hardcoded prices
     switch (seatType) {
       case 'VIP': return 100000;
@@ -314,6 +336,51 @@ const BookingPage: React.FC = () => {
       return (seatCount * 32) + ((seatCount - 1) * 8);
     }
     return 32; // Default single seat width (32px = w-8)
+  };
+
+  // Fetch combos from API
+  const fetchCombos = async () => {
+    setLoadingCombos(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/combos`);
+      const data = await response.json();
+      if (response.ok) {
+        setCombos(data);
+      } else {
+        showToast('error', 'Không thể tải danh sách combo');
+      }
+    } catch (error) {
+      console.error('Error fetching combos:', error);
+      showToast('error', 'Có lỗi xảy ra khi tải combo');
+    } finally {
+      setLoadingCombos(false);
+    }
+  };
+
+  // Handle combo selection
+  const handleComboSelect = (combo: Combo, quantity: number) => {
+    if (quantity === 0) {
+      setSelectedCombos(prev => prev.filter(c => c.id !== combo.id));
+    } else {
+      setSelectedCombos(prev => {
+        const existing = prev.find(c => c.id === combo.id);
+        if (existing) {
+          return prev.map(c =>
+            c.id === combo.id ? { ...c, selectedQuantity: quantity } : c
+          );
+        } else {
+          return [...prev, { ...combo, selectedQuantity: quantity }];
+        }
+      });
+    }
+  };
+
+  // Open combo modal and fetch combos
+  const openComboModal = () => {
+    setShowComboModal(true);
+    if (combos.length === 0) {
+      fetchCombos();
+    }
   };
 
   // Generate legend items from actual seat data
@@ -355,14 +422,27 @@ const BookingPage: React.FC = () => {
     }
 
     setIsBooking(true);
-    
+
     try {
-      const bookingData = {
+      const bookingData: any = {
         userId: user.id,
         showtimeId: selectedShowtime.id,
-        listSeatId: selectedSeats.map(seat => seat.id),
-        amount: totalPrice
+        listSeatId: selectedSeats.map(seat => seat.id)
       };
+
+      // Add combos if any selected
+      if (selectedCombos.length > 0) {
+        bookingData.listCombo = selectedCombos.reduce((acc, combo) => {
+          acc[combo.id] = combo.selectedQuantity;
+          return acc;
+        }, {} as { [key: string]: number });
+      }
+
+      // Log booking data being sent to API
+      console.log('=== BOOKING API DATA ===');
+      console.log('URL:', `${API_BASE_URL}/bookings`);
+      console.log('Booking Data:', JSON.stringify(bookingData, null, 2));
+      console.log('========================');
 
       const response = await fetch(`${API_BASE_URL}/bookings`, {
         method: 'POST',
@@ -373,15 +453,15 @@ const BookingPage: React.FC = () => {
       });
 
       const data = await response.json();
-      
+
       if (data.statusCode === 200 && data.data) {
         // Booking request successful - got payment URL
         window.location.href = data.data;
-        
+
       } else {
         // Booking failed
         showToast('error', 'Không thể tiến thành thanh toán: ' + (data.message || 'Vui lòng thử lại'));
-        
+
       }
     } catch (error) {
       console.error('Error creating booking:', error);
@@ -391,7 +471,9 @@ const BookingPage: React.FC = () => {
     }
   };
 
-  const totalPrice = selectedSeats.reduce((sum, seat) => sum + getSeatPrice(seat.seatType || 'Standard', seat.price), 0);
+  const seatPrice = selectedSeats.reduce((sum, seat) => sum + getSeatPrice(seat.seatType || 'Standard', seat.price), 0);
+  const comboPrice = selectedCombos.reduce((sum, combo) => sum + (combo.price * combo.selectedQuantity), 0);
+  const totalPrice = seatPrice + comboPrice;
 
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -417,7 +499,7 @@ const BookingPage: React.FC = () => {
       if (!rows[row]) rows[row] = [];
       rows[row].push(seat);
     });
-    
+
     // Sort seats within each row by their position number
     Object.keys(rows).forEach(row => {
       rows[row].sort((a, b) => {
@@ -426,18 +508,22 @@ const BookingPage: React.FC = () => {
             // For walkway like "W_C3", get position 3
             return parseInt(seatNumber.substring(3));
           } else if (seatNumber.includes('+')) {
-            // For couple seats like "F1+F2", get starting position 1
-            return parseInt(seatNumber.split('+')[0].slice(1));
+            // For couple seats like "G12+G34", get starting position 12
+            const firstSeat = seatNumber.split('+')[0];
+            return parseInt(firstSeat.slice(1));
           } else {
             // For regular seats like "A1", get position 1
             return parseInt(seatNumber.slice(1));
           }
         };
+
+        const posA = getPosition(a.seatNumber);
+        const posB = getPosition(b.seatNumber);
         
-        return getPosition(a.seatNumber) - getPosition(b.seatNumber);
+        return posA - posB;
       });
     });
-    
+
     return rows;
   };
 
@@ -451,25 +537,189 @@ const BookingPage: React.FC = () => {
 
   const seatRows = groupSeatsByRow(seats);
 
+  // ComboModal component
+  const ComboModal = () => {
+    if (!showComboModal) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div
+          className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col"
+          style={{ backgroundColor: 'var(--custom-300)', color: 'var(--color-text)' }}
+        >
+          {/* Custom Scrollbar Styles */}
+          <style dangerouslySetInnerHTML={{
+            __html: `
+              .combo-content-scroll::-webkit-scrollbar {
+                width: 8px;
+              }
+              .combo-content-scroll::-webkit-scrollbar-track {
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+              }
+              .combo-content-scroll::-webkit-scrollbar-thumb {
+                background: linear-gradient(45deg, var(--color-accent), var(--color-secondary));
+                border-radius: 4px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+              }
+              .combo-content-scroll::-webkit-scrollbar-thumb:hover {
+                background: linear-gradient(45deg, var(--color-secondary), var(--color-accent));
+                box-shadow: 0 0 8px rgba(var(--color-accent-rgb), 0.3);
+              }
+              .combo-card {
+                background: linear-gradient(135deg, var(--color-background) 0%, rgba(255, 255, 255, 0.05) 100%);
+                backdrop-filter: blur(10px);
+                transition: all 0.3s ease;
+              }
+              .combo-card:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+              }
+            `
+          }} />
+
+          {/* Modal Header - Fixed */}
+          <div className="flex-shrink-0 p-6 border-b border-gray-200 rounded-lg" style={{ backgroundColor: 'var(--custom-300)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <FontAwesomeIcon icon={faUtensils} style={{ color: 'var(--color-accent)' }} />
+                Chọn Combo Bắp Nước
+              </h2>
+              <button
+                onClick={() => setShowComboModal(false)}
+                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                style={{ color: 'var(--color-text)' }}
+              >
+                <FontAwesomeIcon icon={faTimes} className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+
+          {/* Modal Content - Scrollable */}
+          <div className="flex-1 overflow-y-auto combo-content-scroll p-6">
+            {loadingCombos ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: 'var(--color-accent)' }}></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {combos.map((combo) => {
+                  const selectedCombo = selectedCombos.find(c => c.id === combo.id);
+                  const currentQuantity = selectedCombo?.selectedQuantity || 0;
+
+                  return (
+                    <div
+                      key={combo.id}
+                      className="combo-card rounded-xl shadow-lg overflow-hidden border"
+                      style={{
+                        borderColor: 'rgba(255, 255, 255, 0.2)'
+                      }}
+                    >
+                      {/* Combo Image */}
+                      <div className="aspect-[4/3] overflow-hidden relative">
+                        <img
+                          src={combo.img}
+                          alt={combo.name}
+                          className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = '/public/logo_cinema_new.PNG'; // Fallback image
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent"></div>
+                      </div>
+
+                      {/* Combo Info */}
+                      <div className="p-4">
+                        <h3 className="font-bold text-lg mb-2">{combo.name}</h3>
+                        <div className="text-sm mb-3" style={{ color: 'var(--color-primary)' }}>
+                          {combo.listItems.map((item) => (
+                            <div key={item.itemId}>
+                              {item.quantity}x {item.itemName}
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                          <span className="text-xl font-bold" style={{ color: 'var(--color-accent)' }}>
+                            {combo.price.toLocaleString('vi-VN')}đ
+                          </span>
+
+                          {/* Quantity Controls */}
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => handleComboSelect(combo, Math.max(0, currentQuantity - 1))}
+                              className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                              style={{
+                                backgroundColor: currentQuantity > 0 ? 'var(--color-accent)' : '#666',
+                                color: 'white'
+                              }}
+                              disabled={currentQuantity === 0}
+                            >
+                              <FontAwesomeIcon icon={faMinus} className="w-3 h-3" />
+                            </button>
+
+                            <span className="w-8 text-center font-bold">{currentQuantity}</span>
+
+                            <button
+                              onClick={() => handleComboSelect(combo, currentQuantity + 1)}
+                              className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                              style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
+                            >
+                              <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Modal Footer - Fixed */}
+          <div className="flex-shrink-0 p-6 border-t border-gray-200" style={{ backgroundColor: 'var(--custom-300)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+            <div className="flex justify-between items-center">
+              <div>
+                <span className="text-lg">Tổng combo: </span>
+                <span className="text-xl font-bold" style={{ color: 'var(--color-accent)' }}>
+                  {comboPrice.toLocaleString('vi-VN')}đ
+                </span>
+              </div>
+              <button
+                onClick={() => setShowComboModal(false)}
+                className="px-6 py-3 rounded-lg font-semibold transition-colors"
+                style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
+              >
+                Xác Nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen relative" style={{ color: 'var(--color-text)' }}>
-      
+
       {/* Background Image */}
-      <div 
+      <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: `url(${movie.image})` }}
       >
-        <div className="absolute inset-0" style={{ 
+        <div className="absolute inset-0" style={{
           background: 'linear-gradient(to bottom, rgba(36, 34, 30, 0.85), rgba(36, 34, 30, 0.95))'
         }}></div>
       </div>
-      
+
       <div className="relative z-10 container pt-20 mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* Left Side - Movie Info & Selection */}
           <div className="lg:col-span-1 space-y-6">
             {/* Movie Info */}
-            <div className="rounded-2xl shadow-xl overflow-hidden" style={{ 
+            <div className="rounded-2xl shadow-xl overflow-hidden" style={{
               backgroundColor: 'var(--custom-300)',
               border: '1px solid rgba(255, 255, 255, 0.1)'
             }}>
@@ -481,7 +731,7 @@ const BookingPage: React.FC = () => {
                   className="w-full h-80 object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-                
+
                 {/* Movie Title Overlay */}
                 <div className="absolute bottom-0 left-0 right-0 p-4">
                   <h2 className="text-2xl font-bold text-white mb-2">
@@ -489,7 +739,7 @@ const BookingPage: React.FC = () => {
                   </h2>
                 </div>
               </div>
-              
+
               <div className="p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center justify-center gap-2">
@@ -500,7 +750,7 @@ const BookingPage: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-4 text-sm">
                   <div className="flex items-center gap-1">
                     <FontAwesomeIcon icon={faClock} className="w-4 h-4" />
@@ -511,7 +761,7 @@ const BookingPage: React.FC = () => {
                   <span>•</span>
                   <span>{movie.limitageNameVn}</span>
                 </div>
-                
+
                 <div className="text-sm">
                   <span className="font-medium">Đạo diễn: </span>
                   <span>{movie.director}</span>
@@ -525,7 +775,7 @@ const BookingPage: React.FC = () => {
                 <FontAwesomeIcon icon={faCalendarAlt} className="w-5 h-5" style={{ color: 'var(--color-accent)' }} />
                 Chọn Ngày
               </h3>
-              <div 
+              <div
                 className="flex gap-2 overflow-x-auto pb-2"
                 style={{
                   scrollbarWidth: 'thin',
@@ -555,9 +805,8 @@ const BookingPage: React.FC = () => {
                     <button
                       key={date.value}
                       onClick={() => setSelectedDate(date.value)}
-                      className={`flex flex-col items-center p-3 rounded-lg transition-colors border-2 text-sm flex-shrink-0 min-w-[70px] ${
-                        selectedDate === date.value ? 'border-accent' : 'border-transparent'
-                      }`}
+                      className={`flex flex-col items-center p-3 rounded-lg transition-colors border-2 text-sm flex-shrink-0 min-w-[70px] ${selectedDate === date.value ? 'border-accent' : 'border-transparent'
+                        }`}
                       style={{
                         backgroundColor: selectedDate === date.value ? 'var(--color-accent)' : 'var(--custom-300)',
                         color: selectedDate === date.value ? 'white' : 'var(--color-text)',
@@ -585,9 +834,8 @@ const BookingPage: React.FC = () => {
                     <button
                       key={theater.id}
                       onClick={() => setSelectedTheater(theater)}
-                      className={`w-full p-3 rounded-lg text-left transition-colors border-2 ${
-                        selectedTheater?.id === theater.id ? 'border-accent' : 'border-transparent'
-                      }`}
+                      className={`w-full p-3 rounded-lg text-left transition-colors border-2 ${selectedTheater?.id === theater.id ? 'border-accent' : 'border-transparent'
+                        }`}
                       style={{
                         backgroundColor: selectedTheater?.id === theater.id ? 'var(--color-accent)' : 'var(--custom-300)',
                         color: selectedTheater?.id === theater.id ? 'white' : 'var(--color-text)',
@@ -614,9 +862,8 @@ const BookingPage: React.FC = () => {
                     <button
                       key={showtime.id}
                       onClick={() => setSelectedShowtime(showtime)}
-                      className={`p-3 rounded-lg text-center transition-colors border-2 ${
-                        selectedShowtime?.id === showtime.id ? 'border-accent' : 'border-transparent'
-                      }`}
+                      className={`p-3 rounded-lg text-center transition-colors border-2 ${selectedShowtime?.id === showtime.id ? 'border-accent' : 'border-transparent'
+                        }`}
                       style={{
                         backgroundColor: selectedShowtime?.id === showtime.id ? 'var(--color-accent)' : 'var(--custom-300)',
                         color: selectedShowtime?.id === showtime.id ? 'white' : 'var(--color-text)',
@@ -636,16 +883,16 @@ const BookingPage: React.FC = () => {
           <div className="lg:col-span-3">
             <ProgressBar currentStep="booking" />
             {selectedShowtime && seats.length > 0 ? (
-              <div className="p-8 rounded-2xl shadow-xl" style={{ 
+              <div className="p-8 rounded-2xl shadow-xl" style={{
                 backgroundColor: 'var(--custom-300)',
                 border: '1px solid rgba(255, 255, 255, 0.1)'
               }}>
                 <h3 className="text-2xl font-bold mb-8 text-center">Chọn Ghế Ngồi</h3>
                 {/* Screen */}
                 <div className="mb-10">
-                  <div 
+                  <div
                     className="h-3 rounded-full mx-auto mb-3"
-                    style={{ 
+                    style={{
                       width: '70%',
                       background: 'linear-gradient(90deg, transparent, var(--color-accent), transparent)'
                     }}
@@ -655,50 +902,82 @@ const BookingPage: React.FC = () => {
 
                 {/* Seat Map */}
                 <div className="space-y-3 mb-8">
-                  {Object.keys(seatRows).sort().map((row) => (
-                    <div key={row} className="flex items-center gap-3 justify-center">
-                      <span className="w-8 text-center font-bold text-lg" style={{ color: 'var(--color-text)' }}>
-                        {row}
-                      </span>
-                      <div className="flex gap-2 flex-wrap justify-center">
-                        {seatRows[row].map((seat) => 
-                          seat.seatNumber.startsWith('W_') ? (
-                            // Render walkway as empty space
-                            <div
-                              key={seat.id}
-                              className="h-8"
-                              style={{ width: `${getSeatWidth(seat.seatNumber)}px` }}
-                            >
-                              {/* Empty walkway space */}
+                  {Object.keys(seatRows).sort().map((row) => {
+                    // Calculate if this is a couple seat row (like row G)
+                    const hasCoupleSeats = seatRows[row].some(seat => seat.seatNumber.includes('+'));
+                    
+                    return (
+                      <div key={row} className="flex items-center gap-3 justify-center">
+                        <span className="w-8 text-center font-bold text-lg" style={{ color: 'var(--color-text)' }}>
+                          {row}
+                        </span>
+                        <div className="flex justify-center items-center" style={{ minWidth: '400px' }}>
+                          {hasCoupleSeats ? (
+                            // Special layout for couple seats (Row G) - aligned to edges like seats 1-3 and 5-7
+                            <div className="flex justify-between items-center" style={{ width: '280px' }}>
+                              {seatRows[row].map((seat, index) => (
+                                <button
+                                  key={seat.id}
+                                  onClick={() => handleSeatClick(seat)}
+                                  disabled={seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)}
+                                  className="rounded text-sm font-bold transition-all duration-200 hover:scale-110 h-8"
+                                  style={{
+                                    width: `${getSeatWidth(seat.seatNumber)}px`,
+                                    backgroundColor: getSeatColor(seat),
+                                    color: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? '#999' : 'white',
+                                    cursor: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? 'not-allowed' : 'pointer',
+                                    opacity: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? 0.5 : 1,
+                                    fontSize: '10px',
+                                    // Position first seat at left edge, last seat at right edge, middle seat centered
+                                    marginLeft: index === 1 ? 'auto' : '0px',
+                                    marginRight: index === 1 ? 'auto' : '0px'
+                                  }}
+                                >
+                                  {seat.seatNumber.replace(/[A-Z]/g, '').replace('+', '-')}
+                                </button>
+                              ))}
                             </div>
                           ) : (
-                            <button
-                              key={seat.id}
-                              onClick={() => handleSeatClick(seat)}
-                              disabled={seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)}
-                              className="rounded text-sm font-bold transition-all duration-200 hover:scale-110 h-8"
-                              style={{
-                                width: `${getSeatWidth(seat.seatNumber)}px`,
-                                backgroundColor: getSeatColor(seat),
-                                color: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? '#999' : 'white',
-                                cursor: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? 'not-allowed' : 'pointer',
-                                opacity: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? 0.5 : 1,
-                                fontSize: seat.seatNumber.includes('+') && seat.seatNumber.split('+').length > 2 ? '9px' : '10px'
-                              }}
-                            >
-                              {seat.seatNumber.includes('+')
-                                ? seat.seatNumber.replace(/[A-Z]/g, '').replace('+', '  ')
-                                : seat.seatNumber.slice(1)
-                              }
-                            </button>
-                          )
-                        )}
+                            // Regular layout for standard seats
+                            <div className="flex gap-2 justify-center">
+                              {seatRows[row].map((seat) =>
+                                seat.seatNumber.startsWith('W_') ? (
+                                  // Render walkway as empty space
+                                  <div
+                                    key={seat.id}
+                                    className="h-8"
+                                    style={{ width: `${getSeatWidth(seat.seatNumber)}px` }}
+                                  >
+                                    {/* Empty walkway space */}
+                                  </div>
+                                ) : (
+                                  <button
+                                    key={seat.id}
+                                    onClick={() => handleSeatClick(seat)}
+                                    disabled={seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)}
+                                    className="rounded text-sm font-bold transition-all duration-200 hover:scale-110 h-8"
+                                    style={{
+                                      width: `${getSeatWidth(seat.seatNumber)}px`,
+                                      backgroundColor: getSeatColor(seat),
+                                      color: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? '#999' : 'white',
+                                      cursor: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? 'not-allowed' : 'pointer',
+                                      opacity: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? 0.5 : 1,
+                                      fontSize: '10px'
+                                    }}
+                                  >
+                                    {seat.seatNumber.slice(1)}
+                                  </button>
+                                )
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <span className="w-8 text-center font-bold text-lg" style={{ color: 'var(--color-text)' }}>
+                          {row}
+                        </span>
                       </div>
-                      <span className="w-8 text-center font-bold text-lg" style={{ color: 'var(--color-text)' }}>
-                        {row}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Legend */}
@@ -712,7 +991,7 @@ const BookingPage: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="p-8 rounded-2xl shadow-xl text-center" style={{ 
+              <div className="p-8 rounded-2xl shadow-xl text-center" style={{
                 backgroundColor: 'var(--custom-300)',
                 border: '1px solid rgba(255, 255, 255, 0.1)'
               }}>
@@ -726,9 +1005,9 @@ const BookingPage: React.FC = () => {
 
           {/* Right Side - Ticket Info */}
           <div className="lg:col-span-1">
-            <div 
+            <div
               className="p-6 rounded-2xl shadow-xl relative overflow-hidden"
-              style={{ 
+              style={{
                 backgroundColor: 'var(--custom-300)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
                 background: 'linear-gradient(135deg, var(--custom-300) 0%, rgba(255, 255, 255, 0.05) 100%)'
@@ -739,7 +1018,7 @@ const BookingPage: React.FC = () => {
                 <h3 className="text-xl font-bold mb-2">VÉ XEM PHIM</h3>
                 <div className="w-full h-px border-t-2 border-dashed" style={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}></div>
               </div>
-              
+
               {/* Movie & Theater Info */}
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between items-center">
@@ -748,7 +1027,7 @@ const BookingPage: React.FC = () => {
                     {selectedTheater?.nameEn || 'Chọn Rạp'}
                   </span>
                 </div>
-                
+
                 <div className="flex justify-between items-center">
                   <span className="font-semibold">Ngày</span>
                   <span style={{ color: 'var(--color-primary)' }} className="text-sm">
@@ -775,6 +1054,34 @@ const BookingPage: React.FC = () => {
                 )}
               </div>
 
+              {/* Combo Section */}
+              <div className="mb-6">
+                <button
+                  onClick={openComboModal}
+                  className="w-full py-3 rounded-lg font-semibold transition-colors text-center flex items-center justify-center gap-2"
+                  style={{
+                    backgroundColor: 'var(--color-secondary)',
+                    color: 'white',
+                    border: '2px solid var(--color-secondary)'
+                  }}
+                >
+                  <FontAwesomeIcon icon={faUtensils} />
+                  Mua Bắp Nước
+                </button>
+
+                {/* Display selected combos */}
+                {selectedCombos.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {selectedCombos.map((combo) => (
+                      <div key={combo.id} className="flex justify-between text-sm">
+                        <span>{combo.selectedQuantity}x {combo.name.substring(0, 25)}...</span>
+                        <span>{(combo.price * combo.selectedQuantity).toLocaleString('vi-VN')}đ</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Seat Selection */}
               <div className="mb-6">
                 <div className="w-full h-px border-t-2 border-dashed mb-4" style={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}></div>
@@ -788,7 +1095,7 @@ const BookingPage: React.FC = () => {
                     <div key={seat.id} className="flex text-sm">
                       <span className="w-12 text-center">{seat.seatNumber.charAt(0)}</span>
                       <span className="flex-1 text-center">
-                        {seat.seatNumber.includes('+') 
+                        {seat.seatNumber.includes('+')
                           ? seat.seatNumber.replace(/[A-Z]/g, '').replace('+', '-')
                           : seat.seatNumber.slice(1)
                         }
@@ -807,24 +1114,38 @@ const BookingPage: React.FC = () => {
               {selectedSeats.length > 0 && (
                 <div className="space-y-4">
                   <div className="w-full h-px border-t-2 border-dashed" style={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}></div>
-                  
+
+                  {/* Price breakdown */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center text-sm">
+                      <span>Tiền vé</span>
+                      <span>{seatPrice.toLocaleString('vi-VN')}đ</span>
+                    </div>
+                    {comboPrice > 0 && (
+                      <div className="flex justify-between items-center text-sm">
+                        <span>Tiền combo</span>
+                        <span>{comboPrice.toLocaleString('vi-VN')}đ</span>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="flex justify-between items-center text-lg font-bold">
                     <span>Tổng Cộng</span>
                     <span style={{ color: 'var(--color-accent)' }}>{totalPrice.toLocaleString('vi-VN')}đ</span>
                   </div>
 
-                  <button 
+                  <button
                     onClick={handleBooking}
                     disabled={isBooking || selectedSeats.length === 0}
                     className="w-full py-4 rounded-lg font-semibold transition-colors text-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{ 
+                    style={{
                       backgroundColor: 'var(--color-accent)',
                       color: 'white'
                     }}
                   >
                     {isBooking ? 'Đang xử lý...' : 'Thanh Toán'}
                   </button>
-                  
+
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-2 text-sm" style={{ color: 'var(--color-primary)' }}>
                       <FontAwesomeIcon icon={faCreditCard} className="w-4 h-4" />
@@ -835,14 +1156,17 @@ const BookingPage: React.FC = () => {
               )}
 
               {/* Ticket Perforations */}
-              <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-4 h-4 rounded-full" 
-                   style={{ backgroundColor: 'var(--color-background)', marginLeft: '-8px' }}></div>
-              <div className="absolute right-0 top-1/2 transform -translate-y-1/2 w-4 h-4 rounded-full" 
-                   style={{ backgroundColor: 'var(--color-background)', marginRight: '-8px' }}></div>
+              <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-4 h-4 rounded-full"
+                style={{ backgroundColor: 'var(--color-background)', marginLeft: '-8px' }}></div>
+              <div className="absolute right-0 top-1/2 transform -translate-y-1/2 w-4 h-4 rounded-full"
+                style={{ backgroundColor: 'var(--color-background)', marginRight: '-8px' }}></div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Combo Modal */}
+      <ComboModal />
     </div>
   );
 };

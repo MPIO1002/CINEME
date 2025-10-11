@@ -12,7 +12,7 @@ import TheatersIcon from '@mui/icons-material/Theaters';
 import { CalendarRange, Film, Star } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { hasPermission } from "../utils/authUtils";
+// import { hasPermission } from "../utils/authUtils"; // Không cần nữa - backend handle authorization
 
 const Sidebar = () => {
     const [isOpen, setIsOpen] = useState(true);
@@ -80,31 +80,8 @@ const Sidebar = () => {
         }
     ];
 
-    // Filter menu groups based on permissions
-    const filteredMenuGroups = menuGroups
-        .map(group => {
-            if (group.type === 'single') {
-                // For single items, check permission if exists
-                if (group.permission && !hasPermission(group.permission)) {
-                    return null;
-                }
-                return group;
-            } else {
-                // For groups, filter children based on permissions
-                const filteredChildren = group.children?.filter(child => 
-                    !child.permission || hasPermission(child.permission)
-                ) || [];
-                // Only include group if it has children after filtering
-                if (filteredChildren.length === 0) {
-                    return null;
-                }
-                return {
-                    ...group,
-                    children: filteredChildren
-                };
-            }
-        })
-        .filter(group => group !== null);
+    // Hiển thị tất cả menu - Backend sẽ handle authorization khi call API
+    const filteredMenuGroups = menuGroups;
 
     const toggleMenu = (menuId: string) => {
         setExpandedMenus(prev => 
