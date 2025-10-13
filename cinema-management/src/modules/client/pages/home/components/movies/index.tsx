@@ -14,6 +14,8 @@ type Movie = {
 
 const MovieList: React.FC<{ lang: "vi" | "en" }> = ({ lang }) => {
     const [movies, setMovies] = useState<Movie[]>([]);
+    // pendingHover: immediate lightweight preview; hovered: promoted full popup after delay
+    const [pendingHover, setPendingHover] = useState<string | null>(null);
     const [hovered, setHovered] = useState<string | null>(null);
     const [trailerUrl, setTrailerUrl] = useState<string | null>(null);
     const [popupPos, setPopupPos] = useState<{
@@ -21,6 +23,17 @@ const MovieList: React.FC<{ lang: "vi" | "en" }> = ({ lang }) => {
     } | null>(null);
     const movieRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
     const [isPopupHovered, setIsPopupHovered] = useState(false);
+    const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // clear timer on unmount
+    useEffect(() => {
+        return () => {
+            if (hoverTimerRef.current) {
+                clearTimeout(hoverTimerRef.current);
+                hoverTimerRef.current = null;
+            }
+        };
+    }, []);
 
     useEffect(() => {
         fetch(`${API_BASE_URL}/movies`)
@@ -40,9 +53,14 @@ const MovieList: React.FC<{ lang: "vi" | "en" }> = ({ lang }) => {
         return match ? match[1] : "";
     };
 
-    // Khi hover vào movie, lấy vị trí để đặt popup
+    // Khi hover vào movie: show a lightweight preview immediately (pendingHover)
+    // and start a timer to promote to full popup after 2s
     const handleMouseEnter = (id: string) => {
-        setHovered(id);
+        // cancel existing timer
+        if (hoverTimerRef.current) {
+            clearTimeout(hoverTimerRef.current);
+            hoverTimerRef.current = null;
+        }
         const ref = movieRefs.current[id];
         if (ref) {
             const rect = ref.getBoundingClientRect();
@@ -53,15 +71,26 @@ const MovieList: React.FC<{ lang: "vi" | "en" }> = ({ lang }) => {
                 height: rect.height,
             });
         }
+        setPendingHover(id);
+        // promote to full after 2s
+        hoverTimerRef.current = setTimeout(() => {
+            setHovered(id);
+            setPendingHover(null);
+            hoverTimerRef.current = null;
+        }, 2000);
     };
 
+    // Khi rời movie: cancel timer and hide preview/popup if popup not hovered
     const handleMouseLeave = () => {
-        setTimeout(() => {
-            if (!isPopupHovered) {
-                setHovered(null);
-                setPopupPos(null);
-            }
-        }, 50);
+        if (hoverTimerRef.current) {
+            clearTimeout(hoverTimerRef.current);
+            hoverTimerRef.current = null;
+        }
+        if (!isPopupHovered) {
+            setPendingHover(null);
+            setHovered(null);
+            setPopupPos(null);
+        }
     };
 
     return (
@@ -124,27 +153,37 @@ const MovieList: React.FC<{ lang: "vi" | "en" }> = ({ lang }) => {
                 </div>
             </div>
             {/* Popup movie nằm ngoài grid, định vị tuyệt đối */}
-            {hovered && popupPos && (
+            {(pendingHover || hovered) && popupPos && (
                 <div
                     className="absolute z-50"
                     style={{
                         top: popupPos.top + (popupPos.height ? (popupPos.height / 2) : (popupPos.width / 2)) - 30,
                         left: popupPos.left + (popupPos.width / 2) - 210,
                         width: 420,
-                        pointerEvents: "none",
-                    }}
-                    onMouseEnter={() => setIsPopupHovered(true)}
-                    onMouseLeave={() => {
-                        setIsPopupHovered(false);
-                        handleMouseLeave();
+                        pointerEvents: 'none',
                     }}
                 >
-                    <div style={{ pointerEvents: "auto" }}>
-                        <MoviePopup
-                            movieId={hovered}
-                            lang={lang}
-                            onShowTrailer={(url) => setTrailerUrl(url)}
-                        />
+                    <div
+                        style={{ pointerEvents: 'auto' }}
+                        onMouseEnter={() => setIsPopupHovered(true)}
+                        onMouseLeave={() => {
+                            setIsPopupHovered(false);
+                            setPendingHover(null);
+                            setHovered(null);
+                            setPopupPos(null);
+                        }}
+                    >
+                        <div style={{
+                            opacity: hovered ? 0 : 1,
+                            transform: hovered ? 'translateY(0px) scale(1)' : 'translateY(6px) scale(0.985)',
+                            transition: 'opacity 200ms ease, transform 200ms ease'
+                        }}>
+                            <MoviePopup
+                                movieId={hovered || pendingHover!}
+                                lang={lang}
+                                onShowTrailer={(url) => setTrailerUrl(url)}
+                            />
+                        </div>
                     </div>
                 </div>
             )}

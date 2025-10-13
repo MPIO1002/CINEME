@@ -406,7 +406,6 @@ const BookingPage: React.FC = () => {
     // Add status-based legend items
     legendItems.push(
       { color: '#666', label: 'Đã bán', type: 'unavailable' },
-      { color: '#ff8c00', label: 'Đang được đặt', type: 'locked' }
     );
 
     return legendItems;

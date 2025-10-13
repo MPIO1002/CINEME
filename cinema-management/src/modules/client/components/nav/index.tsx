@@ -73,6 +73,11 @@ const Nav = ({
   
   const dropdownRef = useRef<HTMLDivElement>(null);
   const userDropdownRef = useRef<HTMLDivElement>(null);
+  // Refs and timers for movie/theater popup hide delays
+  const moviePopupRef = useRef<HTMLDivElement | null>(null);
+  const theaterPopupRef = useRef<HTMLDivElement | null>(null);
+  const movieHideTimer = useRef<number | null>(null);
+  const theaterHideTimer = useRef<number | null>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -225,16 +230,30 @@ const Nav = ({
         <li 
           className="hover:text-[var(--color-secondary)] cursor-pointer transition relative"
           onMouseEnter={() => {
+            // Cancel any hide timer and show popup
+            if (movieHideTimer.current) { window.clearTimeout(movieHideTimer.current); movieHideTimer.current = null; }
             setShowMoviePopup(true);
             fetchMovies();
           }}
-          onMouseLeave={() => setShowMoviePopup(false)}
+          onMouseLeave={() => {
+            // Start a short hide timer to allow pointer to move into popup
+            movieHideTimer.current = window.setTimeout(() => setShowMoviePopup(false), 160);
+          }}
         >
           {TEXT[lang].phim}
           
           {/* Movies Popup */}
           {showMoviePopup && (
-            <div className="absolute top-full left-0 mt-2 w-96 bg-[var(--color-background)] border border-gray-700 rounded-lg shadow-xl z-50">
+            <div ref={el => { moviePopupRef.current = el; }} className="absolute top-full left-0 mt-2 w-96 bg-[var(--color-background)] border border-gray-700 rounded-lg shadow-xl z-50"
+              onMouseEnter={() => {
+                // Cancel hide while hovering popup
+                if (movieHideTimer.current) { window.clearTimeout(movieHideTimer.current); movieHideTimer.current = null; }
+              }}
+              onMouseLeave={() => {
+                // Hide shortly after leaving popup
+                movieHideTimer.current = window.setTimeout(() => setShowMoviePopup(false), 160);
+              }}
+            >
               <div className="p-4">
                 <h3 className="text-lg font-bold mb-3 text-[var(--color-accent)]">Danh sách phim</h3>
                 {isLoadingMovies ? (
@@ -268,16 +287,26 @@ const Nav = ({
         <li 
           className="hover:text-[var(--color-secondary)] cursor-pointer transition relative"
           onMouseEnter={() => {
+            if (theaterHideTimer.current) { window.clearTimeout(theaterHideTimer.current); theaterHideTimer.current = null; }
             setShowTheaterPopup(true);
             fetchTheaters();
           }}
-          onMouseLeave={() => setShowTheaterPopup(false)}
+          onMouseLeave={() => {
+            theaterHideTimer.current = window.setTimeout(() => setShowTheaterPopup(false), 160);
+          }}
         >
           {TEXT[lang].rap}
           
           {/* Theaters Popup */}
           {showTheaterPopup && (
-            <div className="absolute top-full left-0 mt-2 w-80 bg-[var(--color-background)] border border-gray-700 rounded-lg shadow-xl z-50">
+            <div ref={el => { theaterPopupRef.current = el; }} className="absolute top-full left-0 mt-2 w-80 bg-[var(--color-background)] border border-gray-700 rounded-lg shadow-xl z-50"
+              onMouseEnter={() => {
+                if (theaterHideTimer.current) { window.clearTimeout(theaterHideTimer.current); theaterHideTimer.current = null; }
+              }}
+              onMouseLeave={() => {
+                theaterHideTimer.current = window.setTimeout(() => setShowTheaterPopup(false), 160);
+              }}
+            >
               <div className="p-4">
                 <h3 className="text-lg font-bold mb-3 text-[var(--color-accent)]">Danh sách rạp</h3>
                 {isLoadingTheaters ? (
@@ -396,10 +425,6 @@ const Nav = ({
             <FontAwesomeIcon icon={faUser} className="w-6 h-6" />
           </button>
         )}
-        
-        <button aria-label="Settings" className="hover:text-[var(--color-accent)] transition cursor-pointer">
-          <FontAwesomeIcon icon={faGear} className="w-6 h-6" />
-        </button>
       </div>
 
       {/* Auth Modal */}

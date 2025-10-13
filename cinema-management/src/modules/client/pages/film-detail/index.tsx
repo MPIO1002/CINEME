@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Play, Star, Calendar, Clock, Globe, Users, MessageSquare, ThumbsUp, CheckCircle, TrendingUp } from 'lucide-react';
+import { Play, Calendar, Clock, Globe, Users, MessageSquare, ThumbsUp, TrendingUp } from 'lucide-react';
 import { API_BASE_URL } from '../../../../components/api-config';
 import ProgressBar from '../../components/progress-bar'; 
+// Using emoji fallback for face icons to avoid adding new FontAwesome dependency
 
 interface Actor {
   id: string;
@@ -42,12 +43,22 @@ interface ApiResponse {
   data: MovieDetail;
 }
 
+interface Review {
+  username: string;
+  comment: string;
+  rating: number;
+  date: string;
+}
+
 const FilmDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [movie, setMovie] = useState<MovieDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [showTrailer, setShowTrailer] = useState(false);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [recommended, setRecommended] = useState<MovieDetail[]>([]);
+  const recommendedRef = React.useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const fetchMovieDetail = async () => {
@@ -70,10 +81,97 @@ const FilmDetail: React.FC = () => {
     }
   }, [id]);
 
-  // Scroll to top when component mounts
+  // Fetch reviews for the movie
+  useEffect(() => {
+    const fetchReviews = async () => {
+      if (!id) return;
+      try {
+        const res = await fetch(`${API_BASE_URL}/movies/${id}/reviews`);
+        const json = await res.json();
+        if (json && json.statusCode === 200 && Array.isArray(json.data)) {
+          setReviews(json.data);
+        } else {
+          console.warn('Unexpected reviews response', json);
+        }
+      } catch (err) {
+        console.error('Error fetching reviews:', err);
+      }
+    };
+
+    fetchReviews();
+  }, [id]);
+
+  // Fetch recommended movies
+  useEffect(() => {
+    const fetchRecommended = async () => {
+      if (!id) return;
+      try {
+        const res = await fetch(`${API_BASE_URL}/movies/recommend?movieId=${encodeURIComponent(id)}&topN=10`);
+        const json = await res.json();
+        if (json && json.statusCode === 200 && Array.isArray(json.data)) {
+          setRecommended(json.data);
+        } else {
+          console.warn('Unexpected recommend response', json);
+        }
+      } catch (err) {
+        console.error('Error fetching recommended movies:', err);
+      }
+    };
+
+    fetchRecommended();
+  }, [id]);
+
+  // Enable click+drag to scroll horizontally (desktop mouse). Touch devices keep native swipe.
+  useEffect(() => {
+    const el = recommendedRef.current;
+    if (!el) return;
+
+    const isDown = { value: false } as { value: boolean };
+    const startX = { value: 0 } as { value: number };
+    const scrollLeft = { value: 0 } as { value: number };
+
+    const onPointerDown = (e: PointerEvent) => {
+      // Only engage drag behavior for mouse to avoid interfering with touch swipe
+      if (e.pointerType !== 'mouse') return;
+      isDown.value = true;
+      startX.value = e.clientX;
+      scrollLeft.value = el.scrollLeft;
+      el.classList.add('dragging');
+      try { (e.target as Element).setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!isDown.value) return;
+      e.preventDefault();
+      const x = e.clientX;
+      const walk = x - startX.value; // positive when moving right
+      el.scrollLeft = scrollLeft.value - walk;
+    };
+
+    const onPointerUp = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse') return;
+      isDown.value = false;
+      el.classList.remove('dragging');
+      try { (e.target as Element).releasePointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    };
+
+    el.addEventListener('pointerdown', onPointerDown);
+    el.addEventListener('pointermove', onPointerMove);
+    el.addEventListener('pointerup', onPointerUp);
+    el.addEventListener('pointerleave', onPointerUp);
+
+    return () => {
+      el.removeEventListener('pointerdown', onPointerDown);
+      el.removeEventListener('pointermove', onPointerMove);
+      el.removeEventListener('pointerup', onPointerUp);
+      el.removeEventListener('pointerleave', onPointerUp);
+    };
+  }, [recommendedRef.current]);
+
+  // Scroll to top when the movie id changes (e.g., navigating to another film)
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+  }, [id]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('vi-VN');
@@ -109,9 +207,20 @@ const FilmDetail: React.FC = () => {
 
   const videoId = getYouTubeVideoId(movie.trailer);
 
+  // Use backend-provided rating percent (movie.ratings is already a percent)
+  const ratingPercent = Math.round(Number(movie.ratings) || 0);
+  const totalReviews = reviews.length;
+
+  const getInitials = (name: string) => {
+    if (!name) return '';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
+    return (parts[0].slice(0,1) + parts[parts.length-1].slice(0,1)).toUpperCase();
+  };
+
   return (
     <>
-      {/* Custom CSS for scrolling animations */}
+      {/* Custom CSS for scrolling animations and recommended scroller */}
       <style dangerouslySetInnerHTML={{
         __html: `
           @keyframes scroll-left {
@@ -131,6 +240,23 @@ const FilmDetail: React.FC = () => {
           .animate-scroll-right {
             animation: scroll-right 15s linear infinite;
           }
+
+          /* Recommended scroller - show a thin themed scrollbar similar to booking page */
+          .recommended-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: var(--color-accent) transparent;
+            cursor: grab;
+          }
+          .recommended-scroll.dragging { cursor: grabbing; }
+          .recommended-scroll::-webkit-scrollbar { height: 10px; }
+          .recommended-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.06); border-radius: 6px; }
+          .recommended-scroll::-webkit-scrollbar-thumb { background: linear-gradient(45deg, var(--color-accent), var(--color-secondary)); border-radius: 6px; }
+          .recommended-scroll::-webkit-scrollbar-thumb:hover { background: linear-gradient(45deg, var(--color-secondary), var(--color-accent)); }
+
+          .recommended-card {
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+          }
+          .recommended-card:hover { transform: translateY(-6px); box-shadow: 0 12px 30px rgba(0,0,0,0.35); }
         `
       }} />
 
@@ -143,7 +269,7 @@ const FilmDetail: React.FC = () => {
             className="h-screen bg-cover bg-center bg-no-repeat"
             style={{ backgroundImage: `url(${movie.image})` }}
           >
-            <div className="relative z-20 container mx-auto px-4 h-full flex items-center">
+            <div className="relative z-20 container mx-auto p-10 h-full flex items-center">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center w-full">
                 {/* Movie Info */}
                 <div className="space-y-6">
@@ -319,7 +445,7 @@ const FilmDetail: React.FC = () => {
         <ProgressBar currentStep="film-detail" />
 
         {/* Rating and Reviews Section */}
-        <div className="py-16" style={{ backgroundColor: 'var(--custom-300)' }}>
+        <div className="py-16 px-8" style={{ backgroundColor: 'var(--custom-300)' }}>
           <div className="container mx-auto px-4">
 
             {/* Section Header */}
@@ -335,262 +461,112 @@ const FilmDetail: React.FC = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Rating Score and Chart */}
-              <div className="lg:col-span-1">
-                <div className="p-8 rounded-2xl shadow-xl" style={{
-                  backgroundColor: 'var(--color-background)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)'
-                }}>
-                  <div className="text-center mb-6">
-                    <div className="flex items-center justify-center gap-6 mb-4">
-                      <div className="relative">
-                        <div className="text-7xl font-bold">
-                          {movie.ratings}.0
-                        </div>
+            <div className="space-y-6">
+              {/* Rating Card - moved above reviews */}
+              <div className="p-8">
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-6 mb-2">
+                    <div className="relative">
+                      <div className="text-5xl font-bold">
+                        {ratingPercent}%
                       </div>
-                      <div className="flex flex-col items-start">
-                        <div className="flex mb-2">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`w-7 h-7 ${i < parseInt(movie.ratings)
-                                  ? 'fill-current animate-bounce'
-                                  : ''
-                                }`}
-                              style={{
-                                color: i < parseInt(movie.ratings) ? 'var(--color-accent)' : 'rgba(255, 255, 255, 0.3)',
-                                animationDelay: `${i * 0.1}s`
-                              }}
-                            />
-                          ))}
-                        </div>
-                        <p className="text-sm font-medium">
-                          Đánh giá từ 1,247 khán giả
-                        </p>
-                      </div>
+                      <div className="text-sm text-gray-300">Trung bình</div>
                     </div>
                   </div>
-
-                  {/* Rating Bar Chart */}
-                  <div className="space-y-3">
-                    {[
-                      { stars: 5, percentage: 78, count: 973 },
-                      { stars: 4, percentage: 15, count: 187 },
-                      { stars: 3, percentage: 5, count: 62 },
-                      { stars: 2, percentage: 1, count: 15 },
-                      { stars: 1, percentage: 1, count: 10 }
-                    ].map((rating) => (
-                      <div key={rating.stars} className="flex items-center gap-3 text-sm group hover:scale-105 transition-transform duration-200">
-                        <span style={{ color: 'var(--color-text)' }} className="w-8 font-medium">{rating.stars}★</span>
-                        <div className="flex-1 h-3 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--custom-300)' }}>
-                          <div
-                            className="h-full rounded-full transition-all duration-1000 ease-out"
-                            style={{
-                              backgroundColor: rating.stars >= 4 ? 'var(--color-accent)' : rating.stars >= 3 ? 'var(--color-secondary)' : 'rgba(255, 255, 255, 0.4)',
-                              width: `${rating.percentage}%`,
-                              transform: 'translateX(0%)'
-                            }}
-                          ></div>
-                        </div>
-                        <span style={{ color: 'rgba(255, 255, 255, 0.8)' }} className="w-12 text-right font-medium">
-                          {rating.percentage}%
-                        </span>
-                        <span style={{ color: 'rgba(255, 255, 255, 0.5)' }} className="w-12 text-right text-xs">
-                          ({rating.count})
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Summary Stats */}
-                  <div className="mt-6 pt-6 border-t" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-                    <div className="grid grid-cols-2 gap-4 text-center">
-                      <div>
-                        <div className="text-2xl font-bold" style={{ color: 'var(--color-accent)' }}>93%</div>
-                        <div className="text-xs" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Khuyên xem</div>
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold" style={{ color: 'var(--color-secondary)' }}>8.5</div>
-                        <div className="text-xs" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>IMDb Score</div>
-                      </div>
+                  <div className="flex items-center justify-center gap-4">
+                    <div className="h-3 w-48 rounded-full overflow-hidden bg-[var(--custom-300)]">
+                      <div className="h-full bg-[var(--color-accent)]" style={{ width: `${ratingPercent}%` }} />
                     </div>
+                    <div className="text-sm font-medium">{ratingPercent}%</div>
                   </div>
+                  <p className="text-sm font-medium mt-3">
+                    Đánh giá từ {totalReviews} khán giả
+                  </p>
                 </div>
               </div>
 
-              {/* Review Examples */}
-              <div className="lg:col-span-2">
-                <div className="space-y-5 shadow-lg rounded-2xl p-4"
-                  style={{
-                    backgroundColor: 'var(--color-background)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)'
-                  }}>
-                  {/* Review Header */}
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-2">
-                      <MessageSquare className="w-5 h-5" style={{ color: 'var(--color-accent)' }} />
-                      <h3 className="text-xl font-semibold" style={{ color: 'var(--color-text)' }}>
-                        Bình luận nổi bật
-                      </h3>
-                    </div>
-                    <button className="text-sm px-4 py-2 rounded-lg transition-colors border"
-                      style={{
-                        borderColor: 'rgba(255, 255, 255, 0.2)',
-                        color: 'rgba(255, 255, 255, 0.8)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                        e.currentTarget.style.color = 'white';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.8)';
-                      }}>
-                      Xem tất cả
-                    </button>
+              {/* Reviews List - single column */}
+              <div className="space-y-5 shadow-lg rounded-2xl p-4"
+                style={{
+                  backgroundColor: 'var(--color-background)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                {/* Review Header */}
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-5 h-5" style={{ color: 'var(--color-accent)' }} />
+                    <h3 className="text-xl font-semibold" style={{ color: 'var(--color-text)' }}>
+                      Bình luận nổi bật
+                    </h3>
                   </div>
-
-                  {/* Individual Reviews */}
-                  <div className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 group"
+                  <button className="text-sm px-4 py-2 rounded-lg transition-colors border"
                     style={{
-                      backgroundColor: 'var(--color-background)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                      borderColor: 'rgba(255, 255, 255, 0.2)',
+                      color: 'rgba(255, 255, 255, 0.8)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                      e.currentTarget.style.color = 'white';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = 'rgba(255, 255, 255, 0.8)';
                     }}>
-                    <div className="flex items-start gap-4 mb-4">
-                      <div className="relative">
-                        <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
-                          style={{ backgroundColor: '#e11d48' }}>
-                          <span className="text-sm font-bold" style={{ color: 'white' }}>TH</span>
-                        </div>
-                        <CheckCircle className="absolute -bottom-1 -right-1 w-4 h-4 text-blue-500 bg-white rounded-full" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-semibold text-lg" style={{ color: 'var(--color-text)' }}>Thanh Huyền</p>
-                          <span className="text-xs px-2 py-1 rounded-full"
-                            style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}>
-                            Verified
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="flex">
-                            {[...Array(5)].map((_, i) => (
-                              <Star key={i} className="w-4 h-4 fill-current" style={{ color: 'var(--color-accent)' }} />
-                            ))}
-                          </div>
-                          <span className="text-xs" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>• 2 ngày trước</span>
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-base leading-relaxed mb-4" style={{ color: 'var(--color-text)' }}>
-                      Phim hay, kịch tính và hấp dẫn. Diễn xuất của các diễn viên rất tự nhiên và
-                      cuốn hút người xem từ đầu đến cuối. Đặc biệt là phần âm nhạc và cinematography thực sự ấn tượng!
-                    </p>
-                    <div className="flex items-center gap-4">
-                      <button className="flex items-center gap-2 text-sm transition-colors group-hover:text-accent"
-                        style={{ color: 'rgba(255, 255, 255, 0.7)' }}
-                        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-accent)'}
-                        onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)'}>
-                        <ThumbsUp className="w-4 h-4" />
-                        <span>142</span>
-                      </button>
-                      <button className="text-sm transition-colors"
-                        style={{ color: 'rgba(255, 255, 255, 0.7)' }}
-                        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-accent)'}
-                        onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)'}>
-                        Trả lời
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 group"
-                    style={{
-                      backgroundColor: 'var(--color-background)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)'
-                    }}>
-                    <div className="flex items-start gap-4 mb-4">
-                      <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
-                        style={{ backgroundColor: '#10b981' }}>
-                        <span className="text-sm font-bold" style={{ color: 'white' }}>MN</span>
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-semibold text-lg mb-1" style={{ color: 'var(--color-text)' }}>Minh Ngọc</p>
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="flex">
-                            {[...Array(5)].map((_, i) => (
-                              <Star key={i} className="w-4 h-4 fill-current" style={{ color: 'var(--color-accent)' }} />
-                            ))}
-                          </div>
-                          <span className="text-xs" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>• 3 ngày trước</span>
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-base leading-relaxed mb-4" style={{ color: 'var(--color-text)' }}>
-                      Một bộ phim trinh thám xuất sắc với cốt truyện hấp dẫn và những tình tiết
-                      bất ngờ. Rất đáng xem!
-                    </p>
-                    <div className="flex items-center gap-4">
-                      <button className="flex items-center gap-2 text-sm transition-colors"
-                        style={{ color: 'rgba(255, 255, 255, 0.7)' }}
-                        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-accent)'}
-                        onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)'}>
-                        <ThumbsUp className="w-4 h-4" />
-                        <span>89</span>
-                      </button>
-                      <button className="text-sm transition-colors"
-                        style={{ color: 'rgba(255, 255, 255, 0.7)' }}
-                        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-accent)'}
-                        onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)'}>
-                        Trả lời
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 group"
-                    style={{
-                      backgroundColor: 'var(--color-background)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      opacity: 0.9
-                    }}>
-                    <div className="flex items-start gap-4 mb-4">
-                      <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
-                        style={{ backgroundColor: '#3b82f6' }}>
-                        <span className="text-sm font-bold" style={{ color: 'white' }}>DL</span>
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-semibold text-lg mb-1" style={{ color: 'var(--color-text)' }}>Duy Lâm</p>
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="flex">
-                            {[...Array(5)].map((_, i) => (
-                              <Star key={i} className="w-4 h-4 fill-current" style={{ color: 'var(--color-accent)' }} />
-                            ))}
-                          </div>
-                          <span className="text-xs" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>• 1 tuần trước</span>
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-base leading-relaxed mb-4" style={{ color: 'var(--color-text)' }}>
-                      Cinematography tuyệt vời, âm thanh sống động. Victor Vũ thực sự đã tạo ra một
-                      kiệt tác điện ảnh Việt Nam đáng tự hào!
-                    </p>
-                    <div className="flex items-center gap-4">
-                      <button className="flex items-center gap-2 text-sm transition-colors"
-                        style={{ color: 'rgba(255, 255, 255, 0.7)' }}
-                        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-accent)'}
-                        onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)'}>
-                        <ThumbsUp className="w-4 h-4" />
-                        <span>203</span>
-                      </button>
-                      <button className="text-sm transition-colors"
-                        style={{ color: 'rgba(255, 255, 255, 0.7)' }}
-                        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-accent)'}
-                        onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)'}>
-                        Trả lời
-                      </button>
-                    </div>
-                  </div>
+                    Xem tất cả
+                  </button>
                 </div>
+
+                {/* Render reviews fetched from backend */}
+                {reviews.length === 0 ? (
+                  <p className="text-center text-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>Chưa có bình luận nào.</p>
+                ) : (
+                  reviews.map((r, idx) => {
+                    return (
+                      <div key={`${r.username}-${idx}`} className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 group" style={{ backgroundColor: 'var(--color-background)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                        <div className="flex items-start gap-4 mb-4">
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg" style={{ backgroundColor: '#6b7280' }}>
+                                <span className="text-white text-xl font-bold">{getInitials(r.username)}</span>
+                              </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-semibold text-lg" style={{ color: 'var(--color-text)' }}>{r.username}</p>
+                              <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}>
+                                {r.rating}/10
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>{new Date(r.date).toLocaleDateString('vi-VN')}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-base leading-relaxed mb-4" style={{ color: 'var(--color-text)' }}>{r.comment}</p>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Recommended Movies */}
+              <div className="mt-8">
+                <h4 className="text-xl font-semibold mb-4" style={{ color: 'var(--color-text)' }}>PHIM ĐỀ CỬ</h4>
+                {recommended.length === 0 ? (
+                  <p className="text-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>Không có đề cử nào.</p>
+                ) : (
+                  <div ref={recommendedRef} className="flex gap-4 overflow-x-auto pb-2 recommended-scroll">
+                    {recommended.map((rec) => (
+                      <div key={rec.id} className="w-56 flex-shrink-0 cursor-pointer recommended-card" onClick={() => navigate(`/film/${rec.id}`)}>
+                        <div className="relative mb-2 rounded-lg overflow-hidden" style={{ height: '400px', backgroundColor: 'rgba(0,0,0,0.08)' }}>
+                          <img src={rec.image} alt={rec.nameVn} className="w-full h-full object-cover" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-center font-semibold truncate" style={{ color: 'var(--color-text)' }}>{rec.nameVn || rec.nameEn}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

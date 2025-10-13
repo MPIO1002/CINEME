@@ -65,64 +65,6 @@ type HeroMovie = {
   descriptionVI: string;
 };
 
-const MOVIES: HeroMovie[] = [
-  {
-    id: "1",
-    nameEN: "The Old Woman With The Knife",
-    nameVI: "Bà Già Cầm Dao",
-    image: "https://static.nutscdn.com/vimg/1920-0/80800a687102c4b8dcfb7948fd2af086.jpg",
-    logo: "https://static.nutscdn.com/vimg/0-260/426b552389673483a9bf5979c24c8cf9.png",
-    descriptionEN:
-      "Hornclaw, an experienced old assassin, thought she had seen it all in the underworld, but she never expected to become a mentor to a reckless rookie named Bullfight. As their strange relationship deepens, cracks in the world they operate in begin to show. Things get even more dangerous when Hornclaw discovers someone is out to kill her. Surrounded by enemies and betrayal, to survive, she must keep both her blade—and her mind—sharp.",
-    descriptionVI:
-      "Hornclaw, một sát thủ già từng trải, tưởng chừng đã nhìn thấu mọi mặt của thế giới ngầm, nhưng bà không ngờ rằng mình sẽ trở thành người dẫn dắt cho một tay lính mới liều lĩnh tên Bullfight. Khi mối quan hệ kỳ lạ giữa hai người dần sâu sắc, những rạn nứt trong thế giới ngầm mà họ hoạt động cũng bắt đầu lộ ra. Mọi thứ càng trở nên nguy hiểm khi Hornclaw phát hiện có kẻ đang muốn lấy mạng mình. Giữa vòng vây của kẻ thù và sự phản bội rình rập, để sống sót, bà buộc phải giữ cho lưỡi dao – và cả đầu óc – luôn sắc bén.",
-  },
-  {
-    id: "2",
-    nameEN: "ONE: High School Heroes",
-    nameVI: "ONE: Anh Hùng Trung Học",
-    image: "https://static.nutscdn.com/vimg/1920-0/ca24572562380c30faeaedb6e5fcb854.webp",
-    logo: "https://static.nutscdn.com/vimg/0-260/dd963bdc79bfd59109bf53b067db0e3c.png",
-    descriptionEN:
-      "Based on the webtoon of the same name, it tells the story of a model student who once devoted all his attention to studying but gets entangled in domestic violence and school bullying, forcing him to make a life-changing decision. ONE: High School Heroes follows a group of brave students fighting against school violence, blending thrilling action and deep drama, delivering a message of unity.",
-    descriptionVI:
-      "Dựa trên webtoon cùng tên, kể về câu chuyện của một học sinh gương mẫu từng dành toàn bộ sự chú ý của mình cho việc học nhưng bị vướng vào bạo lực gia đình và bắt nạt ở trường, buộc anh phải đưa ra quyết định mang tính thay đổi. One: High School Heroes kể về hành trình nhóm học sinh dũng cảm chống bạo lực học đường, kết hợp hành động mãn nhãn và drama sâu sắc, truyền tải thông điệp đoàn kết.",
-  },
-  {
-    id: "3",
-    nameEN: "Good Boy",
-    nameVI: "Good Boy",
-    image: "https://static.nutscdn.com/vimg/1920-0/27591bc926452f55a69c18dbf6b6f930.webp",
-    logo: "https://static.nutscdn.com/vimg/0-260/67f61f7bc00c3b66a801580626cdcddc.png",
-    descriptionEN:
-      "“Good Boy” tells the story of Yoon Dong Joo (played by Park Bo Gum), a former national boxing athlete and international gold medalist, who becomes a police officer through a special recruitment program for medal-winning athletes. His life takes a dramatic turn when Min Joo Young (Oh Jung Se)—a ruthless villain ruling Inseong city from the shadows—emerges as the ultimate enemy. With his sinister presence and disregard for law and order, even his shadow sends chills down people's spines.",
-    descriptionVI:
-      "“Good Boy” kể về câu chuyện của Yoon Dong Joo (Park Bo Gum thủ vai), một cựu vận động viên quyền anh quốc gia từng giành huy chương vàng quốc tế, trở thành cảnh sát thông qua một chương trình tuyển dụng đặc biệt dành cho các vận động viên giành huy chương. Cuộc sống của cậu rẽ sang một hướng đầy kịch tính khi Min Joo Young (Oh Jung Se) - một nhân vật phản diện tàn nhẫn cai trị thành phố Inseong từ trong bóng tối - xuất hiện như kẻ thù cuối cùng. Với sự hiện diện nham hiểm và sự khinh thường luật pháp, trật tự, ngay cả hình bóng của hắn cũng khiến người ta rùng mình.",
-  },
-  {
-    id: "4",
-    nameEN: "Final Destination: Bloodlines",
-    nameVI: "Final Destination: Bloodlines",
-    image: "https://static.nutscdn.com/vimg/1920-0/3f912f6db5f248397fe4140f01c1c374.jpg",
-    logo: "https://static.nutscdn.com/vimg/0-260/1bb2997c7ffda96d2dd5ff44c0f74e35.png",
-    descriptionEN:
-      "The latest installment of the famous horror franchise, “Final Destination: Bloodlines” continues the story of survivors of a catastrophic accident. This time, the main characters must face a mysterious force hunting them, forcing them to find a way to escape their predetermined fate. With breathtaking action and thrilling situations, the film promises a chilling experience for audiences.",
-    descriptionVI:
-      "Phần mới nhất của loạt phim kinh dị nổi tiếng, “Final Destination Bloodliness” tiếp tục câu chuyện về những người sống sót sau một tai nạn thảm khốc. Lần này, nhóm nhân vật chính phải đối mặt với một thế lực bí ẩn đang săn đuổi họ, buộc họ phải tìm cách thoát khỏi số phận đã được định sẵn. Với những pha hành động nghẹt thở và những tình huống giật gân, bộ phim hứa hẹn mang đến trải nghiệm rùng rợn cho khán giả.",
-  },
-  {
-    id: "5",
-    nameEN: "The Amateur",
-    nameVI: "The Amateur",
-    image: "https://static.nutscdn.com/vimg/1920-0/3c774ef35d12cbeb4ad28d00416861f4.jpg",
-    logo: "https://static.nutscdn.com/vimg/0-260/b0960d1728d29ce3efab9ca56ce21fc0.png",
-    descriptionEN:
-      "The film tells the story of a group of young people passionate about eSports who decide to form a team to participate in the biggest tournament of the year. However, they face many challenges, from fierce competition to internal conflicts. “The Amateur” is not only about eSports but also a journey of self-discovery and friendship.",
-    descriptionVI:
-      "Bộ phim kể về một nhóm thanh niên đam mê thể thao điện tử, họ quyết định thành lập một đội tuyển để tham gia giải đấu lớn nhất trong năm. Tuy nhiên, họ phải đối mặt với nhiều thử thách, từ sự cạnh tranh khốc liệt đến những mâu thuẫn nội bộ. “The Amateur” không chỉ là câu chuyện về thể thao điện tử mà còn là hành trình tìm kiếm bản thân và tình bạn.",
-  },
-];
-
 const HeroCarousel: React.FC<{ lang: "vi" | "en" }> = ({ lang }) => {
   const navigate = useNavigate();
   const [active, setActive] = useState(0);
@@ -142,8 +84,7 @@ const HeroCarousel: React.FC<{ lang: "vi" | "en" }> = ({ lang }) => {
           const movieList = data.data.slice(0, 7);
           setHotMovies(movieList);
 
-          // Fetch detailed info for first 5 movies for carousel
-          const carouselPromises = movieList.slice(0, 5).map((movie: Movie) =>
+          const carouselPromises = movieList.slice(0, 7).map((movie: Movie) =>
             fetch(`${API_BASE_URL}/movies/${movie.id}/detail`)
               .then(res => res.json())
               .then(detailData => {
