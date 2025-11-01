@@ -97,6 +97,9 @@ const BookingPage: React.FC = () => {
   const [selectedCombos, setSelectedCombos] = useState<SelectedCombo[]>([]);
   const [showComboModal, setShowComboModal] = useState(false);
   const [loadingCombos, setLoadingCombos] = useState(false);
+  const [rankLoading, setRankLoading] = useState(false);
+  const [rankInfo, setRankInfo] = useState<any>(null);
+  const [rankDiscountPercent, setRankDiscountPercent] = useState<number>(0);
   const wsRef = useRef<SocketIOClient.Socket | null>(null);
 
   // Generate next 7 days
@@ -344,9 +347,14 @@ const BookingPage: React.FC = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/combos`);
       const data = await response.json();
-      if (response.ok) {
+      // Backend returns { statusCode, message, data: [...] }
+      if (response.ok && data && data.statusCode === 200) {
+        setCombos(Array.isArray(data.data) ? data.data : []);
+      } else if (response.ok && Array.isArray(data)) {
+        // Some endpoints might return raw array directly
         setCombos(data);
       } else {
+        setCombos([]);
         showToast('error', 'Không thể tải danh sách combo');
       }
     } catch (error) {
@@ -356,6 +364,56 @@ const BookingPage: React.FC = () => {
       setLoadingCombos(false);
     }
   };
+
+  // Fetch rank info for current user
+  const fetchRank = async () => {
+    try {
+      const savedUserData = localStorage.getItem('userData');
+      if (!savedUserData) return;
+      const parsed: UserData = JSON.parse(savedUserData);
+      if (!parsed || !parsed.id) return;
+
+      setRankLoading(true);
+
+      // The backend requires the refresh token to be provided - pass it in Authorization header as Bearer <refreshToken>
+      const response = await fetch(`${API_BASE_URL}/rank/${parsed.id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${parsed.refreshToken}`
+        }
+      });
+
+      const data = await response.json();
+      if (response.ok && data && data.statusCode === 200) {
+        setRankInfo(data.data);
+        setRankDiscountPercent(data.data?.rank?.discountPercentage || 0);
+      } else {
+        // If not OK, clear rank info
+        setRankInfo(null);
+        setRankDiscountPercent(0);
+        // Optionally log message
+        console.warn('Failed to fetch rank:', data?.message || response.statusText);
+      }
+    } catch (error) {
+      console.error('Error fetching rank:', error);
+      setRankInfo(null);
+      setRankDiscountPercent(0);
+    } finally {
+      setRankLoading(false);
+    }
+  };
+
+  // Call fetchRank when user changes
+  useEffect(() => {
+    if (user) {
+      fetchRank();
+    } else {
+      setRankInfo(null);
+      setRankDiscountPercent(0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // Handle combo selection
   const handleComboSelect = (combo: Combo, quantity: number) => {
@@ -473,6 +531,10 @@ const BookingPage: React.FC = () => {
   const seatPrice = selectedSeats.reduce((sum, seat) => sum + getSeatPrice(seat.seatType || 'Standard', seat.price), 0);
   const comboPrice = selectedCombos.reduce((sum, combo) => sum + (combo.price * combo.selectedQuantity), 0);
   const totalPrice = seatPrice + comboPrice;
+  const discountedTotalPrice = rankDiscountPercent > 0 ? Math.round(totalPrice * (1 - rankDiscountPercent / 100)) : totalPrice;
+  const discountSaved = Math.max(0, totalPrice - discountedTotalPrice);
+
+
 
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -1128,10 +1190,37 @@ const BookingPage: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="flex justify-between items-center text-lg font-bold">
-                    <span>Tổng Cộng</span>
-                    <span style={{ color: 'var(--color-accent)' }}>{totalPrice.toLocaleString('vi-VN')}đ</span>
-                  </div>
+                  {/* Membership discount info (if any) */}
+                  {rankLoading ? (
+                    <div className="flex justify-between items-center text-sm">
+                      <span>Ưu đãi</span>
+                      <span style={{ color: 'var(--color-primary)' }}>Đang tải ưu đãi...</span>
+                    </div>
+                  ) : rankDiscountPercent > 0 ? (
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-semibold">Ưu đãi</span>
+                          <span className="px-2 py-1 rounded text-sm" style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}>
+                            {rankInfo?.rank?.name || 'Hạng'} • {rankDiscountPercent}%
+                          </span>
+                      </div>
+
+                      <div className="flex justify-between items-center text-lg font-bold mt-5">
+                        <span>Tổng Cộng</span>
+                        <div className="text-right">
+                          <div style={{ textDecoration: 'line-through', fontSize: '0.95rem', color: 'rgba(255,255,255,0.6)' }}>
+                            {totalPrice.toLocaleString('vi-VN')}đ
+                          </div>
+                          <div style={{ color: 'var(--color-accent)' }}>{discountedTotalPrice.toLocaleString('vi-VN')}đ</div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between items-center text-lg font-bold">
+                      <span>Tổng Cộng</span>
+                      <span style={{ color: 'var(--color-accent)' }}>{totalPrice.toLocaleString('vi-VN')}đ</span>
+                    </div>
+                  )}
 
                   <button
                     onClick={handleBooking}

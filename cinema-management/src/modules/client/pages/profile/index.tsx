@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import BookingDetailModal from './components/booking-detail';
 import { useNavigate } from 'react-router-dom';
 import { Star, Eye, MessageSquare, Badge } from 'lucide-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -43,6 +44,9 @@ const Profile: React.FC = () => {
   const [bookingHistory, setBookingHistory] = useState<BookingHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
+  const [rankInfo, setRankInfo] = useState<{ rankName: string; points: number; progressPercent?: number } | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailBookingId, setDetailBookingId] = useState<string | null>(null);
   const navigate = useNavigate();
   const { showToast } = useToast();
 
@@ -135,8 +139,53 @@ const Profile: React.FC = () => {
       }
     };
 
+    const fetchRank = async () => {
+      try {
+        const userData = localStorage.getItem('userData');
+        if (!userData) return;
+
+        const user = JSON.parse(userData);
+        const { id, refreshToken } = user;
+        if (!id || !refreshToken) return;
+
+        const res = await fetch(`${API_BASE_URL}/rank/${encodeURIComponent(id)}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${refreshToken}`
+          }
+        });
+
+        if (!res.ok) {
+          console.warn('Rank API returned non-OK status', res.status);
+          return;
+        }
+
+        const json = await res.json();
+        const data = json?.data || json;
+
+        const rankName =
+          typeof data.rank === 'object'
+            ? data.rank.name
+            : data.rank ?? data.rankName ?? data.name ?? data.tier ?? null;
+
+        const points = data?.points ?? data?.score ?? data?.totalSpent ?? 0; // dùng totalSpent nếu API không có points
+        const progressPercent = data?.percent ?? data?.progressPercent ?? 0;
+
+        setRankInfo({
+          rankName: rankName || '—',
+          points: Number(points),
+          progressPercent,
+        });
+      } catch (error) {
+        console.error('Error fetching rank info:', error);
+      }
+    };
+
+
     fetchUserProfile();
     fetchBookingHistory();
+    fetchRank();
   }, [navigate, showToast]);
 
   const formatDate = (dateString: string) => {
@@ -149,6 +198,22 @@ const Profile: React.FC = () => {
 
   const formatTime = (timeString: string) => {
     return timeString.substring(0, 5); // Get HH:MM from HH:MM:SS
+  };
+
+  // Helper to safely render potentially non-primitive values
+  const safeString = (v: any) => {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v);
+    if (Array.isArray(v)) {
+      return v.map(item => {
+        if (item === null || item === undefined) return '';
+        if (typeof item === 'string' || typeof item === 'number') return String(item);
+        // common seat object shapes
+        return item.seatNumber ?? item.name ?? item.id ?? JSON.stringify(item);
+      }).join(', ');
+    }
+    if (typeof v === 'object') return v.name ?? v.title ?? v.rankName ?? JSON.stringify(v);
+    return String(v);
   };
 
   if (isLoading) {
@@ -186,50 +251,50 @@ const Profile: React.FC = () => {
     <div className="min-h-screen bg-[var(--color-background)] py-8">
       <div className="w-full px-6 mt-15">
         {/* Profile Card */}
-        <div 
+        <div
           className="rounded-3xl p-8 mb-8 relative overflow-hidden"
           style={{ backgroundColor: '#292722' }}
         >
-          
-          
+
+
           <div className="flex items-start gap-6 relative z-10">
             {/* Avatar */}
             <div className="w-24 h-24 rounded-full flex items-center justify-center flex-shrink-0 p-5" style={{ backgroundColor: 'var(--color-background)' }}>
-              <img 
-                src="/logo_cinema_new.PNG" 
-                alt="Cinema Logo" 
+              <img
+                src="/logo_cinema_new.PNG"
+                alt="Cinema Logo"
                 className="w-full h-full object-contain"
               />
             </div>
-            
+
             {/* User Info */}
             <div className="flex-1">
               <div className="mb-4">
                 <p className="text-2xl font-bold text-[var(--color-text)]">{userProfile.fullName}</p>
               </div>
-              
+
               <div className="mb-4">
                 <p className="text-lg text-white">{userProfile.email}</p>
               </div>
-              
+
               <div className="mb-6">
                 <p className="text-lg text-white">{userProfile.phone || 'Chưa cập nhật số điện thoại'}</p>
               </div>
-              
+
               {/* Rank Section */}
               <div className="border-t border-white pt-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Badge className="w-5 h-5 text-white" />
-                    <span className="text-lg font-semibold text-white">HẠNG: CUỒNG PHIM</span>
+                    <span className="text-lg font-semibold text-white">HẠNG: {rankInfo ? rankInfo.rankName : '—'}</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-2xl font-bold text-white">1500 điểm</span>
+                    <span className="text-2xl font-bold text-white">{rankInfo ? `${rankInfo.points} điểm` : '— điểm'}</span>
                   </div>
                 </div>
                 <div className="mt-2">
                   <div className="w-full bg-gray-600 rounded-full h-2">
-                    <div className="bg-gradient-to-r from-[var(--color-secondary)] to-[var(--color-accent)] h-2 rounded-full" style={{width: '75%'}}></div>
+                    <div className="bg-gradient-to-r from-[var(--color-secondary)] to-[var(--color-accent)] h-2 rounded-full" style={{ width: `${rankInfo?.progressPercent ?? 0}%` }}></div>
                   </div>
                 </div>
               </div>
@@ -276,7 +341,7 @@ const Profile: React.FC = () => {
         {/* Tickets History Section */}
         <div className="rounded-3xl p-8" style={{ backgroundColor: '#292722' }}>
           <h2 className="text-2xl font-bold text-[var(--color-text)] mb-6">LỊCH SỬ VÉ XEM PHIM</h2>
-          
+
           {isLoadingBookings ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-t-4 border-[var(--color-secondary)] mx-auto mb-4"></div>
@@ -291,7 +356,7 @@ const Profile: React.FC = () => {
               {bookingHistory.map((booking) => (
                 <div key={booking.id} className="relative overflow-hidden rounded-2xl">
                   {/* Ticket Design - Similar to Payment Result */}
-                  <div 
+                  <div
                     className="relative min-h-[300px] flex"
                     style={{
                       background: `url('${booking.movieImg}')`,
@@ -302,30 +367,30 @@ const Profile: React.FC = () => {
                   >
                     {/* Dark overlay */}
                     <div className="absolute inset-0 bg-[var(--color-background)]/80 backdrop-blur-[2px]"></div>
-                    
+
                     {/* Perforated line separating sections */}
                     <div className="absolute left-1/3 top-0 bottom-0 w-6 transform -translate-x-1/2 z-20">
                       {/* Top half circle */}
                       <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 w-12 h-12 rounded-full" style={{ backgroundColor: '#292722' }}></div>
-                      
+
                       {/* Perforated dots */}
                       <div className="h-full flex flex-col items-center justify-center space-y-3">
                         {Array.from({ length: 8 }).map((_, i) => (
-                          <div 
-                            key={i} 
+                          <div
+                            key={i}
                             className="w-3 h-3 rounded-full"
                             style={{ backgroundColor: '#292722' }}
                           />
                         ))}
                       </div>
-                      
+
                       {/* Bottom half circle */}
                       <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 w-12 h-12 rounded-full" style={{ backgroundColor: '#292722' }}></div>
                     </div>
-                    
+
                     {/* Left side - Movie Poster */}
                     <div className="w-1/3 p-6 flex flex-col justify-center items-center relative z-10">
-                      <img 
+                      <img
                         src={booking.movieImg}
                         alt={booking.movieName}
                         className="w-full max-w-[200px] h-[250px] object-cover rounded-lg"
@@ -334,51 +399,58 @@ const Profile: React.FC = () => {
                         }}
                       />
                     </div>
-                    
+
                     {/* Right side - Booking details */}
                     <div className="w-2/3 p-6 flex items-center relative z-10">
                       <div className="w-full space-y-4">
                         <div className="flex justify-between items-center border-b border-white/20 pb-3">
                           <span className="text-white/80 text-base">Phim</span>
-                          <span className="text-white font-bold text-right text-base max-w-[60%]">{booking.movieName}</span>
+                          <span className="text-white font-bold text-right text-base max-w-[60%]">{safeString(booking.movieName)}</span>
                         </div>
-                        
+
                         <div className="flex justify-between items-center border-b border-white/20 pb-3">
                           <span className="text-white/80 text-base">Rạp</span>
-                          <span className="text-white font-bold text-right text-base max-w-[60%]">{booking.theaterName}</span>
+                          <span className="text-white font-bold text-right text-base max-w-[60%]">{safeString(booking.theaterName)}</span>
                         </div>
-                        
+
                         <div className="flex justify-between items-center border-b border-white/20 pb-3">
                           <span className="text-white/80 text-base">Phòng</span>
-                          <span className="text-white font-bold text-base">{booking.roomName}</span>
+                          <span className="text-white font-bold text-base">{safeString(booking.roomName)}</span>
                         </div>
-                        
+
                         <div className="flex justify-between items-center border-b border-white/20 pb-3">
                           <span className="text-white/80 text-base">Ngày chiếu</span>
                           <span className="text-white font-bold text-base">{formatDate(booking.date)}</span>
                         </div>
-                        
+
                         <div className="flex justify-between items-center border-b border-white/20 pb-3">
                           <span className="text-white/80 text-base">Giờ chiếu</span>
                           <span className="text-white font-bold text-base">
                             {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
                           </span>
                         </div>
-                        
+
                         <div className="flex justify-between items-center border-b border-white/20 pb-3">
                           <span className="text-white/80 text-base">Ghế</span>
-                          <span className="text-white font-bold text-base">{booking.listSeats.join(', ')}</span>
+                          <span className="text-white font-bold text-base">{safeString(booking.listSeats)}</span>
                         </div>
-                        
+
                         <div className="flex justify-between items-center">
                           <span className="text-white/80 text-base">Trạng thái</span>
-                          <span className={`font-bold text-base px-3 py-1 rounded-full ${
-                            booking.status === 'CONFIRMED' 
-                              ? 'bg-green-500/20 text-green-400' 
+                          <span className={`font-bold text-base px-3 py-1 rounded-full ${booking.status === 'CONFIRMED'
+                              ? 'bg-green-500/20 text-green-400'
                               : 'bg-yellow-500/20 text-yellow-400'
-                          }`}>
+                            }`}>
                             {booking.status === 'CONFIRMED' ? 'Đã xác nhận' : booking.status}
                           </span>
+                        </div>
+                        <div className="flex justify-end mt-4">
+                          <button
+                            onClick={() => { setDetailBookingId(booking.id); setDetailOpen(true); }}
+                            className="px-4 py-2 rounded-md bg-[var(--color-accent)] text-white text-sm font-semibold hover:bg-[var(--color-secondary)] transition-colors"
+                          >
+                            Xem chi tiết
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -389,10 +461,13 @@ const Profile: React.FC = () => {
           )}
         </div>
 
-        {/* Recent Movies Section */}
+  {/* Booking Detail Modal */}
+  <BookingDetailModal bookingId={detailBookingId || undefined} open={detailOpen} onClose={() => { setDetailOpen(false); setDetailBookingId(null); }} />
+
+  {/* Recent Movies Section */}
         <div className="rounded-3xl p-8 mt-8" style={{ backgroundColor: '#292722' }}>
           <h2 className="text-2xl font-bold text-[var(--color-text)] mb-6">PHIM ĐÃ XEM GẦN ĐÂY</h2>
-          
+
           {bookingHistory.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-400 text-lg">Chưa có phim nào được xem</p>
@@ -401,7 +476,7 @@ const Profile: React.FC = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {/* Get unique movies from booking history, sorted by most recent */}
               {bookingHistory
-                .filter((booking, index, self) => 
+                .filter((booking, index, self) =>
                   index === self.findIndex(b => b.movieName === booking.movieName)
                 )
                 .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -409,7 +484,7 @@ const Profile: React.FC = () => {
                 .map((booking, index) => (
                   <div key={index} className="">
                     <div className="relative overflow-hidden rounded-lg aspect-[3/4] mb-3">
-                      <img 
+                      <img
                         src={booking.movieImg}
                         alt={booking.movieName}
                         className="w-full h-full object-cover"
