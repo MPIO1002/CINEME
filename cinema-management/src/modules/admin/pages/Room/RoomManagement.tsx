@@ -35,12 +35,12 @@ interface LocalSeat extends ApiSeat {
 interface Room extends ApiRoom {
   type: '2D' | '3D' | 'IMAX' | '4DX';
   regularSeats?: number;
-  screenSize?: string;
-  audioSystem?: string;
-  has4K?: boolean;
-  hasDolbyAtmos?: boolean;
-  hasAirCondition?: boolean;
-  hasEmergencyExit?: boolean;
+//   screenSize?: string;
+//   audioSystem?: string;
+//   has4K?: boolean;
+//   hasDolbyAtmos?: boolean;
+//   hasAirCondition?: boolean;
+//   hasEmergencyExit?: boolean;
   seatLayout?: LocalSeat[];
 }
 
@@ -142,7 +142,7 @@ const RoomManagement: React.FC = () => {
       const roomsData = await roomApiService.getAllRooms();
       // Fetch seats for each room to calculate totals
       const roomsWithSeats = await Promise.all(
-        roomsData.map(async (room) => {
+        roomsData.map(async (room : Room) => {
           if (room.id) {
             try {
               const roomSeats = await roomApiService.getRoomSeats(room.id);
@@ -176,9 +176,9 @@ const RoomManagement: React.FC = () => {
                 console.log('Saving room:', modalRoom);
                 // Create new room
                 // const apiRoom = convertLocalRoomToApi(room);
-                const newRoom = await roomApiService.createRoom(modalRoom.theaterId, modalRoom);
-                const localRoom = convertApiRoomToLocal(newRoom);
-                setRooms(prev => [...prev, {...localRoom, utilization: 0, monthlyRevenue: 0}]);
+                await roomApiService.createRoom(modalRoom.theaterId, modalRoom);
+                // const localRoom = convertApiRoomToLocal(newRoom);
+                // setRooms(prev => [...prev, {...localRoom, utilization: 0, monthlyRevenue: 0}]);
                 alert('Thêm phòng chiếu thành công!');
             } else if (modalMode === "edit" && modalRoom.id) {
                 console.log('Updating room:', modalRoom, roomLayout);
@@ -198,26 +198,28 @@ const RoomManagement: React.FC = () => {
         } catch (error) {
             console.error('Error saving room:', error);
             alert('Có lỗi xảy ra khi lưu phòng chiếu. Vui lòng thử lại!');
+        } finally {
+            fetchRooms();
+            setModalOpen(false);
+            setLoading(false);
         }
-        setModalOpen(false);
-        setLoading(false);
     };
 
-  const handleDeleteRoom = async (roomId: string) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa phòng chiếu này?')) {
-      setLoading(true);
-      try {
-        console.log('Deleting room:', roomId);
-        await roomApiService.deleteRoom(roomId);
-        setRooms(prev => prev.filter(r => r.id !== roomId));
-        alert('Xóa phòng chiếu thành công!');
-      } catch (error) {
-        console.error('Error deleting room:', error);
-        alert('Có lỗi xảy ra khi xóa phòng chiếu. Vui lòng thử lại!');
-      }
-      setLoading(false);
-    }
-  };
+//   const handleDeleteRoom = async (roomId: string) => {
+//     if (window.confirm('Bạn có chắc chắn muốn xóa phòng chiếu này?')) {
+//       setLoading(true);
+//       try {
+//         console.log('Deleting room:', roomId);
+//         await roomApiService.deleteRoom(roomId);
+//         setRooms(prev => prev.filter(r => r.id !== roomId));
+//         alert('Xóa phòng chiếu thành công!');
+//       } catch (error) {
+//         console.error('Error deleting room:', error);
+//         alert('Có lỗi xảy ra khi xóa phòng chiếu. Vui lòng thử lại!');
+//       }
+//       setLoading(false);
+//     }
+//   };
 
   // Helper functions
   const getStatusLabel = (status: string | undefined) => {
@@ -283,6 +285,9 @@ const RoomManagement: React.FC = () => {
   const endIndex = startIndex + itemsPerPage;
   const paginatedRooms = filteredRooms.slice(startIndex, endIndex);
 
+  useEffect(() => {
+    setCurrentPage(1); // Reset to first page on filter change
+  }, [searchTerm, selectedType, selectedStatus, capacityRange]);
   // Clear all filters
   const clearFilters = () => {
     setSearchTerm('');
@@ -321,21 +326,18 @@ const RoomManagement: React.FC = () => {
       render: (_, room) => (
         <div className="text-sm">
           <div className="font-medium text-gray-900">{room.totalSeats} ghế</div>
-          <div className="text-xs text-gray-500">
+          {/* <div className="text-xs text-gray-500">
             VIP: {room.vipSeats} | Thường: {room.regularSeats}
-          </div>
+          </div> */}
         </div>
       )
     },
     {
       key: 'features',
-      title: 'Tính năng',
+      title: 'Vị trí',
       render: (_, room) => (
         <div className="flex space-x-1">
-          {room.has4K && <span className="text-blue-600" title="4K">📺</span>}
-          {room.hasDolbyAtmos && <span className="text-purple-600" title="Dolby Atmos">🎵</span>}
-          {room.hasAirCondition && <span className="text-cyan-600" title="Điều hòa">❄️</span>}
-          {room.hasEmergencyExit && <span className="text-green-600" title="Lối thoát khẩn cấp">🚪</span>}
+          {room.theaterName}
         </div>
       )
     },
@@ -399,7 +401,7 @@ const RoomManagement: React.FC = () => {
               <Edit size={16} />
             </button>
           )}
-          {hasPermission("room.delete") && (
+          {/* {hasPermission("room.delete") && (
             <button
               onClick={() => room.id && handleDeleteRoom(room.id)}
               className="text-red-600 hover:text-red-900 transition-colors"
@@ -408,7 +410,7 @@ const RoomManagement: React.FC = () => {
             >
               <Trash2 size={16} />
             </button>
-          )}
+          )} */}
         </div>
       )
     }
@@ -615,9 +617,9 @@ const RoomManagement: React.FC = () => {
           /* Cards View */
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {paginatedRooms.map((room) => (
+              {paginatedRooms.length > 0 ? paginatedRooms.map((room) => (
                 <div key={room.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-                    <div className="h-7/8">
+                    <div className="">
                         {/* Card Header */}
                         <div className="p-4 border-b border-gray-100">
                             <div className="flex items-center justify-between mb-2">
@@ -639,7 +641,7 @@ const RoomManagement: React.FC = () => {
                                         <Edit size={14} />
                                     </button>
                                 )}
-                                { hasPermission("room.delete") && (
+                                {/* { hasPermission("room.delete") && (
                                     <button
                                         onClick={() => room.id && handleDeleteRoom(room.id)}
                                         className="p-2 text-gray-400 hover:text-red-600 transition-colors cursor-pointer rounded-lg hover:bg-red-100"
@@ -647,7 +649,7 @@ const RoomManagement: React.FC = () => {
                                     >
                                         <Trash2 size={14} />
                                     </button>
-                                )}
+                                )} */}
                             </div>
                             </div>
                             <div className="flex items-center justify-between">
@@ -666,46 +668,12 @@ const RoomManagement: React.FC = () => {
                             <div className="space-y-2">
                             <div className="flex items-center text-sm text-gray-600">
                                 <MapPin className="w-4 h-4 mr-2" />
-                                {room.location}
+                                {room.theaterName}
                             </div>
                             <div className="flex items-center text-sm text-gray-600">
                                 <Users className="w-4 h-4 mr-2" />
                                 {room.totalSeats} ghế ({room.vipSeats} VIP)
                             </div>
-                            </div>
-
-                            {/* Screen & Audio */}
-                            <div className="space-y-2">
-                            <div className="flex items-center text-sm text-gray-600">
-                                <Monitor className="w-4 h-4 mr-2" />
-                                {room.screenSize}
-                            </div>
-                            <div className="flex items-center text-sm text-gray-600">
-                                <Volume2 className="w-4 h-4 mr-2" />
-                                {room.audioSystem}
-                            </div>
-                            </div>
-
-                            {/* Features */}
-                            <div className="flex items-center space-x-3 text-sm">
-                            {room.has4K && (
-                                <div className="flex items-center text-blue-600">
-                                <Monitor className="w-3 h-3 mr-1" />
-                                <span>4K</span>
-                                </div>
-                            )}
-                            {room.hasDolbyAtmos && (
-                                <div className="flex items-center text-purple-600">
-                                <Volume2 className="w-3 h-3 mr-1" />
-                                <span>Atmos</span>
-                                </div>
-                            )}
-                            {room.hasAirCondition && (
-                                <div className="flex items-center text-cyan-600">
-                                <Thermometer className="w-3 h-3 mr-1" />
-                                <span>AC</span>
-                                </div>
-                            )}
                             </div>
 
                             {/* Utilization */}
@@ -724,8 +692,7 @@ const RoomManagement: React.FC = () => {
                                     style={{ width: `${room.utilization || 0}%` }}
                                 />
                                 </div>
-                            </div>
-                            )}
+                            </div>)}
                         </div>
                     </div>
                   {/* Card Footer */}
@@ -740,7 +707,9 @@ const RoomManagement: React.FC = () => {
                       Xem chi tiết
                     </button>
                 </div>
-              ))}
+              )) : (
+                <div className="text-sm text-gray-500 italic">Phòng không hoạt động, hiệu suất không áp dụng.</div>
+                )}
             </div>
           </>
         ) : (

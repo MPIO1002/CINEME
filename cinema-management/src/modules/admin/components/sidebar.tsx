@@ -9,20 +9,40 @@ import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import SettingsIcon from '@mui/icons-material/Settings';
 import TheatersIcon from '@mui/icons-material/Theaters';
-import { CalendarRange, Film, Star } from "lucide-react";
-import { useState } from "react";
+import { BriefcaseBusiness, CalendarRange, Crown, Film, PopcornIcon, Star, TicketCheckIcon } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-// import { hasPermission } from "../utils/authUtils"; // Không cần nữa - backend handle authorization
 
 const Sidebar = () => {
     const [isOpen, setIsOpen] = useState(true);
     const [expandedMenus, setExpandedMenus] = useState<string[]>(['content']);
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    // const [isMenuOpen, setIsMenuOpen] = useState(false);
     const { pathname } = useLocation();
 
-    const handleOpen = () => {
-        setIsMenuOpen(!isMenuOpen);
-    };
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        // khởi tạo trạng thái ban đầu
+        setIsOpen(window.innerWidth >= 1024);
+
+        // debounce đơn giản
+        let timeoutId: number | null = null;
+        const handleResize = () => {
+            if (timeoutId) {
+            clearTimeout(timeoutId);
+            }
+            timeoutId = window.setTimeout(() => {
+            setIsOpen(window.innerWidth >= 1024);
+            }, 150); // 150ms debounce
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+    }, []);
+
 
     const menuGroups = [
         {
@@ -38,9 +58,9 @@ const Sidebar = () => {
             icon: <Film className="w-5 h-5" />,
             type: 'group',
             children: [
-                { label: "Quản lý phim", path: "/admin/movies", icon: <DvrIcon />, permission: "movie.view" },
-                { label: "Quản lý diễn viên", path: "/admin/actors", icon: <Star className="w-5 h-5" />, permission: "actor.view" },
-                { label: "Quản lý suất chiếu", path: "/admin/showtimes", icon: <CalendarRange className="w-5 h-5" />, permission: "showtime.view" },
+                { label: "Phim", path: "/admin/movies", icon: <DvrIcon /> },
+                { label: "Diễn viên", path: "/admin/actors", icon: <Star className="w-5 h-5" /> },
+                { label: "Suất chiếu", path: "/admin/showtimes", icon: <CalendarRange className="w-5 h-5" /> },
             ]
         },
         {
@@ -49,27 +69,44 @@ const Sidebar = () => {
             icon: <TheatersIcon />,
             type: 'group',
             children: [
-                { label: "Quản lý rạp", path: "/admin/theaters", icon: <TheatersIcon />, permission: "theater.view" },
-                { label: "Quản lý phòng", path: "/admin/rooms", icon: <MeetingRoomIcon />, permission: "room.view" },
+                { label: "Rạp chiếu", path: "/admin/theaters", icon: <TheatersIcon /> },
+                { label: "Phòng chiếu", path: "/admin/rooms", icon: <MeetingRoomIcon /> },
             ]
         },
         {
             id: 'business',
             label: 'Vận hành kinh doanh',
-            icon: <LocalOfferIcon />,
+            icon: <BriefcaseBusiness />,
             type: 'group',
             children: [
-                { label: "Quản lý người dùng", path: "/admin/users", icon: <GroupsIcon />, permission: "user.view" },
-                { label: "Khuyến mãi", path: "/admin/promotions", icon: <LocalOfferIcon />, permission: "promotion.view" },
+                { label: "Combo & Sản phẩm", path: "/admin/combos", icon: <PopcornIcon /> },
+                { label: "Giá bán & Khuyến mãi", path: "/admin/prices", icon: <LocalOfferIcon /> },
+                { label: "Hạng thành viên", path: "/admin/ranks", icon: <Star /> },
             ]
         },
         {
-            id: 'system',
-            label: 'Hệ thống & Cấu hình',
+            id: 'users',
+            label: 'Quản lý người dùng',
+            icon: <GroupsIcon />,
+            type: 'group',
+            children: [
+                { label: "Người dùng", path: "/admin/users", icon: <GroupsIcon /> },
+                { label: "Nhân viên", path: "/admin/employees", icon: <Crown /> },
+            ]
+        },
+        {
+            id: 'movie-config',
+            label: 'Cấu hình phim',
             icon: <SettingsIcon />,
-            path: '/admin/system',
-            type: 'single',
-            permission: 'system.view'
+            path: '/admin/movie-config',
+            type: 'single'
+        },
+        {
+            id: 'bookings',
+            label: 'Đặt vé',
+            icon: <TicketCheckIcon />,
+            path: '/admin/bookings',
+            type: 'single'
         },
         {
             id: 'security',
@@ -80,14 +117,12 @@ const Sidebar = () => {
         }
     ];
 
-    // Hiển thị tất cả menu - Backend sẽ handle authorization khi call API
-    const filteredMenuGroups = menuGroups;
 
     const toggleMenu = (menuId: string) => {
         setExpandedMenus(prev => 
             prev.includes(menuId) 
                 ? prev.filter(id => id !== menuId)
-                : [...prev, menuId]
+                : [ ...prev, menuId]
         );
     };
 
@@ -109,7 +144,7 @@ const Sidebar = () => {
             </button>
             
             <nav className="flex flex-col gap-1 overflow-visible px-2 ">
-                {filteredMenuGroups.map(group => {
+                {menuGroups.map(group => {
                     if (group.type === 'single') {
                         return (
                             <div key={group.path} className="relative group">
@@ -165,8 +200,14 @@ const Sidebar = () => {
                             </button>
 
                             {/* Submenu khi sidebar mở rộng */}
-                            {isOpen && isExpanded && group.children && (
-                                <div className="ml-6 mt-1 space-y-1 overflow-hidden">
+                            {isOpen && group.children && (
+                                <div 
+                                    className={`ml-6 mt-1 space-y-1 overflow-hidden transition-all duration-500 ease-in-out ${
+                                        isExpanded 
+                                            ? "max-h-96 opacity-100 translate-y-0" 
+                                            : "max-h-0 opacity-0 -translate-y-2"
+                                    }`}
+                                >
                                     {group.children.map(child => (
                                         <Link
                                             key={child.path}

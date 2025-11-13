@@ -679,7 +679,7 @@ const UserModal: React.FC<UserModalProps> = ({
                 
                 <div className="space-y-3">
                   {/* Mock activity data */}
-                  <div className="bg-white rounded-lg p-3 border border-gray-200">
+                  {/* <div className="bg-white rounded-lg p-3 border border-gray-200">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                         <UserIcon className="w-4 h-4 text-blue-600" />
@@ -691,8 +691,6 @@ const UserModal: React.FC<UserModalProps> = ({
                     </div>
                   </div>
 
-                  {form.role === 'CUSTOMER' && (
-                    <>
                       <div className="bg-white rounded-lg p-3 border border-gray-200">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
@@ -703,7 +701,7 @@ const UserModal: React.FC<UserModalProps> = ({
                             <div className="text-xs text-gray-500">1 ngày trước</div>
                           </div>
                         </div>
-                      </div>
+                      </div> */}
 
                       <div className="bg-white rounded-lg p-3 border border-gray-200">
                         <div className="flex items-center gap-3">
@@ -716,8 +714,6 @@ const UserModal: React.FC<UserModalProps> = ({
                           </div>
                         </div>
                       </div>
-                    </>
-                  )}
 
                   <div className="bg-white rounded-lg p-3 border border-gray-200">
                     <div className="flex items-center gap-3">

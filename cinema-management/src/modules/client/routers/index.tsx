@@ -1,16 +1,20 @@
 import AdminMainLayout from "@/modules/admin/layouts/main";
 import ActorManagement from "@/modules/admin/pages/Actor/ActorManagement";
+import BookingManagement from "@/modules/admin/pages/Booking/BookingManagement";
+import ComboManagement from "@/modules/admin/pages/Combo/ComboManagement";
 import Dashboard from "@/modules/admin/pages/Dashboard";
+import EmployeeManagement from "@/modules/admin/pages/Employee/EmployeeManagement";
 import MovieManagement from "@/modules/admin/pages/Movie/MovieManagement";
+import MovieConfigManagement from "@/modules/admin/pages/MovieConfig/MovieConfigManagement";
+import PriceManagement from "@/modules/admin/pages/Price/PriceManagement";
+import RankManagement from "@/modules/admin/pages/Rank/RankManagement";
 import RoomManagement from "@/modules/admin/pages/Room/RoomManagement";
 import SecurityManagement from "@/modules/admin/pages/SecurityManagement";
 import ShowtimeManagement from "@/modules/admin/pages/ShowTime/ShowtimeManagement";
-import SystemManagement from "@/modules/admin/pages/System/SystemManagement";
-import TheaterManagement from "@/modules/admin/pages/theater/TheaterManagement";
+import TheaterManagement from "@/modules/admin/pages/Theater/TheaterManagement";
 import UserManagement from "@/modules/admin/pages/User/UserManagement";
 import { useState } from "react";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
-import AdminPrivateRoute from "../../../components/protect-route";
 import AdminLogin from "../../admin/pages/Login";
 import Layout from "../layout";
 import BookingPage from "../pages/booking";
@@ -40,20 +44,21 @@ const Routers = () => {
 
         {/* Admin routes */}
         <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin" element={
-          <AdminPrivateRoute>
-            <AdminMainLayout />
-          </AdminPrivateRoute>
-        }>
+        <Route path="/admin" element={<AdminMainLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="movies" element={<MovieManagement />} />
           <Route path="actors" element={<ActorManagement />} />
           <Route path="showtimes" element={<ShowtimeManagement />} />
           <Route path="theaters" element={<TheaterManagement />} />
           <Route path="rooms" element={<RoomManagement />} />
+          <Route path="combos" element={<ComboManagement />} />
+          <Route path="prices" element={<PriceManagement />} />
+          <Route path="ranks" element={<RankManagement />} />
           <Route path="users" element={<UserManagement />} />
-          <Route path="system" element={<SystemManagement />} />
+          <Route path="employees" element={<EmployeeManagement />} />
+          <Route path="movie-config" element={<MovieConfigManagement />} />
           <Route path="security" element={<SecurityManagement />} />
+          <Route path="bookings" element={<BookingManagement />} />
         </Route>
       </Routes>
     </BrowserRouter>

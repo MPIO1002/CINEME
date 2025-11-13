@@ -2,7 +2,7 @@ import { Calendar, CalendarClock, Clock, ClockPlus, Edit, Eye, Film, Filter, Lis
 import React, { useEffect, useState } from 'react';
 import { movieApiService, type Movie } from '../../../../services/movieApi';
 import { type Room } from '../../../../services/roomApi';
-import { createShowtime, deleteShowtime, getAllShowtimes, updateShowtime, validateShowtimeEdit, type Showtime } from '../../../../services/showtimeApi';
+import { showtimeApiService, type Showtime } from '../../../../services/showtimeApi';
 import { theaterApi, type Theater } from '../../../../services/theaterApi';
 import { Pagination } from "../../components/pagination";
 import ShowtimeCalendar from "./components/ShowtimeCalendar";
@@ -63,10 +63,10 @@ useEffect(() => {
 const fetchShowtimes = async () => {
     setLoading(true);
     try {
-        const response = await getAllShowtimes();
+        const response = await showtimeApiService.getAllShowtimes();
         if (response.statusCode === 200) {
-            setShowtimes(response.data);
-            console.table(response.data);
+            setShowtimes(response);
+            console.table(response);
         }
     } catch (error) {
         console.error('Error fetching showtimes:', error);
@@ -144,56 +144,34 @@ const handleSaveShowtime = async (showtime: Showtime) => {
                 return;
             }
             console.table(showtimeData);
-            const response = await createShowtime(showtimeData);
+            const response = await showtimeApiService.createShowtime(showtimeData);
             if (response.statusCode === 200 || response.statusCode === 201) {
                 alert('Thêm suất chiếu thành công!');
                 await fetchShowtimes(); // Refresh the list
             }
         } else if (modalMode === "edit" && showtime.id) {
             // Validate edit permissions first
-            try {
-                const validationResponse = await validateShowtimeEdit(showtime.id);
-                if (!validationResponse.data.canEdit) {
-                    const reasons = validationResponse.data.reasons.join('\n');
-                    alert(`Không thể chỉnh sửa suất chiếu này:\n${reasons}`);
-                    setLoading(false);
-                    return;
-                }
+            alert("Chuc nang dang phat trien!")
+            // // Update existing showtime
+            // const updateData = {
+            //     movieId: showtime.movieId,
+            //     theaterId: showtime.theaterId,
+            //     roomId: showtime.roomId,
+            //     date: showtime.date,
+            //     startTime: showtime.startTime?.substring(0, 5), // Convert to HH:mm format
+            //     endTime: showtime.endTime?.substring(0, 5), // Convert to HH:mm format
+            //     languageVn: showtime.languageVn,
+            //     languageEn: showtime.languageEn,
+            //     formatVn: showtime.formatVn,
+            //     formatEn: showtime.formatEn
+            // };
 
-                // Show warnings if any
-                if (validationResponse.data.warnings.length > 0) {
-                    const warnings = validationResponse.data.warnings.join('\n');
-                    const confirmed = window.confirm(`Cảnh báo:\n${warnings}\n\nBạn có muốn tiếp tục?`);
-                    if (!confirmed) {
-                        setLoading(false);
-                        return;
-                    }
-                }
-            } catch (validationError) {
-                console.error('Error validating edit permissions:', validationError);
-                // Continue with edit if validation endpoint is not available
-            }
-
-            // Update existing showtime
-            const updateData = {
-                movieId: showtime.movieId,
-                theaterId: showtime.theaterId,
-                roomId: showtime.roomId,
-                date: showtime.date,
-                startTime: showtime.startTime?.substring(0, 5), // Convert to HH:mm format
-                endTime: showtime.endTime?.substring(0, 5), // Convert to HH:mm format
-                languageVn: showtime.languageVn,
-                languageEn: showtime.languageEn,
-                formatVn: showtime.formatVn,
-                formatEn: showtime.formatEn
-            };
-
-            console.log('Updating showtime:', updateData);
-            const response = await updateShowtime(showtime.id, updateData);
-            if (response.statusCode === 200) {
-                alert('Cập nhật suất chiếu thành công!');
-                await fetchShowtimes(); // Refresh the list
-            }
+            // console.log('Updating showtime:', updateData);
+            // const response = await updateShowtime(showtime.id, updateData);
+            // if (response.statusCode === 200) {
+            //     alert('Cập nhật suất chiếu thành công!');
+            //     await fetchShowtimes(); // Refresh the list
+            // }
         }
         
         setModalOpen(false);
@@ -215,18 +193,19 @@ const handleSaveShowtime = async (showtime: Showtime) => {
 
 const handleDeleteShowtime = async (showtimeId: string) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa suất chiếu này?')) {
-        setLoading(true);
-        try {
-            const response = await deleteShowtime(showtimeId);
-            if (response.statusCode === 200) {
-                alert('Xóa suất chiếu thành công!');
-                await fetchShowtimes(); // Refresh the list
-            }
-        } catch (error) {
-            console.error('Error deleting showtime:', error);
-            alert('Có lỗi xảy ra khi xóa suất chiếu!');
-        }
-        setLoading(false);
+        // setLoading(true);
+        // try {
+        //     const response = await deleteShowtime(showtimeId);
+        //     if (response.statusCode === 200) {
+        //         alert('Xóa suất chiếu thành công!');
+        //         await fetchShowtimes(); // Refresh the list
+        //     }
+        // } catch (error) {
+        //     console.error('Error deleting showtime:', error);
+        //     alert('Có lỗi xảy ra khi xóa suất chiếu!');
+        // }
+        // setLoading(false);
+        alert("Chuc nang dang phat trien!")
     }
 };
 

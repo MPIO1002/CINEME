@@ -1,5 +1,3 @@
-import Alert from '@mui/material/Alert';
-import AlertTitle from '@mui/material/AlertTitle';
 import axios from 'axios';
 import { Edit, Eye, Filter, Popcorn, Search, TicketPlus, Trash2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
@@ -8,6 +6,8 @@ import { Pagination } from "../../components/pagination";
 import { Table, type Column } from "../../components/tableProps";
 import { hasPermission } from '../../utils/authUtils';
 import MovieModal from "./components/MovieModal";
+import { toast } from 'sonner';
+import ConfirmDeleteDialog from '../../components/confirmDeleteDialog';
 
 // Main Movie Management Component
 const MovieManagement: React.FC = () => {
@@ -18,19 +18,7 @@ const [movies, setMovies] = useState<Movie[]>([]);
 const [modalOpen, setModalOpen] = useState(false);
 const [modalMode, setModalMode] = useState<"add" | "edit" | "view">("add");
 const [selectedMovie, setSelectedMovie] = useState<Movie | undefined>(undefined);
-
-// Alert state
-const [alertState, setAlertState] = useState<{
-    show: boolean;
-    severity: 'error' | 'warning' | 'info' | 'success';
-    title: string;
-    message: string;
-}>({
-    show: false,
-    severity: 'info',
-    title: '',
-    message: ''
-});
+const [isOpenConfirmDelete, setIsOpenConfirmDelete] = useState(false);
 
 // Filter states
 const [selectedStatus, setSelectedStatus] = useState('');
@@ -68,20 +56,6 @@ const getMovieStatus = (releaseDate: string, endDate: string): { key: string; la
     }
 };
 
-// Helper function to show alert
-const showAlert = (severity: 'error' | 'warning' | 'info' | 'success', title: string, message: string) => {
-    setAlertState({
-        show: true,
-        severity,
-        title,
-        message
-    });
-    // Auto hide alert after 5 seconds
-    setTimeout(() => {
-        setAlertState(prev => ({ ...prev, show: false }));
-    }, 8000);
-};
-
 // Fetch movies from API
 useEffect(() => {
     fetchMovies();
@@ -94,20 +68,18 @@ useEffect(() => {
 }, [movies]);
 
 const fetchMovies = async () => {
-    if(!hasPermission('movie.view')) {
-        showAlert('error', 'Lỗi phân quyền', 'Bạn không có quyền xem danh sách phim.');
-        return;
-    }
+    // if(!hasPermission('movie.view')) {
+    //     showAlert('error', 'Lỗi phân quyền', 'Bạn không có quyền xem danh sách phim.');
+    //     return;
+    // }
     setLoading(true);
     try {
         const moviesData = await movieApiService.getAllMovies();
         setMovies(moviesData);
-        showAlert('success', 'Thành công', `Đã tải ${moviesData.length} phim thành công.`);
-        // Note: movies state won't be updated immediately here due to React's asynchronous state updates
     } catch (error) {
         console.error('Error fetching movies:', error);
         setMovies([]);
-        showAlert('error', 'Lỗi', 'Không thể tải danh sách phim. Vui lòng thử lại!');
+        toast.error('Không thể tải danh sách phim. Vui lòng thử lại!');
     }
     setLoading(false);
 };
@@ -129,56 +101,56 @@ const handleSaveMovie = async (movie: Movie) => {
         // }
         
         if (missingFields.length > 0) {
-        showAlert('error', 'Lỗi xác thực', `Thiếu các trường bắt buộc: ${missingFields.join(', ')}`);
-        return;
+            toast.error(`Thiếu các trường bắt buộc: ${missingFields.join(', ')}`);
+            return;
         }
 
         // Validate UUID format for foreign keys
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        const uuidFields = ['countryId', 'limitageId'];
+        // const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        // const uuidFields = ['countryId', 'limitageId'];
         
-        for (const field of uuidFields) {
-        const value = movie[field as keyof Movie] as string;
-        if (value && !uuidRegex.test(value)) {
-            showAlert('error', 'Lỗi xác thực', `${field} không đúng định dạng UUID`);
-            return;
-        }
-        }
+        // for (const field of uuidFields) {
+        // const value = movie[field as keyof Movie] as string;
+        // if (value && !uuidRegex.test(value)) {
+        //     toast.error(`${field} không đúng định dạng UUID`);
+        //     return;
+        // }
+        // }
 
         // Format dates for Java LocalDateTime (without timezone)
         const formatDateTimeForBackend = (dateString: string) => {
-        if (!dateString) return '';
-        
-        try {
-            const date = new Date(dateString);
+            if (!dateString) return '';
             
-            // Check if date is valid
-            if (isNaN(date.getTime())) {
-            console.error('Invalid date:', dateString);
-            return '';
+            try {
+                const date = new Date(dateString);
+                
+                // Check if date is valid
+                if (isNaN(date.getTime())) {
+                    console.error('Invalid date:', dateString);
+                    return '';
+                }
+                
+                // Format as YYYY-MM-DDTHH:mm:ss (without timezone)
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                const seconds = String(date.getSeconds()).padStart(2, '0');
+                
+                return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+            } catch (error) {
+                console.error('Error formatting date:', error);
+                return '';
             }
-            
-            // Format as YYYY-MM-DDTHH:mm:ss (without timezone)
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            const hours = String(date.getHours()).padStart(2, '0');
-            const minutes = String(date.getMinutes()).padStart(2, '0');
-            const seconds = String(date.getSeconds()).padStart(2, '0');
-            
-            return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-        } catch (error) {
-            console.error('Error formatting date:', error);
-            return '';
-        }
         };
 
         const formattedReleaseDate = formatDateTimeForBackend(movie.releaseDate);
         const formattedEndDate = formatDateTimeForBackend(movie.endDate);
         
         if (!formattedReleaseDate || !formattedEndDate) {
-        showAlert('error', 'Lỗi xác thực', 'Định dạng ngày không hợp lệ. Vui lòng kiểm tra lại ngày phát hành và ngày kết thúc.');
-        return;
+            toast.error('Định dạng ngày không hợp lệ. Vui lòng kiểm tra lại ngày phát hành và ngày kết thúc.');
+            return;
         }
 
         // Check file sizes before processing (only for new files)
@@ -186,33 +158,33 @@ const handleSaveMovie = async (movie: Movie) => {
         const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
         
         if (movie.image instanceof File) {
-        if (!movie.image.type.startsWith('image/')) {
-            showAlert('error', 'Lỗi tập tin', 'File ảnh không hợp lệ. Chỉ chấp nhận file ảnh.');
-            return;
-        }
-        if (movie.image.size > MAX_IMAGE_SIZE) {
-            showAlert('error', 'Lỗi tập tin', `File ảnh quá lớn (${(movie.image.size / 1024 / 1024).toFixed(2)}MB). Giới hạn tối đa là 10MB.`);
-            return;
-        }
+            if (!movie.image.type.startsWith('image/')) {
+                toast.error('File ảnh không hợp lệ. Chỉ chấp nhận file ảnh.');
+                return;
+            }
+            if (movie.image.size > MAX_IMAGE_SIZE) {
+                toast.error(`File ảnh quá lớn (${(movie.image.size / 1024 / 1024).toFixed(2)}MB). Giới hạn tối đa là 10MB.`);
+                return;
+            }
         } else if (modalMode === "add") {
-        // Chỉ bắt buộc file khi thêm mới
-        showAlert('error', 'Thiếu tập tin', 'Vui lòng chọn file ảnh để upload');
-        return;
+            // Chỉ bắt buộc file khi thêm mới
+            toast.error('Vui lòng chọn file ảnh để upload');
+            return;
         }
         
         if (movie.trailer instanceof File) {
-        if (!movie.trailer.type.startsWith('video/')) {
-            alert('File trailer không hợp lệ. Chỉ chấp nhận file video.');
-            return;
-        }
-        if (movie.trailer.size > MAX_VIDEO_SIZE) {
-            alert(`File trailer quá lớn (${(movie.trailer.size / 1024 / 1024).toFixed(2)}MB). Giới hạn tối đa là 100MB.`);
-            return;
-        }
+            if (!movie.trailer.type.startsWith('video/')) {
+                toast.error('File trailer không hợp lệ. Chỉ chấp nhận file video.');
+                return;
+            }
+            if (movie.trailer.size > MAX_VIDEO_SIZE) {
+                toast.error(`File trailer quá lớn (${(movie.trailer.size / 1024 / 1024).toFixed(2)}MB). Giới hạn tối đa là 100MB.`);
+                return;
+            }
         } else if (modalMode === "add") {
-        // Chỉ bắt buộc file khi thêm mới
-        alert('Vui lòng chọn file trailer để upload');
-        return;
+            // Chỉ bắt buộc file khi thêm mới
+            toast.error('Vui lòng chọn file trailer để upload');
+            return;
         }
 
         // Use FormData exactly matching SwaggerUI structure
@@ -230,7 +202,7 @@ const handleSaveMovie = async (movie: Movie) => {
         // image and trailer will be added below as files
         formData.append('time', Math.max(1, movie.time || 90).toString());
         formData.append('limitageId', movie.limitageId || '');
-        formData.append('ratings', movie.ratings?.trim() || '0'); // Default to 0 if not provided
+        // formData.append('ratings', movie.ratings?.trim() || '0'); // Default to 0 if not provided
         // Note: status is now calculated automatically based on releaseDate and endDate
         
         // Backend expects listActorId (array of UUIDs), not listActor (array of Actor objects)
@@ -253,63 +225,63 @@ const handleSaveMovie = async (movie: Movie) => {
         }
         // Handle image field - smart upload logic
         if (modalMode === "add") {
-        // Khi thêm mới: bắt buộc phải có file
-        if (movie.image instanceof File) {
-            console.log('Adding new image file to FormData:', movie.image.name);
-            formData.append('image', movie.image);
-        } else {
-            console.error('Image must be a File object when adding new movie');
-            alert('Vui lòng chọn file ảnh để upload');
-            return;
-        }
+            // Khi thêm mới: bắt buộc phải có file
+            if (movie.image instanceof File) {
+                console.log('Adding new image file to FormData:', movie.image.name);
+                formData.append('image', movie.image);
+            } else {
+                console.error('Image must be a File object when adding new movie');
+                toast.error('Vui lòng chọn file ảnh để upload');
+                return;
+            }
         } else if (modalMode === "edit") {
-        // Khi sửa: chỉ upload nếu user chọn file mới
-        if (movie.image instanceof File) {
-            console.log('Adding new image file to FormData for update:', movie.image.name);
-            formData.append('image', movie.image);
-        } else {
-            console.log('Keeping existing image (no new file selected)');
-            // Không append image vào FormData - backend sẽ giữ nguyên file cũ
-        }
+            // Khi sửa: chỉ upload nếu user chọn file mới
+            if (movie.image instanceof File) {
+                console.log('Adding new image file to FormData for update:', movie.image.name);
+                formData.append('image', movie.image);
+            } else {
+                console.log('Keeping existing image (no new file selected)');
+                // Không append image vào FormData - backend sẽ giữ nguyên file cũ
+            }
         }
 
         // Handle trailer field - smart upload logic
         if (modalMode === "add") {
-        // Khi thêm mới: bắt buộc phải có file
-        if (movie.trailer instanceof File) {
-            console.log('Adding new trailer file to FormData:', movie.trailer.name);
-            formData.append('trailer', movie.trailer);
-        } else {
-            console.error('Trailer must be a File object when adding new movie');
-            alert('Vui lòng chọn file trailer để upload');
-            return;
-        }
+            // Khi thêm mới: bắt buộc phải có file
+            if (movie.trailer instanceof File) {
+                console.log('Adding new trailer file to FormData:', movie.trailer.name);
+                formData.append('trailer', movie.trailer);
+            } else {
+                console.error('Trailer must be a File object when adding new movie');
+                alert('Vui lòng chọn file trailer để upload');
+                return;
+            }
         } else if (modalMode === "edit") {
-        // Khi sửa: chỉ upload nếu user chọn file mới
-        if (movie.trailer instanceof File) {
-            console.log('Adding new trailer file to FormData for update:', movie.trailer.name);
-            formData.append('trailer', movie.trailer);
-        } else {
-            console.log('Keeping existing trailer (no new file selected)');
-            // Không append trailer vào FormData - backend sẽ giữ nguyên file cũ
-        }
+            // Khi sửa: chỉ upload nếu user chọn file mới
+            if (movie.trailer instanceof File) {
+                console.log('Adding new trailer file to FormData for update:', movie.trailer.name);
+                formData.append('trailer', movie.trailer);
+            } else {
+                console.log('Keeping existing trailer (no new file selected)');
+                // Không append trailer vào FormData - backend sẽ giữ nguyên file cũ
+            }
         }
 
         let response;
         if (modalMode === "add") {
-        console.log('Making POST request to add movie');
-        response = await movieApiService.createMovie(formData);
+            console.log('Making POST request to add movie');
+            response = await movieApiService.createMovie(formData);
         } else if (modalMode === "edit" && selectedMovie?.id) {
-        console.log(`Making PUT request to edit movie, ID: ${selectedMovie.id}`);
-        response = await movieApiService.updateMovie(selectedMovie.id, formData);
+            console.log(`Making PUT request to edit movie, ID: ${selectedMovie.id}`);
+            response = await movieApiService.updateMovie(selectedMovie.id, formData);
         } else {
-        throw new Error('Invalid operation mode or missing movie ID for edit');
+            throw new Error('Invalid operation mode or missing movie ID for edit');
         }
 
         console.log('API Response:', response);
         
         // Success feedback
-        alert(modalMode === "add" ? "Thêm phim thành công!" : "Cập nhật phim thành công!");
+        toast.success(modalMode === "add" ? "Thêm phim thành công!" : "Cập nhật phim thành công!");
         
         // Refresh data and close modal
         await fetchMovies();
@@ -317,7 +289,7 @@ const handleSaveMovie = async (movie: Movie) => {
         
     } catch (error) {
         console.error("Error saving movie:", error);
-        alert("Có lỗi không xác định xảy ra. Vui lòng kiểm tra console và thử lại.");
+        toast.error("Có lỗi không xác định xảy ra. Vui lòng kiểm tra console và thử lại.");
     } finally {
         setLoading(false);
     }
@@ -342,19 +314,14 @@ const formatDuration = (minutes: number) => {
     return `${hours}h ${mins}m`;
 };
 
+const openConfirmDialog = (movie: Movie) => {
+    setSelectedMovie(movie);
+    setIsOpenConfirmDelete(true);
+}
 const handleDelete = async (movie: Movie) => {
     if (!movie.id) {
         console.error('Cannot delete movie: movie.id is undefined');
-        alert('Không thể xóa phim: ID không hợp lệ');
-        return;
-    }
-
-    // Confirm deletion
-    const confirmDelete = window.confirm(
-        `Bạn có chắc chắn muốn xóa phim "${movie.nameVn}"?\nHành động này không thể hoàn tác.`
-    );
-    
-    if (!confirmDelete) {
+        toast.success('Không thể xóa phim: ID không hợp lệ');
         return;
     }
 
@@ -363,7 +330,7 @@ const handleDelete = async (movie: Movie) => {
         await movieApiService.deleteMovie(movie.id);
         
         // Success
-        alert(`Đã xóa phim "${movie.nameVn}" thành công!`);
+        toast.success(`Đã xóa phim "${movie.nameVn}" thành công!`);
         
         // Refresh movie list
         fetchMovies();
@@ -378,24 +345,25 @@ const handleDelete = async (movie: Movie) => {
             
             switch (status) {
                 case 404:
-                    alert(`Phim "${movie.nameVn}" không tồn tại hoặc đã được xóa trước đó.\nDanh sách sẽ được làm mới.`);
+                    toast.error(`Phim "${movie.nameVn}" không tồn tại hoặc đã được xóa trước đó.\nDanh sách sẽ được làm mới.`);
                     // Refresh list to remove the non-existent movie from UI
                     await fetchMovies();
                     break;
                 case 403:
-                    alert('Bạn không có quyền xóa phim này.');
+                    toast.error('Bạn không có quyền xóa phim này.');
                     break;
                 case 409:
-                    alert('Không thể xóa phim này vì đang có dữ liệu liên quan (vé đã bán, lịch chiếu, v.v...)');
+                    toast.error('Không thể xóa phim này vì đang có dữ liệu liên quan (vé đã bán, lịch chiếu, v.v...)');
                     break;
                 default:
-                    alert(`Có lỗi xảy ra khi xóa phim: ${message || error.message || 'Lỗi không xác định'}`);
+                    toast.error(`Có lỗi xảy ra khi xóa phim: ${message || error.message || 'Lỗi không xác định'}`);
             }
         } else {
             alert(`Có lỗi xảy ra khi xóa phim: ${error instanceof Error ? error.message : 'Lỗi không xác định'}`);
         }
     } finally {
         setLoading(false);
+        setIsOpenConfirmDelete(false);
     }
 };
 
@@ -575,7 +543,7 @@ const columns: Column<Movie>[] = [
               <button 
                 className="text-red-600 hover:text-red-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-red-100" 
                 title="Xóa"
-                onClick={() => handleDelete(movie)}
+                onClick={() => openConfirmDialog(movie)}
               >
                 <Trash2 size={16} />
               </button>
@@ -586,20 +554,6 @@ const columns: Column<Movie>[] = [
 ];
 return (
     <div className=" bg-gray-50 max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Alert Notification */}
-        {alertState.show && (
-            <div className="absolute bottom-5 right-10 z-100">
-                <Alert 
-                    severity={alertState.severity}
-                    onClose={() => setAlertState(prev => ({ ...prev, show: false }))}
-                    sx={{ width: '400px' }}
-                >
-                    <AlertTitle>{alertState.title}</AlertTitle>
-                    {alertState.message}
-                </Alert>
-            </div>
-        )}
-
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -647,7 +601,7 @@ return (
             </div>
 
             {/* Second Row - Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 border-t-2 border-gray-200 pt-4">
                 {/* Status Filter */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Trạng thái</label>
@@ -782,6 +736,17 @@ return (
             onSubmit={(movie) => {
                 handleSaveMovie(movie);
             }}
+            isLoading={loading}
+        />
+
+        {/* Confirm Delete Dialog */}
+        <ConfirmDeleteDialog
+            isOpen={isOpenConfirmDelete}
+            itemName={selectedMovie?.nameVn || ''}
+            title="Xác nhận xóa phim"
+            message={`Bạn có chắc chắn muốn xóa phim`}
+            onConfirm={() => handleDelete(selectedMovie!)}
+            onCancel={() => setIsOpenConfirmDelete(false)}
         />
         </div>
 );

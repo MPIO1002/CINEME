@@ -1,7 +1,26 @@
-import { getUserData, logout } from "../utils/authUtils";
+// import { getUserData, logout } from "../utils/authUtils";
+
+import authApiService from "@/services/authApi";
 
 const Navbar = () => {
-  const userData = getUserData();
+//   const userData = getUserData();
+    const handleLogout = async () => {
+        try {
+            const adminToken = localStorage.getItem("accessToken");
+
+            if(adminToken) {
+                await authApiService.logout();
+
+                localStorage.removeItem("accessToken");
+                localStorage.removeItem("refreshToken");
+                localStorage.removeItem("fullName");
+
+                window.location.href = "/admin/login";
+            }
+        } catch (error) {
+            console.error('Error during logout:', error);
+        }
+    }
 
   return (
     <header className="bg-white shadow px-6 py-4 flex justify-between items-center border-1 border-gray-300 sticky top-0 z-10">
@@ -9,37 +28,10 @@ const Navbar = () => {
       <div className="flex items-center gap-4">
         <div className="text-sm">
           <p>Xin chào, {localStorage.getItem("fullName") || "Khách"}</p>
-          {userData?.permissions && userData.permissions.length > 0 && (
-            <p className="text-gray-500 text-xs">
-              Quyền: {userData.permissions.join(', ')}
-            </p>
-          )}
         </div>
         <button
           className="text-indigo-700 hover:underline"
-          onClick={async () => {
-            try {
-              const adminToken = localStorage.getItem("admin_token");
-              
-              // Call logout API if admin is authenticated
-              if (adminToken) {
-                const tokenData = JSON.parse(adminToken);
-                await fetch('http://localhost:8080/api/v1/auth/logout', {
-                  method: 'GET',
-                  headers: {
-                    'Authorization': `Bearer ${tokenData.accessToken || tokenData.token}`,
-                  },
-                });
-              }
-            } catch (error) {
-              console.error('Admin logout API error:', error);
-              // Continue with logout even if API fails
-            } finally {
-              // Always clear local storage and redirect
-              localStorage.removeItem("admin_token");
-              window.location.href = "/admin/login";
-            }
-          }}
+          onClick={handleLogout}
         >
           Đăng xuất
         </button>

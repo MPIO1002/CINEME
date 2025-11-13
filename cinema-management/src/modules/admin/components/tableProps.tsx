@@ -1,5 +1,6 @@
 import { Loader2 } from 'lucide-react';
 import React from 'react';
+import Loading from './loading';
 
 export interface Column<T> {
   key: keyof T | string;
@@ -31,35 +32,26 @@ export const Table = <T extends Record<string, any>>({
 
   if (loading) {
     return (
-        <div className="animate-pulse">
-            <div className="flex items-center justify-center py-16">
-            <div className="flex flex-col items-center">
-                <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
-                <div className="text-gray-500 text-lg font-medium">Đang tải dữ liệu...</div>
-                <div className="text-gray-400 text-sm mt-2">Vui lòng chờ trong giây lát</div>
-            </div>
-            </div>
-        </div>
+        <Loading />
     );
   }
 
   return (
-    <div className={`bg-white rounded-lg shadow-sm overflow-hidden ${className}`}>
-      <div className="overflow-x-auto">
-        <table className="w-full">
+      <div className={`bg-white rounded-2xl border-2 border-slate-200 overflow-x-auto ${className}`}>
+        <table className="w-full table-auto min-w-max">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               {columns.map((column) => (
                 <th
                   key={column.key as string}
-                  className="p-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="text-left px-6 py-3 font-medium text-slate-700 "
                 >
                   {column.title}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white ">
             {data.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="px-6 py-12 text-center text-gray-500">
@@ -68,9 +60,9 @@ export const Table = <T extends Record<string, any>>({
               </tr>
             ) : (
               data.map((record, index) => (
-                <tr key={record.id || index} className="hover:bg-gray-50 transition-colors">
+                <tr key={record.id || index} className="transition-colors border-b border-slate-100 hover:bg-slate-50">
                   {columns.map((column) => (
-                    <td key={column.key as string} className="p-2">
+                    <td key={column.key as string} className=" px-6 py-3">
                       {column.render 
                         ? column.render(getValue(record, column.key as string), record)
                         : getValue(record, column.key as string)
@@ -83,6 +75,5 @@ export const Table = <T extends Record<string, any>>({
           </tbody>
         </table>
       </div>
-    </div>
   );
 };

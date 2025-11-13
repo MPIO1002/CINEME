@@ -5,6 +5,8 @@ import ActorModal from './components/ActorModal';
 import { Pagination } from "../../components/pagination";
 import { Table, type Column } from "../../components/tableProps";
 import { hasPermission } from "../../utils/authUtils";
+import ConfirmDeleteDialog from "../../components/confirmDeleteDialog";
+import { toast } from "sonner";
 
 const ActorManagement: React.FC = () => {
   const [actors, setActors] = useState<Actor[]>([]);
@@ -18,7 +20,8 @@ const ActorManagement: React.FC = () => {
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"add" | "edit" | "view">("add");
-  const [selectedActor, setSelectedActor] = useState<string | undefined>();
+  const [selectedActor, setSelectedActor] = useState<Actor | string>();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const itemsPerPage = 5;
 
@@ -60,51 +63,37 @@ const ActorManagement: React.FC = () => {
     setModalOpen(true);
   };
 
+  const openConfirmDialog = (actor: Actor) => {
+    setSelectedActor(actor);
+    setIsDialogOpen(true);
+  }
+
   const handleDeleteActor = async (actorId: string) => {
     const actor = actors.find(a => a.id === actorId);
     if (!actor) return;
 
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa diễn viên "${actor.name}"?`)) {
-      return;
-    }
+    // if (!window.confirm(`Bạn có chắc chắn muốn xóa diễn viên "${actor.name}"?`)) {
+    //   return;
+    // }
 
     try {
       setLoading(true);
       await actorApiService.deleteActor(actorId);
-      alert(`Đã xóa diễn viên "${actor.name}" thành công!`);
+      toast.success(`Đã xóa diễn viên "${actor.name}" thành công!`);
       await fetchActors();
+      setSearchTerm("");
     } catch (error) {
       console.error('Error deleting actor:', error);
-      alert("Có lỗi xảy ra khi xóa diễn viên!");
+      toast.error("Có lỗi xảy ra khi xóa diễn viên!");
     } finally {
       setLoading(false);
+      setIsDialogOpen(false);
     }
   };
 
-  const handleModalSubmit = async (actor: Actor) => {
-    try {
-      let response;
-      setLoading(true);
-      
-      console.log('Submitting actor:', actor);
-      console.log('Img type:', typeof actor.img, actor.img instanceof File ? 'File' : 'String');
-
-      if (modalMode === "add") {
-        response = await actorApiService.createActor(actor);
-        alert("Thêm diễn viên thành công!");
-      } else if (modalMode === "edit" && selectedActor) {
-        response = await actorApiService.updateActor(selectedActor, actor);
-        alert("Cập nhật diễn viên thành công!");
-      }
-      console.log('Actor saved:', response);
-      setModalOpen(false);
-      await fetchActors();
-    } catch (error) {
-      console.error('Error saving actor:', error);
-      alert("Có lỗi xảy ra khi lưu diễn viên!");
-    } finally {
-      setLoading(false);
-    }
+  const handleModalSubmit = async () => {
+    await fetchActors();
+    setModalOpen(false);
   };
 
   const handleModalClose = () => {
@@ -137,6 +126,11 @@ const ActorManagement: React.FC = () => {
   const endIndex = startIndex + itemsPerPage;
   const paginatedActors = filteredActors.slice(startIndex, endIndex);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+
   // Table columns configuration
   const columns: Column<Actor>[] = [
     {
@@ -146,13 +140,13 @@ const ActorManagement: React.FC = () => {
         <div className="flex items-center">
           <div className="w-16 h-24 bg-gray-200 rounded-lg mr-4 flex-shrink-0 overflow-hidden">
             <img 
-              src={actor.img instanceof File ? URL.createObjectURL(actor.img) : `http://127.0.0.1:9000/${actor.img}`}
+              src={actor.img instanceof File ? URL.createObjectURL(actor.img) : actor.img}
               alt={actor.name}
               className="w-full h-full object-cover rounded-lg"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
-                target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjRjNGNEY2Ii8+CjxjaXJjbGUgY3g9IjMyIiBjeT0iMjQiIHI9IjgiIGZpbGw9IiM5Q0EzQUYiLz4KUHBhdGggZD0iTTMyIDM2Qzk3IDM2IDE2IDQ2IDE2IDU2VjY0SDQ4VjU2QzQ4IDQ2IDQxIDM2IDMyIDM2WiIgZmlsbD0iIzlDQTNBRiIvPgo8L3N2Zz4=';
-              }}
+                target.src = `http://127.0.0.1:9000/${actor.img}`;
+            }}
             />
           </div>
           
@@ -213,7 +207,7 @@ const ActorManagement: React.FC = () => {
             <button 
               className="text-red-600 hover:text-red-900 transition-colors p-2 rounded-lg cursor-pointer hover:bg-red-100" 
               title="Xóa"
-              onClick={() => handleDeleteActor(actor.id || '')}
+              onClick={() => openConfirmDialog(actor)}
             >
               <Trash2 size={16} />
             </button>
@@ -240,7 +234,7 @@ const ActorManagement: React.FC = () => {
           {hasPermission("actor.create") && (
             <button
               onClick={handleAddActor}
-              className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-xl font-semibold hover:from-green-700 hover:to-green-800 transition-all duration-200 flex items-center gap-2 shadow-lg"
+              className="text-blue-600 hover:text-blue-900 transition-colors flex items-center justify-center gap-2 px-4 py-2 border border-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer"
             >
               <UserPlus className="w-5 h-5" />
               Thêm diễn viên
@@ -292,9 +286,18 @@ const ActorManagement: React.FC = () => {
       <ActorModal
         open={modalOpen}
         mode={modalMode}
-        actor={selectedActor}
+        actor={selectedActor as string}
         onClose={handleModalClose}
         onSubmit={handleModalSubmit}
+      />
+
+      <ConfirmDeleteDialog
+        isOpen={isDialogOpen}
+        onCancel={() => setIsDialogOpen(false)}
+        onConfirm={() => handleDeleteActor((selectedActor as Actor).id || '')}
+        title="Xác nhận xóa diễn viên"
+        message="Bạn có chắc chắn muốn xóa diễn viên"
+        itemName={(selectedActor as Actor)?.name || ''}
       />
     </div>
   );
