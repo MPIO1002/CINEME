@@ -427,22 +427,13 @@ const EmployeeManagement: React.FC = () => {
                     <Eye className="w-4 h-4" />
                     Xem
                   </button>
-                  <button
+                  {/* <button
                     onClick={() => handleEditEmployee(employee)}
                     className="flex-1 px-3 py-2 text-green-600 border border-green-600 rounded-lg hover:bg-green-50 transition-colors flex items-center justify-center gap-1"
                   >
                     <Edit3 className="w-4 h-4" />
-                    Sửa trang thai
-                  </button>
-                  <div className="relative">
-                    <button
-                      className="p-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                      onClick={() => {/* Toggle dropdown */}}
-                    >
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
-                    {/* Dropdown menu can be added here */}
-                  </div>
+                    Sửa
+                  </button> */}
                 </div>
               </div>
             ))

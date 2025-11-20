@@ -1,3 +1,4 @@
+import ConfirmDeleteDialog from "@/modules/admin/components/confirmDeleteDialog";
 import Loading from "@/modules/admin/components/loading";
 import { Pagination } from "@/modules/admin/components/pagination";
 import { mockPromotions, priceApiService, type PricingRule, type Promotion } from "@/services/priceApi";
@@ -17,6 +18,7 @@ const PriceManagement: React.FC = () => {
     const [dialogType, setDialogType] = useState<'pricing-rule' | 'promotion'>('pricing-rule');
     const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
     const [isOpenConfirmDelete, setIsOpenConfirmDelete] = useState(false);
+    const [deleteItem, setDeleteItem] = useState<{ type: 'pricing-rule' | 'promotion', id: string, name: string } | null>(null);
     const [formData, setFormData] = useState({
         id: '',
         dayOfWeek: 2,
@@ -29,6 +31,17 @@ const PriceManagement: React.FC = () => {
         description_vn: '',
         description_en: '',
         is_active: true
+    });
+    const [errors, setErrors] = useState({
+        dayOfWeek: '',
+        seatTypeId: '',
+        price: '',
+        code: '',
+        discount_percent: '',
+        start_date: '',
+        end_date: '',
+        description_vn: '',
+        description_en: '',
     });
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -47,6 +60,103 @@ const PriceManagement: React.FC = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const validateForm = () => {
+        const newErrors = {
+            dayOfWeek: '',
+            seatTypeId: '',
+            price: '',
+            code: '',
+            discount_percent: '',
+            start_date: '',
+            end_date: '',
+            description_vn: '',
+            description_en: '',
+        };
+        let isValid = true;
+
+        if (dialogType === 'pricing-rule') {
+            // Validate dayOfWeek
+            if (!formData.dayOfWeek || formData.dayOfWeek < 2 || formData.dayOfWeek > 8) {
+                newErrors.dayOfWeek = 'Vui lòng chọn ngày trong tuần hợp lệ';
+                isValid = false;
+            }
+
+            // Validate seatTypeId
+            if (!formData.seatTypeId.trim()) {
+                newErrors.seatTypeId = 'Vui lòng chọn loại ghế';
+                isValid = false;
+            }
+
+            // Validate price
+            if (formData.price <= 0) {
+                newErrors.price = 'Giá phải lớn hơn 0';
+                isValid = false;
+            } else if (formData.price > 10000000) {
+                newErrors.price = 'Giá không được vượt quá 10,000,000 VNĐ';
+                isValid = false;
+            }
+        } else if (dialogType === 'promotion') {
+            // Validate code
+            if (!formData.code.trim()) {
+                newErrors.code = 'Mã code là bắt buộc';
+                isValid = false;
+            } else if (formData.code.trim().length < 3) {
+                newErrors.code = 'Mã code phải có ít nhất 3 ký tự';
+                isValid = false;
+            } else if (formData.code.trim().length > 50) {
+                newErrors.code = 'Mã code không được quá 50 ký tự';
+                isValid = false;
+            }
+
+            // Validate discount_percent
+            if (formData.discount_percent < 0 || formData.discount_percent > 100) {
+                newErrors.discount_percent = 'Phần trăm giảm giá phải từ 0 đến 100';
+                isValid = false;
+            }
+
+            // Validate start_date
+            if (!formData.start_date) {
+                newErrors.start_date = 'Ngày bắt đầu là bắt buộc';
+                isValid = false;
+            }
+
+            // Validate end_date
+            if (!formData.end_date) {
+                newErrors.end_date = 'Ngày kết thúc là bắt buộc';
+                isValid = false;
+            } else if (formData.start_date && formData.end_date < formData.start_date) {
+                newErrors.end_date = 'Ngày kết thúc phải sau ngày bắt đầu';
+                isValid = false;
+            }
+
+            // Validate descriptions
+            if (!formData.description_vn.trim()) {
+                newErrors.description_vn = 'Mô tả tiếng Việt là bắt buộc';
+                isValid = false;
+            } else if (formData.description_vn.trim().length < 10) {
+                newErrors.description_vn = 'Mô tả tiếng Việt phải có ít nhất 10 ký tự';
+                isValid = false;
+            } else if (formData.description_vn.trim().length > 500) {
+                newErrors.description_vn = 'Mô tả tiếng Việt không được quá 500 ký tự';
+                isValid = false;
+            }
+
+            if (!formData.description_en.trim()) {
+                newErrors.description_en = 'Mô tả tiếng Anh là bắt buộc';
+                isValid = false;
+            } else if (formData.description_en.trim().length < 10) {
+                newErrors.description_en = 'Mô tả tiếng Anh phải có ít nhất 10 ký tự';
+                isValid = false;
+            } else if (formData.description_en.trim().length > 500) {
+                newErrors.description_en = 'Mô tả tiếng Anh không được quá 500 ký tự';
+                isValid = false;
+            }
+        }
+
+        setErrors(newErrors);
+        return isValid;
     };
 
     const openDialog = (type: 'pricing-rule' | 'promotion', mode: 'add' | 'edit' = 'add', item?: PricingRule | Promotion) => {
@@ -99,11 +209,28 @@ const PriceManagement: React.FC = () => {
                 is_active: true
             });
         }
+        setErrors({
+            dayOfWeek: '',
+            seatTypeId: '',
+            price: '',
+            code: '',
+            discount_percent: '',
+            start_date: '',
+            end_date: '',
+            description_vn: '',
+            description_en: '',
+        });
         setIsDialogOpen(true);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        if (!validateForm()) {
+            toast.error('Vui lòng kiểm tra lại thông tin nhập vào');
+            return;
+        }
+        
         setLoading(true);
         try {
             if (dialogType === 'pricing-rule') {
@@ -166,18 +293,28 @@ const PriceManagement: React.FC = () => {
     //     setFormData({});
     //     setIsOpenConfirmDelete(true);
     // }
-    const handleDelete = async (type: 'pricing-rule' | 'promotion', id: string) => {
-        if (!confirm(`Bạn có chắc chắn muốn xóa ${type === 'pricing-rule' ? 'quy tắc giá' : 'khuyến mãi'} này?`)) return;
+    const handleDelete = (type: 'pricing-rule' | 'promotion', id: string, name: string) => {
+        setDeleteItem({ type, id, name });
+        setIsOpenConfirmDelete(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteItem) return;
 
         try {
-            if (type === 'pricing-rule') {
-                await priceApiService.deletePricingRule(id);
-                setPricingRules(prev => prev.filter(p => p.id !== id));
+            if (deleteItem.type === 'pricing-rule') {
+                await priceApiService.deletePricingRule(deleteItem.id);
+                setPricingRules(prev => prev.filter(p => p.id !== deleteItem.id));
             } else {
-                setPromotions(prev => prev.filter(p => p.id !== id));
+                setPromotions(prev => prev.filter(p => p.id !== deleteItem.id));
             }
+            toast.success(`Xóa ${deleteItem.type === 'pricing-rule' ? 'quy tắc giá' : 'khuyến mãi'} thành công`);
         } catch (error) {
             console.error("Error deleting:", error);
+            toast.error(`Xóa ${deleteItem.type === 'pricing-rule' ? 'quy tắc giá' : 'khuyến mãi'} thất bại`);
+        } finally {
+            setIsOpenConfirmDelete(false);
+            setDeleteItem(null);
         }
     };
 
@@ -286,35 +423,38 @@ const PriceManagement: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {paginatedData.map((rule) => (
-                                        <tr key={rule.id} className="border-b border-slate-100 hover:bg-slate-50">
-                                            <td className="py-3 px-4">
-                                                <div className="font-medium text-slate-800">{rule.dayOfWeekName}</div>
-                                            </td>
-                                            <td className="py-3 px-4">
-                                                <div className="font-medium text-slate-800">{rule.seatType.name}</div>
-                                            </td>
-                                            <td className="py-3 px-4 text-slate-600">
-                                                {rule.price.toLocaleString('vi-VN')}đ
-                                            </td>
-                                            <td className="py-3 px-4">
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => openDialog('pricing-rule', 'edit', rule)}
-                                                        className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                                                    >
-                                                        <Edit className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete('pricing-rule', rule.id!)}
-                                                        className="p-1 text-red-600 hover:bg-red-100 rounded"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {paginatedData.map((rule) => {
+                                        const pricingRule = rule as PricingRule;
+                                        return (
+                                            <tr key={pricingRule.id} className="border-b border-slate-100 hover:bg-slate-50">
+                                                <td className="py-3 px-4">
+                                                    <div className="font-medium text-slate-800">{getDayOfWeekName(pricingRule.dayOfWeek)}</div>
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <div className="font-medium text-slate-800">{pricingRule.seatType.name}</div>
+                                                </td>
+                                                <td className="py-3 px-4 text-slate-600">
+                                                    {pricingRule.price.toLocaleString('vi-VN')}đ
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => openDialog('pricing-rule', 'edit', pricingRule)}
+                                                            className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                                                        >
+                                                            <Edit className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete('pricing-rule', pricingRule.id!, `${getDayOfWeekName(pricingRule.dayOfWeek)} - ${pricingRule.seatType.name}`)}
+                                                            className="p-1 text-red-600 hover:bg-red-100 rounded"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -357,43 +497,45 @@ const PriceManagement: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {paginatedData && paginatedData.length > 0 ? (paginatedData.map((promo) => (
-                                        <tr key={promo.id} className="border-b border-slate-100 hover:bg-slate-50">
-                                            <td className="py-3 px-4">
-                                                <div className="font-medium text-slate-800">{promo.code}</div>
-                                            </td>
-                                            <td className="py-3 px-4 text-slate-600">
-                                                {promo.discount_percent}%
-                                            </td>
-                                            <td className="py-3 px-4 text-slate-600">
-                                                {new Date(promo.start_date).toLocaleDateString('vi-VN')} - {new Date(promo.end_date).toLocaleDateString('vi-VN')}
-                                            </td>
-                                            <td className="py-3 px-4">
-                                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                                    promo.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                                }`}>
-                                                    {promo.is_active ? 'Hoạt động' : 'Không hoạt động'}
-                                                </span>
-                                            </td>
-                                            <td className="py-3 px-4">
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => openDialog('promotion', 'edit', promo)}
-                                                        className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                                                    >
-                                                        <Edit className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete('promotion', promo.id)}
-                                                        className="p-1 text-red-600 hover:bg-red-100 rounded"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                    ) : (
+                                    {paginatedData && paginatedData.length > 0 ? (paginatedData.map((promo) => {
+                                        const promotion = promo as Promotion;
+                                        return (
+                                            <tr key={promotion.id} className="border-b border-slate-100 hover:bg-slate-50">
+                                                <td className="py-3 px-4">
+                                                    <div className="font-medium text-slate-800">{promotion.code}</div>
+                                                </td>
+                                                <td className="py-3 px-4 text-slate-600">
+                                                    {promotion.discount_percent}%
+                                                </td>
+                                                <td className="py-3 px-4 text-slate-600">
+                                                    {new Date(promotion.start_date).toLocaleDateString('vi-VN')} - {new Date(promotion.end_date).toLocaleDateString('vi-VN')}
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                                        promotion.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                    }`}>
+                                                        {promotion.is_active ? 'Hoạt động' : 'Không hoạt động'}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => openDialog('promotion', 'edit', promotion)}
+                                                            className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                                                        >
+                                                            <Edit className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete('promotion', promotion.id!, promotion.code)}
+                                                            className="p-1 text-red-600 hover:bg-red-100 rounded"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })) : (
                                         <tr>
                                             <td colSpan={5} className="py-4 px-4 text-center text-slate-600">
                                                 Không tìm thấy khuyến mãi nào.
@@ -419,8 +561,8 @@ const PriceManagement: React.FC = () => {
                         <DollarSign className="w-8 h-8 text-green-600" />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-bold text-slate-800">Quản lý Giá & Khuyến mãi</h1>
-                        <p className="text-slate-600">Quản lý quy tắc giá và chương trình khuyến mãi</p>
+                        <h1 className="text-3xl font-bold text-slate-800">Quản lý Giá</h1>
+                        <p className="text-slate-600">Quản lý quy tắc giá</p>
                     </div>
                 </div>
             </div>
@@ -428,7 +570,7 @@ const PriceManagement: React.FC = () => {
             {/* Tabs */}
             <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
                 {/* Tab Navigation */}
-                <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-slate-100">
+                {/* <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-slate-100">
                     <nav className="flex">
                         {tabs.map((tab) => (
                             <button
@@ -445,7 +587,7 @@ const PriceManagement: React.FC = () => {
                             </button>
                         ))}
                     </nav>
-                </div>
+                </div> */}
 
                 {/* Tab Content */}
                 <div className="p-6">
@@ -465,12 +607,17 @@ const PriceManagement: React.FC = () => {
                 onPageChange={setCurrentPage}
             />
 
-            {/* <ConfirmDeleteDialog
-                isOpen={false}
-                itemName=
-                onClose={() => {}}
-                onConfirm={() => {}}
-            /> */}
+            <ConfirmDeleteDialog
+                isOpen={isOpenConfirmDelete}
+                title="Xác nhận xóa"
+                message="Bạn có chắc chắn muốn xóa"
+                itemName={deleteItem?.name || ''}
+                onConfirm={confirmDelete}
+                onCancel={() => {
+                    setIsOpenConfirmDelete(false);
+                    setDeleteItem(null);
+                }}
+            />
             {/* Dialog */}
             {isDialogOpen && (
                 <div className="fixed inset-0 flex items-center justify-center z-50">
@@ -528,9 +675,9 @@ const PriceManagement: React.FC = () => {
                                         <select
                                             value={formData.seatTypeId}
                                             onChange={(e) => setFormData({ ...formData, seatTypeId: e.target.value })}
-                                            className={`w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
-                                                ${loading ? 'bg-slate-100 cursor-not-allowed' : ''}`}
-                                            required
+                                            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
+                                                ${loading ? 'bg-slate-100 cursor-not-allowed' : ''}
+                                                ${errors.seatTypeId ? 'border-red-500' : 'border-slate-300'}`}
                                             disabled={loading}
                                         >
                                             <option value="">Chọn loại ghế</option>
@@ -540,6 +687,9 @@ const PriceManagement: React.FC = () => {
                                                 </option>
                                             ))}
                                         </select>
+                                        {errors.seatTypeId && (
+                                            <p className="text-red-500 text-xs mt-1">{errors.seatTypeId}</p>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -549,12 +699,16 @@ const PriceManagement: React.FC = () => {
                                             type="number"
                                             value={formData.price}
                                             onChange={(e) => setFormData({ ...formData, price: parseInt(e.target.value) || 0 })}
-                                            className={`w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
-                                                ${loading ? 'bg-slate-100 cursor-not-allowed' : ''}`}
-                                            required
+                                            className={`w-full px-3 py-2 border  rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
+                                                ${loading ? 'bg-slate-100 cursor-not-allowed' : ''}
+                                                ${errors.price ? 'border-red-500' : 'border-slate-300'}`}
+                                            // required
                                             disabled={loading}
                                             min="0"
                                         />
+                                        {errors.price && (
+                                            <p className="text-red-500 text-xs mt-1">{errors.price}</p>
+                                        )}
                                     </div>
                                 </>
                             )}

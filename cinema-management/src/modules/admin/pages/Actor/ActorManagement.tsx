@@ -156,30 +156,30 @@ const ActorManagement: React.FC = () => {
         </div>
       )
     },
-    {
-      key: 'dateOfBirth',
-      title: 'Ngày sinh',
-      render: (_, actor) => (
-        <div className="flex items-center gap-2 text-slate-600">
-          <Calendar className="w-4 h-4" />
-          <span className="text-sm">{formatDate(actor.dateOfBirth)}</span>
-        </div>
-      )
-    },
-    {
-      key: 'nationality',
-      title: 'Quốc tịch',
-      render: (nationality) => (
-        <span className="text-sm text-gray-600">{nationality || "Chưa cập nhật"}</span>
-      )
-    },
-    {
-      key: 'biography',
-      title: 'Tiểu sử',
-      render: (biography) => (
-        <span className="text-sm text-gray-600">{truncateText(biography)}</span>
-      )
-    },
+    // {
+    //   key: 'dateOfBirth',
+    //   title: 'Ngày sinh',
+    //   render: (_, actor) => (
+    //     <div className="flex items-center gap-2 text-slate-600">
+    //       <Calendar className="w-4 h-4" />
+    //       <span className="text-sm">{formatDate(actor.dateOfBirth)}</span>
+    //     </div>
+    //   )
+    // },
+    // {
+    //   key: 'nationality',
+    //   title: 'Quốc tịch',
+    //   render: (nationality) => (
+    //     <span className="text-sm text-gray-600">{nationality || "Chưa cập nhật"}</span>
+    //   )
+    // },
+    // {
+    //   key: 'biography',
+    //   title: 'Tiểu sử',
+    //   render: (biography) => (
+    //     <span className="text-sm text-gray-600">{truncateText(biography)}</span>
+    //   )
+    // },
     {
       key: 'actions',
       title: 'Hành động',

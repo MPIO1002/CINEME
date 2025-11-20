@@ -6,11 +6,12 @@ import { limitageApiService, type Limitage } from "@/services/limitageApi";
 import { Edit, Flag, Languages, Loader, Plus, Settings, Tags, Trash2, Users, Video, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
+import ConfirmDeleteDialog from "../../components/confirmDeleteDialog";
 import Loading from "../../components/loading";
 import { Pagination } from "../../components/pagination";
 
 const MovieConfigManagement: React.FC = () => {
-    const [activeTab, setActiveTab] = useState("countries");
+    const [activeTab, setActiveTab] = useState("formats");
     const [languages, setLanguages] = useState<Language[]>([]);
     const [formats, setFormats] = useState<Format[]>([]);
     const [genres, setGenres] = useState<Genre[]>([]);
@@ -28,6 +29,14 @@ const MovieConfigManagement: React.FC = () => {
         descVn: '',
         descEn: '',
     });
+    const [errors, setErrors] = useState({
+        nameVn: '',
+        nameEn: '',
+        descVn: '',
+        descEn: '',
+    });
+    const [isOpenConfirmDelete, setIsOpenConfirmDelete] = useState(false);
+    const [deleteItem, setDeleteItem] = useState<{ id: string; name: string; tab: string } | null>(null);
 
 
     useEffect(() => {
@@ -71,6 +80,68 @@ const MovieConfigManagement: React.FC = () => {
         }
     }
 
+    const validateForm = () => {
+        const newErrors = {
+            nameVn: '',
+            nameEn: '',
+            descVn: '',
+            descEn: '',
+        };
+        let isValid = true;
+
+        // Validate nameVn
+        if (!formData.nameVn.trim()) {
+            newErrors.nameVn = 'Tên tiếng Việt là bắt buộc';
+            isValid = false;
+        } else if (formData.nameVn.trim().length < 2) {
+            newErrors.nameVn = 'Tên tiếng Việt phải có ít nhất 2 ký tự';
+            isValid = false;
+        } else if (formData.nameVn.trim().length > 100) {
+            newErrors.nameVn = 'Tên tiếng Việt không được quá 100 ký tự';
+            isValid = false;
+        }
+
+        // Validate nameEn
+        if (!formData.nameEn.trim()) {
+            newErrors.nameEn = 'Tên tiếng Anh là bắt buộc';
+            isValid = false;
+        } else if (formData.nameEn.trim().length < 2) {
+            newErrors.nameEn = 'Tên tiếng Anh phải có ít nhất 2 ký tự';
+            isValid = false;
+        } else if (formData.nameEn.trim().length > 100) {
+            newErrors.nameEn = 'Tên tiếng Anh không được quá 100 ký tự';
+            isValid = false;
+        }
+
+        // Validate descriptions for limitages tab
+        if (activeTab === 'limitages') {
+            if (!formData.descVn.trim()) {
+                newErrors.descVn = 'Mô tả tiếng Việt là bắt buộc';
+                isValid = false;
+            } else if (formData.descVn.trim().length < 10) {
+                newErrors.descVn = 'Mô tả tiếng Việt phải có ít nhất 10 ký tự';
+                isValid = false;
+            } else if (formData.descVn.trim().length > 500) {
+                newErrors.descVn = 'Mô tả tiếng Việt không được quá 500 ký tự';
+                isValid = false;
+            }
+
+            if (!formData.descEn.trim()) {
+                newErrors.descEn = 'Mô tả tiếng Anh là bắt buộc';
+                isValid = false;
+            } else if (formData.descEn.trim().length < 10) {
+                newErrors.descEn = 'Mô tả tiếng Anh phải có ít nhất 10 ký tự';
+                isValid = false;
+            } else if (formData.descEn.trim().length > 500) {
+                newErrors.descEn = 'Mô tả tiếng Anh không được quá 500 ký tự';
+                isValid = false;
+            }
+        }
+
+        setErrors(newErrors);
+        return isValid;
+    };
+
     const openModal = (mode: 'add' | 'edit', item?: any) => {
         setModalMode(mode);
         setSelectedItem(item);
@@ -89,6 +160,12 @@ const MovieConfigManagement: React.FC = () => {
                 descEn: '',
             });
         }
+        setErrors({
+            nameVn: '',
+            nameEn: '',
+            descVn: '',
+            descEn: '',
+        });
         setIsModalOpen(true);
     };
 
@@ -105,12 +182,19 @@ const MovieConfigManagement: React.FC = () => {
 
     const handleFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        if (!validateForm()) {
+            toast.error('Vui lòng kiểm tra lại thông tin nhập vào');
+            return;
+        }
+        
         setLoading(true);
         try {
             if (modalMode === 'add') {
                 switch (activeTab) {
                 case 'countries':
-                    await countryApiService.createCountry(formData);
+                    // await countryApiService.createCountry(formData);
+                    alert('Tính năng tạm thời bị vô hiệu hóa');
                     break;
                 case 'formats':
                     await formatApiService.createFormat(formData);
@@ -128,7 +212,8 @@ const MovieConfigManagement: React.FC = () => {
             } else {
                 switch (activeTab) {
                 case 'countries':
-                    await countryApiService.updateCountry(selectedItem.id, formData);
+                    // await countryApiService.updateCountry(selectedItem.id, formData);
+                    alert('Tính năng tạm thời bị vô hiệu hóa');
                     break;
                 case 'formats':
                     await formatApiService.updateFormat(selectedItem.id, formData);
@@ -144,55 +229,55 @@ const MovieConfigManagement: React.FC = () => {
                     break;
                 }
             }
-            toast.success('Lưu dữ liệu thành công');
-            await fetchData(); // Refresh data
+            toast.success(`${modalMode === 'add' ? 'Thêm' : 'Cập nhật'} ${getTabLabel(activeTab).toLowerCase()} thành công`);
+            await fetchData();
             closeModal();
         } catch (error) {
             console.error('Error saving data:', error);
-            toast.error('Có lỗi xảy ra khi lưu dữ liệu');
+            toast.error(`${modalMode === 'add' ? 'Thêm' : 'Cập nhật'} ${getTabLabel(activeTab).toLowerCase()} thất bại`);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleDelete = async (itemId: string) => {
-        const confirmDelete = window.confirm(`Bạn có chắc chắn muốn xóa mục này không?`);
-        if (!confirmDelete) {
-        return;
-        }
+    const handleDelete = (itemId: string, name: string) => {
+        setDeleteItem({ id: itemId, name, tab: activeTab });
+        setIsOpenConfirmDelete(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteItem) return;
         try {
-            switch (activeTab) {
+            switch (deleteItem.tab) {
                 case 'countries':
-                    await countryApiService.deleteCountry(itemId);
+                    // await countryApiService.deleteCountry(deleteItem.id);
+                    alert('Tính năng tạm thời bị vô hiệu hóa');
                     break;
                 case 'formats':
-                    await formatApiService.deleteFormat(itemId);
+                    await formatApiService.deleteFormat(deleteItem.id);
                     break;
                 case 'genres':
-                    await genreApiService.deleteGenre(itemId);
+                    await genreApiService.deleteGenre(deleteItem.id);
                     break;
                 case 'languages':
-                    await languageApiService.deleteLanguage(itemId);
+                    await languageApiService.deleteLanguage(deleteItem.id);
                     break;
                 case 'limitages':
-                    await limitageApiService.deleteLimitage(itemId);
+                    await limitageApiService.deleteLimitage(deleteItem.id);
                     break;
             }
-            toast.success('Xóa dữ liệu thành công');
-            await fetchData(); // Refresh data
+            toast.success(`Xóa ${getTabLabel(deleteItem.tab).toLowerCase()} thành công`);
+            await fetchData();
         } catch (error) {
             console.error('Error deleting data:', error);
-            toast.error('Có lỗi xảy ra khi xóa dữ liệu');
+            toast.error(`Xóa ${getTabLabel(deleteItem.tab).toLowerCase()} thất bại`);
+        } finally {
+            setIsOpenConfirmDelete(false);
+            setDeleteItem(null);
         }
-    }
+    };
 
     const tabs = [
-        {
-            id: "countries",
-            label: "Quốc gia",
-            icon: <Flag className="w-4 h-4" />,
-            description: "Quản lý danh sách quốc gia sản xuất phim"
-        },
         {
             id: "formats",
             label: "Định dạng",
@@ -216,7 +301,13 @@ const MovieConfigManagement: React.FC = () => {
             label: "Giới hạn tuổi",
             icon: <Users className="w-4 h-4" />,
             description: "Quản lý phân loại độ tuổi (T13, T16, T18...)"
-        }
+        },
+        {
+            id: "countries",
+            label: "Quốc gia",
+            icon: <Flag className="w-4 h-4" />,
+            description: "Quản lý danh sách quốc gia sản xuất phim"
+        },
     ];
 
     const itemsPerPage = 7;
@@ -308,7 +399,7 @@ const MovieConfigManagement: React.FC = () => {
                           >
                             <Edit className="w-4 h-4" />
                           </button>
-                          <button className="p-1 text-red-600 hover:bg-red-100 rounded" onClick={() => handleDelete(country.id)}>
+                          <button className="p-1 text-red-600 hover:bg-red-100 rounded" onClick={() => handleDelete(country.id, country.nameVn)}>
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -369,7 +460,7 @@ const MovieConfigManagement: React.FC = () => {
                           <button onClick={() => openModal('edit', format)} className="p-1 text-blue-600 hover:bg-blue-100 rounded">
                             <Edit className="w-4 h-4" />
                           </button>
-                          <button className="p-1 text-red-600 hover:bg-red-100 rounded" onClick={() => handleDelete(format.id)}>
+                          <button className="p-1 text-red-600 hover:bg-red-100 rounded" onClick={() => handleDelete(format.id, format.nameVn)}>
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -428,7 +519,7 @@ const MovieConfigManagement: React.FC = () => {
                           <button onClick={() => openModal('edit', genre)} className="p-1 text-blue-600 hover:bg-blue-100 rounded">
                             <Edit className="w-4 h-4" />
                           </button>
-                          <button className="p-1 text-red-600 hover:bg-red-100 rounded" onClick={() => handleDelete(genre.id)}>
+                          <button className="p-1 text-red-600 hover:bg-red-100 rounded" onClick={() => handleDelete(genre.id, genre.nameVn)}>
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -487,7 +578,7 @@ const MovieConfigManagement: React.FC = () => {
                           <button onClick={() => openModal('edit', language)} className="p-1 text-blue-600 hover:bg-blue-100 rounded">
                             <Edit className="w-4 h-4" />
                           </button>
-                          <button className="p-1 text-red-600 hover:bg-red-100 rounded" onClick={() => handleDelete(language.id)}>
+                          <button className="p-1 text-red-600 hover:bg-red-100 rounded" onClick={() => handleDelete(language.id, language.nameVn)}>
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -550,7 +641,7 @@ const MovieConfigManagement: React.FC = () => {
                           <button onClick={() => openModal('edit', limitage)} className="p-1 text-blue-600 hover:bg-blue-100 rounded">
                             <Edit className="w-4 h-4" />
                           </button>
-                          <button className="p-1 text-red-600 hover:bg-red-100 rounded" onClick={() => handleDelete(limitage.id.toString())}>
+                          <button className="p-1 text-red-600 hover:bg-red-100 rounded" onClick={() => handleDelete(limitage.id.toString(), limitage.nameVn)}>
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -621,32 +712,50 @@ const MovieConfigManagement: React.FC = () => {
               {activeTab === 'countries' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Tên tiếng Việt
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Tên tiếng Việt <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
-                      value={formData.nameVn || ''}
-                      onChange={(e) => setFormData({...formData, nameVn: e.target.value})}
-                      className={`w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
-                        ${loading ? 'bg-slate-100 cursor-not-allowed' : ''}`}
-                        disabled={loading}
-                      required
+                      value={formData.nameVn}
+                      onChange={(e) => {
+                        setFormData({ ...formData, nameVn: e.target.value });
+                        if (errors.nameVn) setErrors({ ...errors, nameVn: '' });
+                      }}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.nameVn ? 'border-red-500' : 'border-slate-300'
+                      }`}
+                      disabled={loading}
+                      placeholder="Nhập tên tiếng Việt (2-100 ký tự)"
                     />
+                    {errors.nameVn && (
+                      <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                         {errors.nameVn}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Tên tiếng Anh
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Tên tiếng Anh <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
-                      value={formData.nameEn || ''}
-                      onChange={(e) => setFormData({...formData, nameEn: e.target.value})}
-                      className={`w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
-                        ${loading ? 'bg-slate-100 cursor-not-allowed' : ''}`}
-                        disabled={loading}
-                      required
+                      value={formData.nameEn}
+                      onChange={(e) => {
+                        setFormData({ ...formData, nameEn: e.target.value });
+                        if (errors.nameEn) setErrors({ ...errors, nameEn: '' });
+                      }}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.nameEn ? 'border-red-500' : 'border-slate-300'
+                      }`}
+                      disabled={loading}
+                      placeholder="Nhập tên tiếng Anh (2-100 ký tự)"
                     />
+                    {errors.nameEn && (
+                      <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                         {errors.nameEn}
+                      </p>
+                    )}
                   </div>
                 </>
               )}
@@ -655,32 +764,50 @@ const MovieConfigManagement: React.FC = () => {
               {activeTab === 'formats' && (
                 <>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">
-                            Tên tiếng Việt
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                            Tên tiếng Việt <span className="text-red-500">*</span>
                         </label>
                         <input
                             type="text"
-                            value={formData.nameVn || ''}
-                            onChange={(e) => setFormData({...formData, nameVn: e.target.value})}
-                            className={`w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
-                                ${loading ? 'bg-slate-100 cursor-not-allowed' : ''}`}
-                                disabled={loading}
-                            required
+                            value={formData.nameVn}
+                            onChange={(e) => {
+                              setFormData({ ...formData, nameVn: e.target.value });
+                              if (errors.nameVn) setErrors({ ...errors, nameVn: '' });
+                            }}
+                            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                              errors.nameVn ? 'border-red-500' : 'border-slate-300'
+                            }`}
+                            disabled={loading}
+                            placeholder="Nhập tên tiếng Việt (2-100 ký tự)"
                         />
+                        {errors.nameVn && (
+                          <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                             {errors.nameVn}
+                          </p>
+                        )}
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">
-                            Tên tiếng Anh
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                            Tên tiếng Anh <span className="text-red-500">*</span>
                         </label>
                         <input
                             type="text"
-                            value={formData.nameEn || ''}
-                            onChange={(e) => setFormData({...formData, nameEn: e.target.value})}
-                            className={`w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
-                                ${loading ? 'bg-slate-100 cursor-not-allowed' : ''}`}
-                                disabled={loading}
-                            required
+                            value={formData.nameEn}
+                            onChange={(e) => {
+                              setFormData({ ...formData, nameEn: e.target.value });
+                              if (errors.nameEn) setErrors({ ...errors, nameEn: '' });
+                            }}
+                            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                              errors.nameEn ? 'border-red-500' : 'border-slate-300'
+                            }`}
+                            disabled={loading}
+                            placeholder="Nhập tên tiếng Anh (2-100 ký tự)"
                         />
+                        {errors.nameEn && (
+                          <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                             {errors.nameEn}
+                          </p>
+                        )}
                     </div>
                 </>
               )}
@@ -689,32 +816,50 @@ const MovieConfigManagement: React.FC = () => {
               {activeTab === 'genres' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Tên tiếng Việt
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Tên tiếng Việt <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
-                      value={formData.nameVn || ''}
-                      onChange={(e) => setFormData({...formData, nameVn: e.target.value})}
-                      className={`w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
-                        ${loading ? 'bg-slate-100 cursor-not-allowed' : ''}`}
-                        disabled={loading}
-                      required
+                      value={formData.nameVn}
+                      onChange={(e) => {
+                        setFormData({ ...formData, nameVn: e.target.value });
+                        if (errors.nameVn) setErrors({ ...errors, nameVn: '' });
+                      }}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.nameVn ? 'border-red-500' : 'border-slate-300'
+                      }`}
+                      disabled={loading}
+                      placeholder="Nhập tên tiếng Việt (2-100 ký tự)"
                     />
+                    {errors.nameVn && (
+                      <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                         {errors.nameVn}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Tên tiếng Anh
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Tên tiếng Anh <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
-                      value={formData.nameEn || ''}
-                      onChange={(e) => setFormData({...formData, nameEn: e.target.value})}
-                      className={`w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
-                        ${loading ? 'bg-slate-100 cursor-not-allowed' : ''}`}
-                        disabled={loading}
-                      required
+                      value={formData.nameEn}
+                      onChange={(e) => {
+                        setFormData({ ...formData, nameEn: e.target.value });
+                        if (errors.nameEn) setErrors({ ...errors, nameEn: '' });
+                      }}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.nameEn ? 'border-red-500' : 'border-slate-300'
+                      }`}
+                      disabled={loading}
+                      placeholder="Nhập tên tiếng Anh (2-100 ký tự)"
                     />
+                    {errors.nameEn && (
+                      <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                         {errors.nameEn}
+                      </p>
+                    )}
                   </div>
                 </>
               )}
@@ -723,32 +868,50 @@ const MovieConfigManagement: React.FC = () => {
               {activeTab === 'languages' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Tên tiếng Việt
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Tên tiếng Việt <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
-                      value={formData.nameVn || ''}
-                      onChange={(e) => setFormData({...formData, nameVn: e.target.value})}
-                      className={`w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
-                        ${loading ? 'bg-slate-100 cursor-not-allowed' : ''}`}
-                        disabled={loading}
-                      required
+                      value={formData.nameVn}
+                      onChange={(e) => {
+                        setFormData({ ...formData, nameVn: e.target.value });
+                        if (errors.nameVn) setErrors({ ...errors, nameVn: '' });
+                      }}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.nameVn ? 'border-red-500' : 'border-slate-300'
+                      }`}
+                      disabled={loading}
+                      placeholder="Nhập tên tiếng Việt (2-100 ký tự)"
                     />
+                    {errors.nameVn && (
+                      <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                         {errors.nameVn}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Tên tiếng Anh
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Tên tiếng Anh <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
-                      value={formData.nameEn || ''}
-                      onChange={(e) => setFormData({...formData, nameEn: e.target.value})}
-                      className={`w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
-                        ${loading ? 'bg-slate-100 cursor-not-allowed' : ''}`}
-                        disabled={loading}
-                      required
+                      value={formData.nameEn}
+                      onChange={(e) => {
+                        setFormData({ ...formData, nameEn: e.target.value });
+                        if (errors.nameEn) setErrors({ ...errors, nameEn: '' });
+                      }}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.nameEn ? 'border-red-500' : 'border-slate-300'
+                      }`}
+                      disabled={loading}
+                      placeholder="Nhập tên tiếng Anh (2-100 ký tự)"
                     />
+                    {errors.nameEn && (
+                      <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                         {errors.nameEn}
+                      </p>
+                    )}
                   </div>
                 </>
               )}
@@ -757,58 +920,96 @@ const MovieConfigManagement: React.FC = () => {
               {activeTab === 'limitages' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Tên tiếng Việt
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Tên tiếng Việt <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
-                      value={formData.nameVn || ''}
-                      onChange={(e) => setFormData({...formData, nameVn: e.target.value})}
-                      className={`w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
-                        ${loading ? 'bg-slate-100 cursor-not-allowed' : ''}`}
-                        disabled={loading}
-                      required
+                      value={formData.nameVn}
+                      onChange={(e) => {
+                        setFormData({ ...formData, nameVn: e.target.value });
+                        if (errors.nameVn) setErrors({ ...errors, nameVn: '' });
+                      }}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.nameVn ? 'border-red-500' : 'border-slate-300'
+                      }`}
+                      disabled={loading}
+                      placeholder="Nhập tên tiếng Việt (2-100 ký tự)"
                     />
+                    {errors.nameVn && (
+                      <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                         {errors.nameVn}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Tên tiếng Anh
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Tên tiếng Anh <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
-                      value={formData.nameEn || ''}
-                      onChange={(e) => setFormData({...formData, nameEn: e.target.value})}
-                      className={`w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
-                        ${loading ? 'bg-slate-100 cursor-not-allowed' : ''}`}
-                        disabled={loading}
-                      required
+                      value={formData.nameEn}
+                      onChange={(e) => {
+                        setFormData({ ...formData, nameEn: e.target.value });
+                        if (errors.nameEn) setErrors({ ...errors, nameEn: '' });
+                      }}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.nameEn ? 'border-red-500' : 'border-slate-300'
+                      }`}
+                      disabled={loading}
+                      placeholder="Nhập tên tiếng Anh (2-100 ký tự)"
                     />
+                    {errors.nameEn && (
+                      <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                         {errors.nameEn}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Mô tả tiếng Việt
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Mô tả tiếng Việt <span className="text-red-500">*</span>
                     </label>
                     <textarea
-                      value={formData.descVn || ''}
-                      onChange={(e) => setFormData({...formData, descVn: e.target.value})}
-                      className={`w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
-                        ${loading ? 'bg-slate-100 cursor-not-allowed' : ''}`}
-                        disabled={loading}
+                      value={formData.descVn}
+                      onChange={(e) => {
+                        setFormData({ ...formData, descVn: e.target.value });
+                        if (errors.descVn) setErrors({ ...errors, descVn: '' });
+                      }}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.descVn ? 'border-red-500' : 'border-slate-300'
+                      }`}
                       rows={3}
+                      disabled={loading}
+                      placeholder="Nhập mô tả tiếng Việt (10-500 ký tự)"
                     />
+                    {errors.descVn && (
+                      <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                         {errors.descVn}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Mô tả tiếng Anh
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Mô tả tiếng Anh <span className="text-red-500">*</span>
                     </label>
                     <textarea
-                      value={formData.descEn || ''}
-                      onChange={(e) => setFormData({...formData, descEn: e.target.value})}
-                      className={`w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
-                        ${loading ? 'bg-slate-100 cursor-not-allowed' : ''}`}
-                        disabled={loading}
+                      value={formData.descEn}
+                      onChange={(e) => {
+                        setFormData({ ...formData, descEn: e.target.value });
+                        if (errors.descEn) setErrors({ ...errors, descEn: '' });
+                      }}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.descEn ? 'border-red-500' : 'border-slate-300'
+                      }`}
                       rows={3}
+                      disabled={loading}
+                      placeholder="Nhập mô tả tiếng Anh (10-500 ký tự)"
                     />
+                    {errors.descEn && (
+                      <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                         {errors.descEn}
+                      </p>
+                    )}
                   </div>
                 </>
               )}
@@ -884,6 +1085,17 @@ const MovieConfigManagement: React.FC = () => {
     />
     </div>
 
+    <ConfirmDeleteDialog
+      isOpen={isOpenConfirmDelete}
+      title="Xác nhận xóa"
+      message={`Bạn có chắc chắn muốn xóa ${getTabLabel(deleteItem?.tab || '').toLowerCase()}`}
+      itemName={deleteItem?.name || ''}
+      onConfirm={confirmDelete}
+      onCancel={() => {
+        setIsOpenConfirmDelete(false);
+        setDeleteItem(null);
+      }}
+    />
     </div>
   );
 };

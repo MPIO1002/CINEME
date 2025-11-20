@@ -80,7 +80,7 @@ const Sidebar = () => {
             type: 'group',
             children: [
                 { label: "Combo & Sản phẩm", path: "/admin/combos", icon: <PopcornIcon /> },
-                { label: "Giá bán & Khuyến mãi", path: "/admin/prices", icon: <LocalOfferIcon /> },
+                { label: "Giá bán", path: "/admin/prices", icon: <LocalOfferIcon /> },
                 { label: "Hạng thành viên", path: "/admin/ranks", icon: <Star /> },
             ]
         },
