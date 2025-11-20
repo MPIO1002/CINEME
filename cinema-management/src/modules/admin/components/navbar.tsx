@@ -14,6 +14,7 @@ const Navbar = () => {
                 localStorage.removeItem("admin_accessToken");
                 localStorage.removeItem("admin_refreshToken");
                 localStorage.removeItem("admin_fullName");
+                localStorage.removeItem("admin_employeeId");
                 localStorage.removeItem("admin_userType");
 
                 window.location.href = "/admin/login";

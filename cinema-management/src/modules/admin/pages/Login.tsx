@@ -39,6 +39,7 @@ const Login = () => {
           // Lưu tokens vào localStorage với prefix 'admin_' để phân biệt với client
           localStorage.setItem("admin_accessToken", userData.accessToken);
           localStorage.setItem("admin_refreshToken", userData.refreshToken);
+          localStorage.setItem("admin_employeeId", userData.id);
           localStorage.setItem("admin_fullName", userData.fullName);
           localStorage.setItem("admin_userType", "admin"); // Đánh dấu là admin
           

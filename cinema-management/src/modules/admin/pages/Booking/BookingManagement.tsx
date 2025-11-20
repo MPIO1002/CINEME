@@ -71,7 +71,7 @@ const BookingManagement: React.FC = () => {
   const [loadingCombos, setLoadingCombos] = useState(false);
   const [customer, setCustomer] = useState<User | null>(null);
 //   const [customerPhone, setCustomerPhone] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'creditCard' | 'cash'>();
+  const [paymentMethod, setPaymentMethod] = useState<'MOMO' | 'CASH'>();
   const [activeStep, setActiveStep] = useState<number>(0);
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString('vi-VN'));
   const [searchTerm, setSearchTerm] = useState('');
@@ -344,12 +344,14 @@ const BookingManagement: React.FC = () => {
         userId: string;
         employeeId?: string;
         showtimeId: string;
+        paymentMethod: 'MOMO' | 'CASH';
         listSeatId: string[];
         listCombo?: { [key: string]: number };
       } = {
         userId: 'e4651591-9f9b-4f86-9027-ba968e6550b9',
-        employeeId: '6514c40e-c8bc-4c1b-8a64-1cc38d3b8db1',
+        employeeId: localStorage.getItem("admin_employeeId") || undefined,
         showtimeId: selectedShowtime.id || '',
+        paymentMethod: paymentMethod!,
         listSeatId: selectedSeats.map(seat => seat.id)
       };
 
@@ -365,7 +367,7 @@ const BookingManagement: React.FC = () => {
       console.log('========================');
 
       let data;
-      if (paymentMethod === "creditCard") {
+    //   if (paymentMethod === "MOMO") {
         const response = await fetch(`${API_BASE_URL}/payments/admin`, {
             method: 'POST',
             headers: {
@@ -375,9 +377,9 @@ const BookingManagement: React.FC = () => {
         });
 
         data = await response.json();
-      } else {
-        console.log('Cash booking data:', bookingData);
-      }
+    //   } else {
+    //     console.log('Cash booking data:', bookingData);
+    //   }
 
       if (data.statusCode === 200 && data.data) {
         alert('Đặt vé thành công!');
@@ -479,7 +481,7 @@ const BookingManagement: React.FC = () => {
                         <Calendar1Icon className="w-8 h-8 text-blue-600" />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-bold text-slate-800">Đặt Vé Tại Rạp: {selectedTheater?.nameVn}</h1>
+                        <h1 className="text-3xl font-bold text-slate-800">Đặt Vé Tại Rạp</h1>
                         <p className="text-slate-600">Quản lý đặt vé xem phim tại quầy bán vé</p>
                     </div>
                 </div>
@@ -794,7 +796,7 @@ const BookingManagement: React.FC = () => {
                                 <p className="text-sm font-medium text-gray-700 mb-2">Phương thức thanh toán:</p>
                                 <div className="flex flex-col gap-2">
                                     <label className={`flex items-center justify-between gap-2 cursor-pointer border rounded-lg p-2 transition-all duration-200 ${
-                                        paymentMethod === 'creditCard'
+                                        paymentMethod === 'MOMO'
                                             ? 'bg-indigo-50 text-indigo-900 border-blue-300 ring-indigo-200'
                                             : 'border-transparent hover:bg-slate-200 text-gray-700'
                                     }`}>
@@ -802,14 +804,14 @@ const BookingManagement: React.FC = () => {
                                         <input
                                             type="radio"
                                             name="paymentMethod"
-                                            value="creditCard"
-                                            checked={paymentMethod === 'creditCard'}
-                                            onChange={() => setPaymentMethod('creditCard')}
+                                            value="MOMO"
+                                            checked={paymentMethod === 'MOMO'}
+                                            onChange={() => setPaymentMethod('MOMO')}
                                             className="w-4 h-4"
                                         />
                                     </label>
                                     <label className={`flex items-center justify-between gap-2 cursor-pointer border rounded-lg p-2 transition-all duration-200 ${
-                                        paymentMethod === 'cash'
+                                        paymentMethod === 'CASH'
                                             ? 'bg-indigo-50 text-indigo-900 border-blue-300 ring-indigo-200'
                                             : 'border-transparent hover:bg-slate-200 text-gray-700'
                                     }`}>
@@ -818,8 +820,8 @@ const BookingManagement: React.FC = () => {
                                             type="radio"
                                             name="paymentMethod"
                                             value="cash"
-                                            checked={paymentMethod === 'cash'}
-                                            onChange={() => setPaymentMethod('cash')}
+                                            checked={paymentMethod === 'CASH'}
+                                            onChange={() => setPaymentMethod('CASH')}
                                             className="w-4 h-4"
                                         />
                                     </label>

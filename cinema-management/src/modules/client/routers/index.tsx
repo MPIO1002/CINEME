@@ -23,6 +23,7 @@ import FilmDetail from "../pages/film-detail";
 import Home from "../pages/home";
 import PaymentResult from "../pages/payment-result";
 import Profile from "../pages/profile";
+import ResultPayment from "@/modules/admin/pages/ResultPayment/ResultPayment";
 import ShowtimesPage from "../pages/showtimes";
 
 const Routers = () => {
@@ -39,6 +40,7 @@ const Routers = () => {
           <Route path="/film/:id" element={<FilmDetail />} />
           <Route path="/booking/:id" element={<BookingPage />} />
           <Route path="/payment-result" element={<PaymentResult />} />
+          <Route path="/result-payment" element={<ResultPayment />} />
           <Route path="/showtimes" element={<ShowtimesPage />} />
           <Route path="/profile" element={<Profile />} />
         </Route>
@@ -60,6 +62,7 @@ const Routers = () => {
           <Route path="movie-config" element={<MovieConfigManagement />} />
           <Route path="security" element={<SecurityManagement />} />
           <Route path="bookings" element={<BookingManagement />} />
+          <Route path="result-payment" element={<ResultPayment />} />
         </Route>
       </Routes>
     </BrowserRouter>
