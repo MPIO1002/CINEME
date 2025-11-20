@@ -1,5 +1,6 @@
 import api from '@/lib/axios';
 import type { Actor } from './actorApi';
+import type { Genre } from './genreApi';
 
 // Unified Movie interface for both API and form usage
 export interface Movie {
@@ -20,6 +21,7 @@ export interface Movie {
     countryId?: string;
     limitageId?: string;
     listActor?: Actor[];
+    listGenre?: Genre[];
 }
 
 export interface MovieDetail {
@@ -41,6 +43,7 @@ export interface MovieDetail {
     limitageNameVn: string;
     limitageNameEn: string;
     listActor: Actor[];
+    listGenre: Genre[];
 }
 
 // API Functions

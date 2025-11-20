@@ -347,7 +347,7 @@ const BookingManagement: React.FC = () => {
         listSeatId: string[];
         listCombo?: { [key: string]: number };
       } = {
-        userId: customer?.id || '',
+        userId: 'e4651591-9f9b-4f86-9027-ba968e6550b9',
         employeeId: '6514c40e-c8bc-4c1b-8a64-1cc38d3b8db1',
         showtimeId: selectedShowtime.id || '',
         listSeatId: selectedSeats.map(seat => seat.id)
@@ -366,7 +366,7 @@ const BookingManagement: React.FC = () => {
 
       let data;
       if (paymentMethod === "creditCard") {
-        const response = await fetch(`${API_BASE_URL}/bookings`, {
+        const response = await fetch(`${API_BASE_URL}/payments/admin`, {
             method: 'POST',
             headers: {
             'Content-Type': 'application/json',

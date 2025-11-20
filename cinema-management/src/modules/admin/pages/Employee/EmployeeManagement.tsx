@@ -34,7 +34,7 @@ const EmployeeManagement: React.FC = () => {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 12;
+  const itemsPerPage = 8;
 
   // Phone visibility state - track which phones are visible (default: all hidden)
   const [visiblePhones, setVisiblePhones] = useState<Set<string>>(new Set());

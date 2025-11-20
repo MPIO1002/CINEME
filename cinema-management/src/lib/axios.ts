@@ -9,8 +9,19 @@ const api = axios.create({
 
 // gắn access token vào req header
 api.interceptors.request.use((config) => {
-//   const { accessToken } = useAuthStore.getState();
-    const accessToken = localStorage.getItem('refreshToken');
+  // Kiểm tra xem đang ở admin hay client
+  // Nếu URL chứa '/admin' hoặc có admin token thì dùng admin token
+  const isAdminRequest = config.url?.includes('/admin') || 
+                         window.location.pathname.startsWith('/admin');
+  
+  let accessToken;
+  if (isAdminRequest) {
+    // Lấy admin token
+    accessToken = localStorage.getItem('admin_refreshToken');
+  } else {
+    // Lấy client token
+    accessToken = localStorage.getItem('refreshToken');
+  }
 
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;

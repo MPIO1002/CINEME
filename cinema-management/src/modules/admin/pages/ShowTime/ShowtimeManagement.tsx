@@ -64,10 +64,8 @@ const fetchShowtimes = async () => {
     setLoading(true);
     try {
         const response = await showtimeApiService.getAllShowtimes();
-        if (response.statusCode === 200) {
             setShowtimes(response);
             console.table(response);
-        }
     } catch (error) {
         console.error('Error fetching showtimes:', error);
         setShowtimes([]);

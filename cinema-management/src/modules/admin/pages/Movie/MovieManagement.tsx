@@ -1,13 +1,13 @@
 import axios from 'axios';
 import { Edit, Eye, Filter, Popcorn, Search, TicketPlus, Trash2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { movieApiService, type Movie } from '../../../../services/movieApi';
+import ConfirmDeleteDialog from '../../components/confirmDeleteDialog';
 import { Pagination } from "../../components/pagination";
 import { Table, type Column } from "../../components/tableProps";
 import { hasPermission } from '../../utils/authUtils';
 import MovieModal from "./components/MovieModal";
-import { toast } from 'sonner';
-import ConfirmDeleteDialog from '../../components/confirmDeleteDialog';
 
 // Main Movie Management Component
 const MovieManagement: React.FC = () => {
@@ -223,6 +223,23 @@ const handleSaveMovie = async (movie: Movie) => {
             console.log('No actors selected, sending empty listActorId');
             // Actually don't append anything for empty list - let backend handle missing field
         }
+
+        // Backend expects listGenreId (array of UUIDs), not listGenre (array of Genre objects)
+        const genreIds = (movie.listGenre || []).map(genre => genre.id).filter(id => id !== undefined);
+        console.log('Genre IDs to send:', genreIds);
+        
+        // For FormData with @ModelAttribute, send each UUID separately with the same field name
+        if (genreIds.length > 0) {
+            genreIds.forEach(genreId => {
+                if (genreId) {
+                    formData.append('listGenreId', genreId);
+                }
+            });
+        } else {
+            console.log('No genres selected, sending empty listGenreId');
+            // Don't append anything for empty list - let backend handle missing field
+        }
+
         // Handle image field - smart upload logic
         if (modalMode === "add") {
             // Khi thêm mới: bắt buộc phải có file

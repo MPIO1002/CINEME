@@ -1,3 +1,4 @@
+import AdminPrivateRoute from "@/components/protect-route";
 import AdminMainLayout from "@/modules/admin/layouts/main";
 import ActorManagement from "@/modules/admin/pages/Actor/ActorManagement";
 import BookingManagement from "@/modules/admin/pages/Booking/BookingManagement";
@@ -44,7 +45,7 @@ const Routers = () => {
 
         {/* Admin routes */}
         <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin" element={<AdminMainLayout />}>
+        <Route path="/admin" element={<AdminPrivateRoute><AdminMainLayout /></AdminPrivateRoute>}>
           <Route index element={<Dashboard />} />
           <Route path="movies" element={<MovieManagement />} />
           <Route path="actors" element={<ActorManagement />} />

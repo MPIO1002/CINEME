@@ -6,14 +6,15 @@ const Navbar = () => {
 //   const userData = getUserData();
     const handleLogout = async () => {
         try {
-            const adminToken = localStorage.getItem("accessToken");
+            const adminToken = localStorage.getItem("admin_accessToken");
 
             if(adminToken) {
                 await authApiService.logout();
 
-                localStorage.removeItem("accessToken");
-                localStorage.removeItem("refreshToken");
-                localStorage.removeItem("fullName");
+                localStorage.removeItem("admin_accessToken");
+                localStorage.removeItem("admin_refreshToken");
+                localStorage.removeItem("admin_fullName");
+                localStorage.removeItem("admin_userType");
 
                 window.location.href = "/admin/login";
             }
@@ -27,7 +28,7 @@ const Navbar = () => {
       <div className="font-bold text-lg text-indigo-700">CineMe Admin</div>
       <div className="flex items-center gap-4">
         <div className="text-sm">
-          <p>Xin chào, {localStorage.getItem("fullName") || "Khách"}</p>
+          <p>Xin chào, {localStorage.getItem("admin_fullName") || "Khách"}</p>
         </div>
         <button
           className="text-indigo-700 hover:underline"

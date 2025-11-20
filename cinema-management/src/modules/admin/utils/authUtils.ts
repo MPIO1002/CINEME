@@ -38,16 +38,16 @@ export interface UserData {
 // };
 
 export const getUserData = (): UserData | null => {
-  const token = localStorage.getItem("accessToken");
+  const token = localStorage.getItem("admin_accessToken");
   if (!token) return null;
   
   // Đơn giản hóa - chỉ return basic info, không cần decode permissions
   return {
     id: '',
     email: '',
-    fullName: localStorage.getItem("fullName") || '',
+    fullName: localStorage.getItem("admin_fullName") || '',
     accessToken: token,
-    refreshToken: localStorage.getItem("refreshToken") || '',
+    refreshToken: localStorage.getItem("admin_refreshToken") || '',
     permissions: [] // Không cần permissions nữa
   };
 };
@@ -69,8 +69,12 @@ export const isTokenExpired = (token: string): boolean => {
 };
 
 export const isAuthenticated = (): boolean => {
-  const token = localStorage.getItem("accessToken");
+  const token = localStorage.getItem("admin_accessToken");
   if (!token) return false;
+  
+  // Kiểm tra user type phải là admin
+  const userType = localStorage.getItem("admin_userType");
+  if (userType !== "admin") return false;
   
   // Kiểm tra token có expired không
   return !isTokenExpired(token);
@@ -79,13 +83,15 @@ export const isAuthenticated = (): boolean => {
 export const hasAnyAdminPermission = (): boolean => {
   // Với logic backend mới: chỉ cần có valid token là có thể vào admin
   // Backend sẽ handle authorization khi call API
-  const token = localStorage.getItem("accessToken");
-  return token !== null && !isTokenExpired(token);
+  const token = localStorage.getItem("admin_accessToken");
+  const userType = localStorage.getItem("admin_userType");
+  return token !== null && userType === "admin" && !isTokenExpired(token);
 };
 
 export const logout = () => {
-  localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("fullName");
+  localStorage.removeItem("admin_accessToken");
+  localStorage.removeItem("admin_refreshToken");
+  localStorage.removeItem("admin_fullName");
+  localStorage.removeItem("admin_userType");
   window.location.href = "/admin/login";
 };

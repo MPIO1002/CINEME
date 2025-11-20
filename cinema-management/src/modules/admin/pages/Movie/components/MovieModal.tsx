@@ -1,16 +1,17 @@
 import { Calendar, CheckCircle, Clock, Edit3, Eye, FileText, Film, Image, Loader2, Plus, Star, User, UserPlus, X } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { actorApiService, type Actor } from '../../../../../services/actorApi';
+import { genreApiService, type Genre } from '../../../../../services/genreApi';
 import { movieApiService, type Movie, type MovieDetail } from '../../../../../services/movieApi';
 import ActorModal from '../../Actor/components/ActorModal';
 
 import { countryApiService } from "@/services/countryApi";
+import limitageApiService from "@/services/limitageApi";
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import Autocomplete from '@mui/material/Autocomplete';
 import Checkbox from '@mui/material/Checkbox';
 import TextField from '@mui/material/TextField';
-import limitageApiService from "@/services/limitageApi";
 
 // Cache để lưu trữ movie details đã fetch
 const movieDetailCache = new Map<string, MovieDetail>();
@@ -101,6 +102,11 @@ const MovieModal: React.FC<MovieModalProps> = ({
   const [isActorModalOpen, setIsActorModalOpen] = useState(false);
   const [loadingActors, setLoadingActors] = useState(false);
 
+  // Genre selection states
+  const [selectedGenres, setSelectedGenres] = useState<Genre[]>([]);
+  const [allGenres, setAllGenres] = useState<Genre[]>([]);
+  const [loadingGenres, setLoadingGenres] = useState(false);
+
 //   const limitages: DropdownOption[] = useMemo(() => [
 //     { id: "16e1ac95-3413-4069-8852-3df676ee17e6", name: "T13 - Phim dành cho khán giả từ đủ 13 tuổi trở lên" },
 //     { id: "8a4524a5-36aa-4354-af88-c56a191592ac", name: "T16 - Phim dành cho khán giả từ đủ 16 tuổi trở lên" },
@@ -117,6 +123,19 @@ const MovieModal: React.FC<MovieModalProps> = ({
       console.error('Error loading actors:', error);
     } finally {
       setLoadingActors(false);
+    }
+  };
+
+  // Load all genres for autocomplete
+  const loadGenres = async () => {
+    try {
+      setLoadingGenres(true);
+      const genres = await genreApiService.getAllGenres();
+      setAllGenres(genres);
+    } catch (error) {
+      console.error('Error loading genres:', error);
+    } finally {
+      setLoadingGenres(false);
     }
   };
 
@@ -147,11 +166,12 @@ const MovieModal: React.FC<MovieModalProps> = ({
     }
   };
 
-  // Effect 1: load base data when modal opens (actors, countries) and reset add-mode form
+  // Effect 1: load base data when modal opens (actors, genres, countries) and reset add-mode form
   useEffect(() => {
     if (!open) return;
 
     loadActors(); // Load actors for autocomplete
+    loadGenres(); // Load genres for autocomplete
     fetchData(); // Load countries for dropdown
 
     // If opening in add mode, reset the form immediately
@@ -172,6 +192,7 @@ const MovieModal: React.FC<MovieModalProps> = ({
         status: "",
       });
       setSelectedActors([]);
+      setSelectedGenres([]);
     }
 
     setImageError(false);
@@ -184,7 +205,6 @@ const MovieModal: React.FC<MovieModalProps> = ({
 
     const fetchMovieDetail = async () => {
       if (!movie || !(mode === "edit" || mode === "view") || countries.length === 0) return;
-
       // Kiểm tra cache trước
       if (movieDetailCache.has(movie)) {
         const cachedDetail = movieDetailCache.get(movie)!;
@@ -211,6 +231,7 @@ const MovieModal: React.FC<MovieModalProps> = ({
         });
 
         setSelectedActors(cachedDetail.listActor || []);
+        setSelectedGenres(cachedDetail.listGenre || []);
         console.log('Loaded from cache:', cachedDetail);
         return;
       }
@@ -244,6 +265,7 @@ const MovieModal: React.FC<MovieModalProps> = ({
         });
 
         setSelectedActors(movieDetail.listActor || []);
+        setSelectedGenres(movieDetail.listGenre || []);
         console.log('Fetched movie detail:', movieDetail);
       } catch (error) {
         console.error('Error fetching movie detail:', error);
@@ -364,6 +386,10 @@ const MovieModal: React.FC<MovieModalProps> = ({
       newErrors.listActor = "Danh sách diễn viên là bắt buộc";
     }
 
+    if (!selectedGenres || selectedGenres.length === 0) {
+      newErrors.listGenre = "Danh sách thể loại là bắt buộc";
+    }
+
     setErrors(newErrors);
     
     // Log validation results for debugging
@@ -394,13 +420,14 @@ const MovieModal: React.FC<MovieModalProps> = ({
     try {
         if (isValid && onSubmit) {
             console.log('Calling onSubmit with form data');
-            // Add selected actors to form before submitting
-            const formWithActors = {
+            // Add selected actors and genres to form before submitting
+            const formWithActorsAndGenres = {
                 ...form,
-                listActor: selectedActors
+                listActor: selectedActors,
+                listGenre: selectedGenres
             };
-            console.log('Final form data:', formWithActors);
-            onSubmit(formWithActors);
+            console.log('Final form data:', formWithActorsAndGenres);
+            onSubmit(formWithActorsAndGenres);
         } else {
             console.log('Validation failed or onSubmit not provided');
             console.log('onSubmit:', onSubmit);
@@ -918,16 +945,6 @@ const MovieModal: React.FC<MovieModalProps> = ({
                   )
                 )}
                 
-                {/* Display current trailer info */}
-                {form.trailer && (
-                  <div className="mt-2 text-xs text-slate-500">
-                    {form.trailer instanceof File 
-                      ? `File: ${form.trailer.name} (${(form.trailer.size / 1024 / 1024).toFixed(2)} MB)`
-                      : `URL: ${form.trailer}`
-                    }
-                  </div>
-                )}
-                
               </div>
 
               {/* Actor Selection */}
@@ -1085,6 +1102,116 @@ const MovieModal: React.FC<MovieModalProps> = ({
 
                 {isView && selectedActors.length === 0 && (
                   <div className="text-slate-500 text-sm">Chưa có diễn viên nào được chọn</div>
+                )}
+              </div>
+
+              {/* Genre Selection */}
+              <div>
+                <label className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                  <Film className="w-4 h-4" />
+                  Thể loại phim *
+                </label>
+
+                {!isView && (
+                  <div className="space-y-3">
+                    {/* Genre Search with MUI Autocomplete */}
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <Autocomplete
+                          multiple
+                          id="genre-autocomplete"
+                          options={allGenres}
+                          loading={loadingGenres}
+                          value={selectedGenres}
+                          onChange={(_event, newValue) => {
+                            setSelectedGenres(newValue);
+                            // Clear error when genres are selected
+                            if (errors.listGenre) {
+                              setErrors(prev => ({ ...prev, listGenre: "" }));
+                            }
+                          }}
+                          disableCloseOnSelect
+                          disabled={isLoading}
+                          getOptionLabel={(option) => option.nameVn}
+                          getOptionKey={(option) => option.id}
+                          isOptionEqualToValue={(option, value) => option.id === value.id}
+                          renderOption={(props, option, { selected }) => (
+                            <li {...props}>
+                              <Checkbox
+                                icon={icon}
+                                checkedIcon={checkedIcon}
+                                style={{ marginRight: 8 }}
+                                checked={selected}
+                              />
+                              <div>
+                                <p className="font-medium">{option.nameVn}</p>
+                                <p className="text-xs text-slate-500">{option.nameEn}</p>
+                              </div>
+                            </li>
+                          )}
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              variant="outlined"
+                              placeholder="Tìm kiếm thể loại..."
+                              InputProps={{
+                                ...params.InputProps,
+                                endAdornment: (
+                                  <>
+                                    {loadingGenres ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                    {params.InputProps.endAdornment}
+                                  </>
+                                ),
+                              }}
+                            />
+                          )}
+                          renderTags={(value, getTagProps) =>
+                            value.map((option, index) => (
+                              <div
+                                {...getTagProps({ index })}
+                                key={option.id}
+                                className="inline-flex items-center gap-2 bg-purple-100 text-purple-800 px-3 py-1 rounded-lg mr-2 mb-2"
+                              >
+                                <span className="text-sm font-medium">{option.nameVn}</span>
+                                <button
+                                  type="button"
+                                  tabIndex={-1}
+                                  onClick={() => setSelectedGenres(prev => prev.filter(g => g.id !== option.id))}
+                                  className="ml-1 text-purple-600 hover:text-purple-800 transition-colors"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))
+                          }
+                          sx={{ width: '100%' }}
+                        />
+                      </div>
+                    </div>
+                    {errors.listGenre && (
+                      <p className="text-red-500 text-xs mt-1">{errors.listGenre}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* View Mode - Show selected genres */}
+                {isView && selectedGenres.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedGenres.map((genre) => (
+                      <div
+                        key={genre.id}
+                        className="inline-flex items-center gap-2 bg-slate-100 text-slate-800 px-3 py-2 rounded-lg"
+                      >
+                        <Film className="w-4 h-4" />
+                        <span className="text-sm font-medium">{genre.nameVn}</span>
+                        <span className="text-xs text-slate-600">({genre.nameEn})</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {isView && selectedGenres.length === 0 && (
+                  <div className="text-slate-500 text-sm">Chưa có thể loại nào được chọn</div>
                 )}
               </div>
 

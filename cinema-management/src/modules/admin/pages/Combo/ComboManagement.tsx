@@ -106,7 +106,8 @@ const ComboManagement: React.FC = () => {
                         if (formData.img) {
                             formDataCombo.append('img', formData.img);
                         }
-                        await comboApiService.updateCombo(formData.id, formDataCombo);
+                        const response = await comboApiService.updateCombo(formData.id, formDataCombo);
+                        console.log("Update response:", response);
                         break;
                     }
                 }

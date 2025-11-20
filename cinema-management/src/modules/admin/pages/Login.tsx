@@ -36,10 +36,11 @@ const Login = () => {
 
         if (response.data.statusCode === 200) {
           const userData: UserData = response.data.data;
-          // Lưu tokens vào localStorage
-          localStorage.setItem("accessToken", userData.accessToken);
-          localStorage.setItem("refreshToken", userData.refreshToken);
-          localStorage.setItem("fullName", userData.fullName);
+          // Lưu tokens vào localStorage với prefix 'admin_' để phân biệt với client
+          localStorage.setItem("admin_accessToken", userData.accessToken);
+          localStorage.setItem("admin_refreshToken", userData.refreshToken);
+          localStorage.setItem("admin_fullName", userData.fullName);
+          localStorage.setItem("admin_userType", "admin"); // Đánh dấu là admin
           
           setErrors({});
           navigate("/admin");
