@@ -1,5 +1,9 @@
 import useDebounce from '@/hooks/useDebounce';
+import comboApiService, { type Combo } from '@/services/comboApi';
 import { type MovieDetail, movieApiService } from '@/services/movieApi';
+import type { Seat } from '@/services/roomApi';
+import { type Showtime, showtimeApiService } from '@/services/showtimeApi';
+import type { Theater } from '@/services/theaterApi';
 import { type User, userApiService } from '@/services/userApi';
 import { faCalendarAlt, faClock, faSearch, faTimes, faUtensils } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -13,10 +17,6 @@ import { toast } from 'sonner';
 import { API_BASE_URL, WEBSOCKET_URL } from '../../../../components/api-config';
 import Loading from '../../components/loading';
 import ComboModal from './components/ComboModal';
-import comboApiService, { type Combo } from '@/services/comboApi';
-import type { Theater } from '@/services/theaterApi';
-import { showtimeApiService, type Showtime } from '@/services/showtimeApi';
-import type { Seat } from '@/services/roomApi';
 
 
 // interface Theater {
@@ -47,7 +47,7 @@ import type { Seat } from '@/services/roomApi';
 
 const BookingManagement: React.FC = () => {
   const [movies, setMovies] = useState<MovieDetail[]>([]);
-//   const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<MovieDetail | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedTheater, setSelectedTheater] = useState<Theater>({
@@ -70,7 +70,7 @@ const BookingManagement: React.FC = () => {
   const [showComboModal, setShowComboModal] = useState(false);
   const [loadingCombos, setLoadingCombos] = useState(false);
   const [customer, setCustomer] = useState<User | null>(null);
-//   const [customerPhone, setCustomerPhone] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'MOMO' | 'CASH'>();
   const [activeStep, setActiveStep] = useState<number>(0);
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString('vi-VN'));
@@ -96,14 +96,14 @@ const BookingManagement: React.FC = () => {
 
 //   const dates = generateDates();
 
-    // const fetchUsers = async () => {
-    //     try {
-    //         const userResponse = await userApiService.getAllUsers();
-    //         setUsers(userResponse);
-    //     } catch (error) {
-    //         console.error('Error fetching users:', error);
-    //     }
-    // };
+    const fetchUsers = async () => {
+        try {
+            const userResponse = await userApiService.getAllUsers();
+            setUsers(userResponse);
+        } catch (error) {
+            console.error('Error fetching users:', error);
+        }
+    };
 
     const fetchMovies = async () => {
         if (!selectedTheater || !selectedDate) return; // Tránh gọi API nếu thiếu data
@@ -130,6 +130,7 @@ const BookingManagement: React.FC = () => {
     };
 
     useEffect(() => {
+        fetchUsers();
         fetchMovies();
     }, []);
 
@@ -315,24 +316,28 @@ const BookingManagement: React.FC = () => {
     return legendItems;
   };
 
-//   const handlePhoneNumberSearch = async () => {
-//     if (!customerPhone) return;
+  const handlePhoneNumberSearch = async () => {
+    if (!customerPhone.trim()) {
+      toast.warning('Vui lòng nhập số điện thoại!');
+      return;
+    }
 
-//     try {
-//         const foundUsers = users.filter(user => user.phone === customerPhone);
-//         if (foundUsers.length > 0) {
-//             const user = foundUsers[0];
-//             setCustomer(user || null);
-//             console.log('Found user:', user);
-//         } else {
-//             setCustomer(null);
-//             alert('Không tìm thấy khách hàng với số điện thoại này.');
-//         }
-//     } catch (error) {
-//         console.error('Error searching user by phone:', error);
-//         alert('Có lỗi xảy ra khi tìm kiếm khách hàng.');
-//     }
-//   };
+    try {
+        const foundUsers = users.filter(user => user.phone === customerPhone.trim());
+        if (foundUsers.length > 0) {
+            const user = foundUsers[0];
+            setCustomer(user || null);
+            toast.success(`Tìm thấy khách hàng: ${user.fullName}`);
+            console.log('Found user:', user);
+        } else {
+            setCustomer(null);
+            toast.error('Không tìm thấy khách hàng với số điện thoại này.');
+        }
+    } catch (error) {
+        console.error('Error searching user by phone:', error);
+        toast.error('Có lỗi xảy ra khi tìm kiếm khách hàng.');
+    }
+  };
 
   const handleBooking = async () => {
     if (!selectedShowtime || selectedSeats.length === 0) return;
@@ -348,7 +353,7 @@ const BookingManagement: React.FC = () => {
         listSeatId: string[];
         listCombo?: { [key: string]: number };
       } = {
-        userId: 'e4651591-9f9b-4f86-9027-ba968e6550b9',
+        userId: customer?.id || 'e4651591-9f9b-4f86-9027-ba968e6550b9',
         employeeId: localStorage.getItem("admin_employeeId") || undefined,
         showtimeId: selectedShowtime.id || '',
         paymentMethod: paymentMethod!,
@@ -387,7 +392,7 @@ const BookingManagement: React.FC = () => {
         setSelectedShowtime(null);
         setSelectedSeats([]);
         setSelectedCombos([]);
-        // setCustomerPhone('');
+        setCustomerPhone('');
         setCustomer(null);
         window.location.href = data.data;
       } else {
@@ -406,7 +411,7 @@ const BookingManagement: React.FC = () => {
     setSelectedShowtime(null);
     setSelectedSeats([]);
     setSelectedCombos([]);
-    // setCustomerPhone('');
+    setCustomerPhone('');
     setCustomer(null);
     setSelectedMovie(null);
     setShowtimes([]);
@@ -721,12 +726,36 @@ const BookingManagement: React.FC = () => {
                             )}
 
                             {/* Customer Info */}
-                            {/* {customer?.fullName && (
-                            <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                                <p className="text-sm text-gray-600">Khách hàng:</p>
-                                <p className="font-semibold text-gray-900">{customer?.fullName}</p>
+                            <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                                <p className="text-sm text-gray-600 mb-2">Số điện thoại khách hàng:</p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Nhập SĐT"
+                                        value={customerPhone}
+                                        onChange={(e) => setCustomerPhone(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                handlePhoneNumberSearch();
+                                            }
+                                        }}
+                                        className=" border border-gray-300 rounded-lg p-2 text-sm w-full"
+                                    />
+                                    <button
+                                        onClick={handlePhoneNumberSearch}
+                                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+                                    >
+                                        Tìm
+                                    </button>
+                                </div>
+                                {customer?.fullName && (
+                                    <div className="mt-2 p-2 bg-green-100 rounded border border-green-300">
+                                        <p className="text-xs text-gray-600">Khách hàng:</p>
+                                        <p className="font-semibold text-gray-900 text-sm">{customer.fullName}</p>
+                                        <p className="text-xs text-gray-600">SĐT: {customer.phone}</p>
+                                    </div>
+                                )}
                             </div>
-                            )} */}
 
                             {/* Seats */}
                             {selectedSeats.length > 0 && (
@@ -800,7 +829,7 @@ const BookingManagement: React.FC = () => {
                                             ? 'bg-indigo-50 text-indigo-900 border-blue-300 ring-indigo-200'
                                             : 'border-transparent hover:bg-slate-200 text-gray-700'
                                     }`}>
-                                        <span className="text-sm flex items-center justify-center gap-2"><CreditCard /> Thẻ tín dụng</span>
+                                        <span className="text-sm flex items-center justify-center gap-2"><CreditCard /> Momo</span>
                                         <input
                                             type="radio"
                                             name="paymentMethod"
