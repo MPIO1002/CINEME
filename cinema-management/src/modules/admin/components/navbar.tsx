@@ -1,6 +1,7 @@
 // import { getUserData, logout } from "../utils/authUtils";
 
 import authApiService from "@/services/authApi";
+import Cookies from "js-cookie";
 
 const Navbar = () => {
 //   const userData = getUserData();
@@ -12,7 +13,7 @@ const Navbar = () => {
                 await authApiService.logout();
 
                 localStorage.removeItem("admin_accessToken");
-                localStorage.removeItem("admin_refreshToken");
+                Cookies.remove('refreshToken');
                 localStorage.removeItem("admin_fullName");
                 localStorage.removeItem("admin_employeeId");
                 localStorage.removeItem("admin_userType");

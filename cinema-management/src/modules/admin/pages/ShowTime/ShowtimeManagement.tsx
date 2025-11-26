@@ -65,7 +65,6 @@ const fetchShowtimes = async () => {
     try {
         const response = await showtimeApiService.getAllShowtimes();
             setShowtimes(response);
-            console.table(response);
     } catch (error) {
         console.error('Error fetching showtimes:', error);
         setShowtimes([]);
@@ -141,7 +140,6 @@ const handleSaveShowtime = async (showtime: Showtime) => {
                 setLoading(false);
                 return;
             }
-            console.table(showtimeData);
             const response = await showtimeApiService.createShowtime(showtimeData);
             if (response.statusCode === 200 || response.statusCode === 201) {
                 alert('Thêm suất chiếu thành công!');

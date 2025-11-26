@@ -19,15 +19,35 @@ interface PaymentParams {
   signature: string;
 }
 
-const ResultPayment: React.FC = () => {
+interface BookingDetails {
+  movieTitle: string;
+  movieTitleEn: string;
+  showtime: string;
+  date: string;
+  seats: string[];
+  theaterName: string;
+  roomName: string;
+  totalAmount: number;
+  seatPrice: number;
+  comboPrice: number;
+  combos: Array<{ name: string; quantity: number; price: number }>;
+  customer: { name: string; phone: string } | null;
+  paymentMethod: string;
+}
+
+const ResultPayment: React.FC<{onClose?: () => void}> = ({onClose}) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [paymentParams, setPaymentParams] = useState<PaymentParams | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const ticketRef = useRef<HTMLDivElement>(null);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [bookingDetails, setBookingDetails] = useState<BookingDetails | null>(null);
 
   useEffect(() => {
+    // Đọc thông tin booking từ localStorage trước
+    const savedBookingInfo = localStorage.getItem('lastBookingInfo');
+    
     // Extract all parameters from URL
     const params: PaymentParams = {
       partnerCode: searchParams.get('partnerCode') || '',
@@ -46,7 +66,24 @@ const ResultPayment: React.FC = () => {
     };
 
     setPaymentParams(params);
-    setIsSuccess(params.resultCode === '0');
+
+    // Xử lý logic success
+    if (savedBookingInfo) {
+      // Trường hợp thanh toán CASH - có booking info trong localStorage
+      try {
+        const bookingInfo = JSON.parse(savedBookingInfo);
+        setBookingDetails(bookingInfo);
+        setIsSuccess(true);
+        // Xoá thông tin booking sau khi sử dụng
+        // localStorage.removeItem('lastBookingInfo');
+      } catch (error) {
+        console.error('Error parsing booking info:', error);
+        setIsSuccess(false);
+      }
+    } else {
+      // Trường hợp thanh toán MOMO - kiểm tra resultCode từ URL
+      setIsSuccess(params.resultCode === '0');
+    }
   }, [searchParams]);
 
   const formatAmount = (amount: string) => {
@@ -87,7 +124,7 @@ const ResultPayment: React.FC = () => {
   };
 
   const handlePrintPDF = async () => {
-    if (!paymentParams) return;
+    if (!paymentParams && !bookingDetails) return;
     
     try {
       setIsPrinting(true);
@@ -167,47 +204,114 @@ const ResultPayment: React.FC = () => {
       yPos += 8;
       addText('SO TIEN THANH TOAN', 10, false, 'center');
       yPos += 2;
-      addText(formatAmount(paymentParams.amount), 20, true, 'center');
+      const totalAmount = bookingDetails 
+        ? bookingDetails.totalAmount.toLocaleString('vi-VN') + 'd'
+        : formatAmount(paymentParams?.amount || '0');
+      addText(totalAmount, 20, true, 'center');
       yPos += 8;
 
       addSpace(10);
       addLine();
 
-      // Order info
-      addText('THONG TIN DON HANG', 12, true);
-      addSpace(5);
-      
-      const orderInfo = decodeURIComponent(paymentParams.orderInfo);
-      addText(orderInfo, 10, false);
-      addSpace(3);
-      addText(`Trang thai: ${decodeURIComponent(paymentParams.message)}`, 10, false);
-      
-      addSpace(8);
-      addLine();
+      // Booking Details Section - Thông tin đặt vé
+      if (bookingDetails) {
+        addText('THONG TIN DAT VE', 12, true);
+        addSpace(5);
 
-      // Transaction details
-      addText('CHI TIET GIAO DICH', 12, true);
-      addSpace(5);
+        // Movie info
+        addText(`Phim: ${bookingDetails.movieTitle}`, 10, true);
+        addSpace(2);
+        addText(`${bookingDetails.movieTitleEn}`, 9, false);
+        addSpace(5);
 
-      const details = [
-        ['Ma giao dich:', paymentParams.transId],
-        ['Ma don hang:', paymentParams.orderId],
-        ['Phuong thuc:', `${paymentParams.partnerCode} - ${getPaymentMethodLabel(paymentParams.payType)}`],
-        ['Thoi gian:', `${dateTime.time} - ${dateTime.date}`],
-        ['Ma ket qua:', `${paymentParams.resultCode} (${isSuccess ? 'Thanh cong' : 'That bai'})`]
-      ];
+        // Theater & Room
+        addText(`Rap chieu: ${bookingDetails.theaterName}`, 10, false);
+        addSpace(3);
+        addText(`Phong: ${bookingDetails.roomName}`, 10, false);
+        addSpace(5);
 
-      details.forEach(([label, value]) => {
+        // Showtime & Date
+        addText(`Suat chieu: ${bookingDetails.showtime}`, 10, false);
+        addSpace(3);
+        addText(`Ngay: ${new Date(bookingDetails.date).toLocaleDateString('vi-VN')}`, 10, false);
+        addSpace(5);
+
+        // Seats
+        addText(`Ghe: ${bookingDetails.seats.join(', ')}`, 10, false);
+        addSpace(5);
+
+        // Customer info
+        if (bookingDetails.customer) {
+          addText(`Khach hang: ${bookingDetails.customer.name}`, 10, false);
+          addSpace(3);
+          addText(`SDT: ${bookingDetails.customer.phone}`, 10, false);
+          addSpace(5);
+        }
+
+        // Combos
+        if (bookingDetails.combos.length > 0) {
+          addText('Combo:', 10, true);
+          addSpace(3);
+          bookingDetails.combos.forEach(combo => {
+            addText(`${combo.quantity}x ${combo.name} - ${(combo.price * combo.quantity).toLocaleString('vi-VN')}d`, 9, false);
+            addSpace(2);
+          });
+          addSpace(3);
+        }
+
+        addSpace(5);
+        addLine();
+
+        // Price breakdown
+        addText('CHI TIET GIA', 12, true);
+        addSpace(5);
+
+        addText(`Tien ve: ${bookingDetails.seatPrice.toLocaleString('vi-VN')}d`, 10, false);
+        addSpace(3);
+        
+        if (bookingDetails.comboPrice > 0) {
+          addText(`Tien combo: ${bookingDetails.comboPrice.toLocaleString('vi-VN')}d`, 10, false);
+          addSpace(3);
+        }
+
         pdf.setFont('helvetica', 'bold');
-        pdf.text(toAscii(label), margin, yPos);
+        addText(`Tong cong: ${bookingDetails.totalAmount.toLocaleString('vi-VN')}d`, 11, true);
         pdf.setFont('helvetica', 'normal');
-        const lines = pdf.splitTextToSize(toAscii(value), contentWidth - 50);
-        pdf.text(lines, margin + 50, yPos);
-        yPos += 7 * lines.length;
-      });
+        
+        addSpace(5);
+        addLine();
 
-      addSpace(8);
-      addLine();
+        // Payment method
+        addText(`Phuong thuc thanh toan: ${bookingDetails.paymentMethod === 'MOMO' ? 'MoMo' : 'Tien mat'}`, 10, false);
+        addSpace(8);
+        addLine();
+      }
+
+      // Transaction details (nếu có từ MOMO)
+      if (paymentParams && paymentParams.transId && paymentParams.orderId) {
+        addText('CHI TIET GIAO DICH', 12, true);
+        addSpace(5);
+
+        const dateTime = formatDateTime(paymentParams.responseTime);
+        const details = [
+          ['Ma giao dich:', paymentParams.transId],
+          ['Ma don hang:', paymentParams.orderId],
+          ['Phuong thuc:', `${paymentParams.partnerCode} - ${getPaymentMethodLabel(paymentParams.payType)}`],
+          ['Thoi gian:', `${dateTime.time} - ${dateTime.date}`],
+        ];
+
+        details.forEach(([label, value]) => {
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(toAscii(label), margin, yPos);
+          pdf.setFont('helvetica', 'normal');
+          const lines = pdf.splitTextToSize(toAscii(value), contentWidth - 50);
+          pdf.text(lines, margin + 50, yPos);
+          yPos += 7 * lines.length;
+        });
+
+        addSpace(8);
+        addLine();
+      }
 
       // Footer notes
       if (isSuccess) {
@@ -229,7 +333,7 @@ const ResultPayment: React.FC = () => {
         const notes = [
           'Kiem tra lai ket noi mang va thu lai',
           'Neu van de van tiep dien, lien he bo phan IT',
-          `Ma giao dich de tra cuu: ${paymentParams.transId}`,
+          `Ma giao dich de tra cuu: ${paymentParams?.transId || 'N/A'}`,
           'Giao dich chua hoan tat, vui long thuc hien lai'
         ];
         notes.forEach(note => {
@@ -249,7 +353,8 @@ const ResultPayment: React.FC = () => {
 
       // Generate filename
       const timestamp = new Date().getTime();
-      pdf.save(`Hoa-Don-${paymentParams?.orderId || timestamp}.pdf`);
+      const orderId = paymentParams?.orderId || bookingDetails?.movieTitle.replace(/\s+/g, '-') || timestamp;
+      pdf.save(`Hoa-Don-${orderId}.pdf`);
       
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -270,7 +375,7 @@ const ResultPayment: React.FC = () => {
   const dateTime = formatDateTime(paymentParams.responseTime);
 
   return (
-    <div className="min-h-screen bg-white py-12 px-4">
+    <div className="min-h-screen bg-black/50 py-12 px-4 absolute inset-0 z-50 overflow-auto">
       <div className="max-w-4xl mx-auto">
         {/* Ticket Content - This will be captured for PDF */}
         <div ref={ticketRef} data-pdf-content>
@@ -304,7 +409,7 @@ const ResultPayment: React.FC = () => {
             <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 inline-block">
               <p className="text-white/80 text-sm mb-2">Số tiền thanh toán</p>
               <p className="text-5xl font-bold text-white">
-                {formatAmount(paymentParams.amount)}
+                {bookingDetails ? bookingDetails.totalAmount.toLocaleString('vi-VN') + 'đ' : formatAmount(paymentParams.amount)}
               </p>
             </div>
           </div>
@@ -320,7 +425,76 @@ const ResultPayment: React.FC = () => {
           </div>
 
           <div className="p-8 space-y-6">
-            {/* Order Info */}
+            {/* Movie & Booking Info */}
+            {bookingDetails && (
+              <>
+                <div className="flex items-start gap-4 pb-6 border-b border-gray-200">
+                  <div className="bg-purple-100 p-3 rounded-xl">
+                    <Info className="w-6 h-6 text-purple-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-500 mb-1">Thông tin phim</p>
+                    <p className="text-lg font-semibold text-gray-800">{bookingDetails.movieTitle}</p>
+                    <p className="text-sm text-gray-600">{bookingDetails.movieTitleEn}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-gray-50 p-4 rounded-xl">
+                    <p className="text-sm text-gray-500 mb-2">Rạp chiếu</p>
+                    <p className="text-base font-semibold text-gray-800">{bookingDetails.theaterName}</p>
+                    <p className="text-sm text-gray-600">Phòng: {bookingDetails.roomName}</p>
+                  </div>
+
+                  <div className="bg-gray-50 p-4 rounded-xl">
+                    <p className="text-sm text-gray-500 mb-2">Suất chiếu</p>
+                    <p className="text-base font-semibold text-gray-800">{bookingDetails.showtime}</p>
+                    <p className="text-sm text-gray-600">{new Date(bookingDetails.date).toLocaleDateString('vi-VN')}</p>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-xl">
+                  <p className="text-sm text-gray-500 mb-2">Ghế đã chọn</p>
+                  <p className="text-base font-semibold text-gray-800">{bookingDetails.seats.join(', ')}</p>
+                </div>
+
+                {bookingDetails.combos.length > 0 && (
+                  <div className="bg-gray-50 p-4 rounded-xl">
+                    <p className="text-sm text-gray-500 mb-2">Combo</p>
+                    {bookingDetails.combos.map((combo, idx) => (
+                      <p key={idx} className="text-base text-gray-800">
+                        {combo.quantity}x {combo.name} - {(combo.price * combo.quantity).toLocaleString('vi-VN')}đ
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {bookingDetails.customer && (
+                  <div className="bg-green-50 p-4 rounded-xl border border-green-200">
+                    <p className="text-sm text-gray-500 mb-2">Thông tin khách hàng</p>
+                    <p className="text-base font-semibold text-gray-800">{bookingDetails.customer.name}</p>
+                    <p className="text-sm text-gray-600">SĐT: {bookingDetails.customer.phone}</p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-gray-50 p-4 rounded-xl">
+                    <p className="text-sm text-gray-500 mb-2">Tiền vé</p>
+                    <p className="text-base font-semibold text-gray-800">{bookingDetails.seatPrice.toLocaleString('vi-VN')}đ</p>
+                  </div>
+
+                  {bookingDetails.comboPrice > 0 && (
+                    <div className="bg-gray-50 p-4 rounded-xl">
+                      <p className="text-sm text-gray-500 mb-2">Tiền combo</p>
+                      <p className="text-base font-semibold text-gray-800">{bookingDetails.comboPrice.toLocaleString('vi-VN')}đ</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Order Info - Hiển thị khi có paymentParams (từ MOMO) */}
+            {paymentParams.orderInfo && (
             <div className="flex items-start gap-4 pb-6 border-b border-gray-200">
               <div className="bg-orange-100 p-3 rounded-xl">
                 <Info className="w-6 h-6 text-orange-600" />
@@ -332,9 +506,10 @@ const ResultPayment: React.FC = () => {
                 </p>
               </div>
             </div>
+            )}
 
             {/* Transaction ID */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {paymentParams.transId && paymentParams.orderId && (<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-gray-50 p-4 rounded-xl">
                 <p className="text-sm text-gray-500 mb-2">Mã giao dịch</p>
                 <p className="text-base font-mono font-semibold text-gray-800 break-all">
@@ -348,10 +523,10 @@ const ResultPayment: React.FC = () => {
                   {paymentParams.orderId}
                 </p>
               </div>
-            </div>
+            </div>)}
 
             {/* Payment Method */}
-            <div className="flex items-start gap-4 pb-6 border-b border-gray-200">
+            { paymentParams.partnerCode && paymentParams.payType && (<div className="flex items-start gap-4 pb-6 border-b border-gray-200">
               <div className="bg-blue-100 p-3 rounded-xl">
                 <CreditCard className="w-6 h-6 text-blue-600" />
               </div>
@@ -361,7 +536,7 @@ const ResultPayment: React.FC = () => {
                   {paymentParams.partnerCode} - {getPaymentMethodLabel(paymentParams.payType)}
                 </p>
               </div>
-            </div>
+            </div>)}
 
             {/* Date Time */}
             <div className="flex items-start gap-4">
@@ -371,34 +546,18 @@ const ResultPayment: React.FC = () => {
               <div className="flex-1">
                 <p className="text-sm text-gray-500 mb-1">Thời gian giao dịch</p>
                 <p className="text-lg font-semibold text-gray-800">
-                  {dateTime.time} - {dateTime.date}
+                  {dateTime.time || new Date().toLocaleDateString('vi-VN')} - {dateTime.date}
                 </p>
               </div>
             </div>
 
-            {/* Result Code */}
-            <div className="bg-gray-50 p-4 rounded-xl">
-              <p className="text-sm text-gray-500 mb-2">Mã kết quả</p>
-              <div className="flex items-center gap-2">
-                <span className={`px-4 py-2 rounded-full text-sm font-bold ${
-                  isSuccess 
-                    ? 'bg-green-100 text-green-700' 
-                    : 'bg-red-100 text-red-700'
-                }`}>
-                  {paymentParams.resultCode}
-                </span>
-                <span className="text-gray-600">
-                  {isSuccess ? '(Thành công)' : '(Thất bại)'}
-                </span>
-              </div>
-            </div>
           {/* </div> */}
         {/* )} */}
         </div>
         {/* End Ticket Content */}
 
         {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
           {isSuccess && (
             <button
               onClick={handlePrintPDF}
@@ -413,11 +572,18 @@ const ResultPayment: React.FC = () => {
           )}
           
           <button
-            onClick={() => navigate('/admin/bookings')}
+            onClick={() => {
+              if (onClose) {
+                onClose();
+                localStorage.removeItem('lastBookingInfo');
+              } else {
+                navigate('/admin/bookings');
+              }
+            }}
             className="flex items-center justify-center gap-3 bg-gradient-to-r from-orange-500 to-red-500 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:shadow-2xl hover:scale-105 transition-all duration-300"
           >
             <Receipt className="w-6 h-6" />
-            Quay lại quản lý đặt vé
+            {onClose ? 'Đóng & Đặt vé mới' : 'Quay lại quản lý đặt vé'}
           </button>
 
           {!isSuccess && (
@@ -431,7 +597,7 @@ const ResultPayment: React.FC = () => {
         </div>
 
         {/* Note */}
-        {isSuccess && (
+        {/* {isSuccess && (
           <div className="mt-8 bg-blue-50 border-l-4 border-blue-500 p-6 rounded-r-2xl">
             <div className="flex items-start gap-3">
               <Info className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
@@ -463,7 +629,7 @@ const ResultPayment: React.FC = () => {
               </div>
             </div>
           </div>
-        )}
+        )} */}
         </div>
       </div>
     </div>

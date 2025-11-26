@@ -44,6 +44,20 @@ export interface MovieDetail {
     limitageNameEn: string;
     listActor: Actor[];
     listGenre: Genre[];
+    showtimes?: {
+        date: string;
+        startTime: string;
+        endTime: string;
+        id: string;
+        img: string;
+        isAvailable: boolean;
+        movieId: string;
+        movieNameEn: string;
+        movieNameVn: string;
+        roomId: string;
+        roomName: string;
+        theaterId: string;
+    }[]; // Optional showtime list
 }
 
 // API Functions
@@ -59,12 +73,12 @@ export const movieApiService = {
         }
     },
 
-    getMoviesByTheaterAndDate: async (theaterId: string, date: string) => {
+    getMoviesByTheaterAndDate: async (date: string) => {
         try {
-            const response = await api.get(`/schedules/search?theaterId=${theaterId}&date=${date}`);
+            const response = await api.get(`/schedules/search?date=${date}`);
             return response.data.data;
         } catch (error) {
-            console.error(`Error fetching movies for theater ${theaterId} on date ${date}:`, error);
+            console.error(`Error fetching movies date ${date}:`, error);
             throw error;
         }
     },

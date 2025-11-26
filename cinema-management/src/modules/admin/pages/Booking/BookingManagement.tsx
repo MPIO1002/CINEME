@@ -3,7 +3,6 @@ import comboApiService, { type Combo } from '@/services/comboApi';
 import { type MovieDetail, movieApiService } from '@/services/movieApi';
 import type { Seat } from '@/services/roomApi';
 import { type Showtime, showtimeApiService } from '@/services/showtimeApi';
-import type { Theater } from '@/services/theaterApi';
 import { type User, userApiService } from '@/services/userApi';
 import { faCalendarAlt, faClock, faSearch, faTimes, faUtensils } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -16,6 +15,7 @@ import io from 'socket.io-client';
 import { toast } from 'sonner';
 import { API_BASE_URL, WEBSOCKET_URL } from '../../../../components/api-config';
 import Loading from '../../components/loading';
+import ResultPayment from '../ResultPayment/ResultPayment';
 import ComboModal from './components/ComboModal';
 
 
@@ -50,11 +50,11 @@ const BookingManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<MovieDetail | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [selectedTheater, setSelectedTheater] = useState<Theater>({
-      id: "8f3a5832-8340-4a43-89bc-6653817162f1",
-      nameVn: "Cinestar Quốc Thanh (TP.HCM)",
-      nameEn: "Cinestar Quốc Thanh (TP.HCM)",
-    });
+//   const [selectedTheater, setSelectedTheater] = useState<Theater>({
+//       id: "8f3a5832-8340-4a43-89bc-6653817162f1",
+//       nameVn: "Cinestar Quốc Thanh (TP.HCM)",
+//       nameEn: "Cinestar Quốc Thanh (TP.HCM)",
+//     });
   const [selectedShowtime, setSelectedShowtime] = useState<Showtime | null>(null);
 //   const [theaters, setTheaters] = useState<Theater[]>([]);
   const [showtimes, setShowtimes] = useState<Showtime[]>([]);
@@ -77,6 +77,7 @@ const BookingManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
   const wsRef = useRef<SocketIOClient.Socket | null>(null);
+  const [openResultPayment, setOpenResultPayment] = useState(false);
 
   const steps = ['Chọn phim & suất chiếu', 'Chọn ghế & thanh toán'];
 //   const generateDates = () => {
@@ -106,13 +107,14 @@ const BookingManagement: React.FC = () => {
     };
 
     const fetchMovies = async () => {
-        if (!selectedTheater || !selectedDate) return; // Tránh gọi API nếu thiếu data
+        if (!selectedDate) return; // Tránh gọi API nếu thiếu data
         setLoading(true); // Set loading khi bắt đầu fetch
         try {
             const movieResponse = await movieApiService.getMoviesByTheaterAndDate(
-                selectedTheater.id!,
+                // selectedTheater.id!,
                 selectedDate
             );
+            console.log('Fetched movies:', movieResponse);
             setMovies(movieResponse);
             // Reset các state liên quan nếu cần (ví dụ: reset phim/showtime đã chọn khi date thay đổi)
             setSelectedMovie(null);
@@ -143,31 +145,15 @@ const BookingManagement: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        const fetchShowtimes = async () => {
-        if (!selectedTheater || !selectedDate || !selectedMovie) return;
-        setLoadingShowtimes(true);
-        try {
-            const response = await showtimeApiService.getShowtimesByMovieTheaterDate(
-                selectedTheater.id!,
-                selectedDate,
-                selectedMovie.movieId
-            );
-            setShowtimes(response);
+        if (selectedMovie && selectedMovie.showtimes) {
+            // Cast showtimes from movie to Showtime type
+            setShowtimes(selectedMovie.showtimes as unknown as Showtime[]);
             setSelectedShowtime(null);
             setSeats([]);
             setSelectedSeats([]);
-            
-        } catch (error) {
-            console.error('Error fetching showtimes:', error);
-        } finally {
-            setLoadingShowtimes(false);
-            setSeats([]);
-            setSelectedSeats([]);
-            setPaymentMethod(undefined);
+        } else {
+            setShowtimes([]);
         }
-        };
-
-        fetchShowtimes();
     }, [selectedMovie]);
 
     useEffect(() => {
@@ -346,14 +332,14 @@ const BookingManagement: React.FC = () => {
 
     try {
       const bookingData: {
-        userId: string;
+        userId?: string | null;
         employeeId?: string;
         showtimeId: string;
         paymentMethod: 'MOMO' | 'CASH';
         listSeatId: string[];
         listCombo?: { [key: string]: number };
       } = {
-        userId: customer?.id || 'e4651591-9f9b-4f86-9027-ba968e6550b9',
+        userId: customer?.id || null,
         employeeId: localStorage.getItem("admin_employeeId") || undefined,
         showtimeId: selectedShowtime.id || '',
         paymentMethod: paymentMethod!,
@@ -371,30 +357,54 @@ const BookingManagement: React.FC = () => {
       console.log('Booking Data:', JSON.stringify(bookingData, null, 2));
       console.log('========================');
 
+      // Lưu thông tin booking để hiển thị trong ResultPayment
+      const bookingInfo = {
+        movieTitle: selectedMovie?.movieNameVn || '',
+        movieTitleEn: selectedMovie?.movieNameEn || '',
+        showtime: selectedShowtime?.startTime || '',
+        date: selectedDate,
+        seats: selectedSeats.map(seat => seat.seatNumber),
+        theaterName: 'Cinestar Quốc Thanh (TP.HCM)',
+        roomName: selectedShowtime?.roomName || '',
+        totalAmount: totalPrice,
+        seatPrice: seatPrice,
+        comboPrice: comboPrice,
+        combos: selectedCombos.map(combo => ({
+          name: combo.name,
+          quantity: combo.selectedQuantity,
+          price: combo.price
+        })),
+        customer: customer ? {
+          name: customer.fullName,
+          phone: customer.phone
+        } : null,
+        paymentMethod: paymentMethod
+      };
+
       let data;
-    //   if (paymentMethod === "MOMO") {
-        const response = await fetch(`${API_BASE_URL}/payments/admin`, {
-            method: 'POST',
-            headers: {
-            'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(bookingData)
-        });
+      const response = await fetch(`${API_BASE_URL}/payments/admin`, {
+          method: 'POST',
+          headers: {
+          'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(bookingData)
+      });
 
-        data = await response.json();
-    //   } else {
-    //     console.log('Cash booking data:', bookingData);
-    //   }
+      data = await response.json();
 
-      if (data.statusCode === 200 && data.data) {
-        alert('Đặt vé thành công!');
-        setSelectedMovie(null);
-        setSelectedShowtime(null);
-        setSelectedSeats([]);
-        setSelectedCombos([]);
-        setCustomerPhone('');
-        setCustomer(null);
-        window.location.href = data.data;
+      if (data.statusCode === 200) {
+        // Lưu thông tin booking vào localStorage
+        localStorage.setItem('lastBookingInfo', JSON.stringify(bookingInfo));
+        
+        if(paymentMethod === "MOMO") {
+          // Với MOMO, redirect đến trang thanh toán
+          window.location.href = data.data;
+        } else {
+          // Với CASH, hiển thị modal kết quả
+          alert('Đặt vé thành công!');
+          setOpenResultPayment(true);
+        //   window.location.href = '/admin/result-payment?resultCode=0';
+        }
       } else {
         alert('Không thể đặt vé: ' + (data.message || 'Vui lòng thử lại'));
       }
@@ -415,6 +425,18 @@ const BookingManagement: React.FC = () => {
     setCustomer(null);
     setSelectedMovie(null);
     setShowtimes([]);
+  }
+
+  const handleCloseResultPayment = () => {
+    setOpenResultPayment(false);
+    // Reset form
+    setSelectedMovie(null);
+    setSelectedShowtime(null);
+    setSelectedSeats([]);
+    setSelectedCombos([]);
+    setCustomerPhone('');
+    setCustomer(null);
+    setActiveStep(0);
   }
   const seatPrice = selectedSeats.reduce((sum, seat) => sum + getSeatPrice(seat.seatType || 'Standard', seat.price), 0);
   const comboPrice = selectedCombos.reduce((sum, combo) => sum + (combo.price * combo.selectedQuantity), 0);
@@ -704,11 +726,11 @@ const BookingManagement: React.FC = () => {
                             )}
 
                             {/* Theater & Showtime */}
-                            {selectedTheater && selectedShowtime && (
+                            { selectedShowtime && (
                             <div className="p-3 bg-gray-50 rounded-lg space-y-2">
                                 <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Rạp:</span>
-                                <span className="font-semibold text-gray-900">{selectedTheater.nameVn}</span>
+                                {/* <span className="text-gray-600">Rạp:</span>
+                                <span className="font-semibold text-gray-900">{selectedTheater.nameVn}</span> */}
                                 </div>
                                 <div className="flex justify-between text-sm">
                                 <span className="text-gray-600">Ngày:</span>
@@ -883,8 +905,13 @@ const BookingManagement: React.FC = () => {
         selectedCombos={selectedCombos}
         onConfirm={setSelectedCombos}
       />
+       { openResultPayment && <ResultPayment
+                onClose={handleCloseResultPayment}
+            />};
     </div>
   );
+
+  
 };
 
 export default BookingManagement;
