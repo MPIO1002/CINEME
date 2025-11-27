@@ -68,8 +68,22 @@ const ResultPayment: React.FC<{onClose?: () => void}> = ({onClose}) => {
     setPaymentParams(params);
 
     // Xử lý logic success
-    if (savedBookingInfo) {
-      // Trường hợp thanh toán CASH - có booking info trong localStorage
+    // Ưu tiên kiểm tra resultCode từ MOMO trước (nếu có)
+    if (params.resultCode) {
+      // Trường hợp thanh toán MOMO - kiểm tra resultCode từ URL
+      setIsSuccess(params.resultCode === '0');
+      
+      // Nếu MOMO thành công và có booking info, load nó
+      if (params.resultCode === '0' && savedBookingInfo) {
+        try {
+          const bookingInfo = JSON.parse(savedBookingInfo);
+          setBookingDetails(bookingInfo);
+        } catch (error) {
+          console.error('Error parsing booking info:', error);
+        }
+      }
+    } else if (savedBookingInfo) {
+      // Trường hợp thanh toán CASH - có booking info trong localStorage nhưng không có resultCode
       try {
         const bookingInfo = JSON.parse(savedBookingInfo);
         setBookingDetails(bookingInfo);
@@ -81,8 +95,8 @@ const ResultPayment: React.FC<{onClose?: () => void}> = ({onClose}) => {
         setIsSuccess(false);
       }
     } else {
-      // Trường hợp thanh toán MOMO - kiểm tra resultCode từ URL
-      setIsSuccess(params.resultCode === '0');
+      // Không có gì cả - mặc định là thất bại
+      setIsSuccess(false);
     }
   }, [searchParams]);
 
@@ -586,14 +600,14 @@ const ResultPayment: React.FC<{onClose?: () => void}> = ({onClose}) => {
             {onClose ? 'Đóng & Đặt vé mới' : 'Quay lại quản lý đặt vé'}
           </button>
 
-          {!isSuccess && (
+          {/* {!isSuccess && (
             <button
               onClick={() => navigate(-1)}
               className="flex items-center justify-center gap-3 bg-gradient-to-r from-gray-500 to-gray-600 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:shadow-2xl hover:scale-105 transition-all duration-300"
             >
               Thử lại
             </button>
-          )}
+          )} */}
         </div>
 
         {/* Note */}

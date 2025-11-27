@@ -59,13 +59,14 @@ export const hasPermission = (_permission: string): boolean => {
 };
 
 export const isTokenExpired = (token: string): boolean => {
-  try {
-    const decoded: JWTPayload = jwtDecode(token);
-    const currentTime = Date.now() / 1000;
-    return decoded.exp ? decoded.exp < currentTime : false;
-  } catch {
-    return true; // Nếu không decode được thì coi như expired
-  }
+//   try {
+//     const decoded: JWTPayload = jwtDecode(token);
+//     const currentTime = Date.now() / 1000;
+//     return decoded.exp ? decoded.exp < currentTime : false;
+//   } catch {
+//     return true; // Nếu không decode được thì coi như expired
+//   }
+return false;
 };
 
 export const isAuthenticated = (): boolean => {
