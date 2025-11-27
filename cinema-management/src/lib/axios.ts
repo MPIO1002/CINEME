@@ -100,9 +100,14 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // Gọi API refresh token (refreshToken được gửi tự động qua cookies)
-        const res = await api.post("/auth/refresh-token");
-        const newAccessToken = res.data.accessToken;
+        // Gọi API refresh token với refreshToken trong body
+        const refreshToken = localStorage.getItem('refreshToken') || Cookies.get('refreshToken');
+        
+        const res = await api.post("/auth/refresh-token", { refreshToken });
+        
+        // Handle response format: { statusCode: 200, data: { accessToken: '...', refreshToken: '...' } }
+        const newAccessToken = res.data?.data?.accessToken || res.data?.accessToken;
+        const newRefreshToken = res.data?.data?.refreshToken || res.data?.refreshToken;
 
         // Kiểm tra xem request gốc là admin hay client
         const isAdminRequest = originalRequest.url?.includes('/admin') || 
@@ -114,9 +119,10 @@ api.interceptors.response.use(
           localStorage.setItem('accessToken', newAccessToken);
         }
         
-        // Lưu refreshToken mới vào cookie (nếu backend trả về)
-        if (res.data.refreshToken) {
-          Cookies.set('refreshToken', res.data.refreshToken, {
+        // Lưu refreshToken mới (nếu có)
+        if (newRefreshToken) {
+          localStorage.setItem('refreshToken', newRefreshToken);
+          Cookies.set('refreshToken', newRefreshToken, {
             expires: 30,  // 30 days
             secure: window.location.protocol === 'https:',
             sameSite: window.location.protocol === 'https:' ? 'None' : 'Lax'

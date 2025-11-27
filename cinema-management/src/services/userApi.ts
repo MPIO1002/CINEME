@@ -150,6 +150,38 @@ export const userApiService = {
             throw error;
         }
     },
+
+    // Get user profile (client only)
+    getUserProfile: async () => {
+        try {
+            const response = await api.get(`/users/profile`);
+            
+            if (response.data.statusCode === 200) {
+                return response.data.data;
+            } else {
+                throw new Error(response.data.message || 'Failed to fetch user profile');
+            }
+        } catch (error) {
+            console.error('Error fetching user profile:', error);
+            throw error;
+        }
+    },
+
+    // Get user rank
+    getUserRank: async (userId: string) => {
+        try {
+            const response = await api.get(`/users/${userId}/rank`);
+            
+            if (response.data.statusCode === 200) {
+                return response.data.data;
+            } else {
+                throw new Error(response.data.message || 'Failed to fetch user rank');
+            }
+        } catch (error) {
+            console.error('Error fetching user rank:', error);
+            throw error;
+        }
+    },
 };
 
 // Role API (for getting available roles)

@@ -30,6 +30,7 @@ const PaymentResult: React.FC = () => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [paymentData, setPaymentData] = useState<PaymentResultData | null>(null);
   const hasShownToast = useRef(false);
+  const processedRef = useRef(false);
 
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -40,57 +41,65 @@ const PaymentResult: React.FC = () => {
   };
 
   useEffect(() => {
+    // Prevent multiple executions
+    if (processedRef.current) {
+      return;
+    }
+
     const fetchBookingInfo = async () => {
       try {
         setIsLoading(true);
         
-        // Get status and booking ID from URL parameters
-        const status = searchParams.get('status');
-        const bookingId = searchParams.get('booking');
+        // Get query string from current URL
+        const queryString = window.location.search.substring(1); // Remove the '?'
+        
+        if (!queryString) {
+          setIsSuccess(false);
+          if (!hasShownToast.current) {
+            showToast('error', 'Không có thông tin thanh toán');
+            hasShownToast.current = true;
+          }
+          return;
+        }
 
-        if (status === 'success' && bookingId) {
-          // Call API to get booking information
-          const response = await fetch(
-            `${API_BASE_URL}/bookings/${bookingId}/info`,
-            {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            }
-          );
+        // Mark as processed to prevent re-execution
+        processedRef.current = true;
 
-          if (response.ok) {
-            const result: BookingInfoResponse = await response.json();
-            
-            if (result.statusCode === 200 && result.data) {
-              setPaymentData(result.data);
-              setIsSuccess(true);
-              if (!hasShownToast.current) {
-                showToast('success', 'Thanh toán thành công! Chúc bạn xem phim vui vẻ!', 5000);
-                hasShownToast.current = true;
-              }
-            } else {
-              console.log('API returned error:', result.message);
-              setIsSuccess(false);
-              if (!hasShownToast.current) {
-                showToast('error', 'Không thể lấy thông tin vé. Vui lòng liên hệ hỗ trợ!');
-                hasShownToast.current = true;
-              }
+        // Call backend callback endpoint with all VNPAY parameters
+        const response = await fetch(
+          `${API_BASE_URL}/payments/vnpay/callback?${queryString}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (response.ok) {
+          const result: BookingInfoResponse = await response.json();
+          
+          if (result.statusCode === 200 && result.data) {
+            setPaymentData(result.data);
+            setIsSuccess(true);
+            if (!hasShownToast.current) {
+              showToast('success', 'Thanh toán thành công! Chúc bạn xem phim vui vẻ!', 5000);
+              hasShownToast.current = true;
             }
           } else {
-            console.log('Failed to fetch booking info:', response.status, response.statusText);
+            console.log('API returned error:', result.message);
             setIsSuccess(false);
             if (!hasShownToast.current) {
-              showToast('error', 'Không thể kết nối đến máy chủ. Vui lòng thử lại!');
+              showToast('error', 'Không thể lấy thông tin vé. Vui lòng liên hệ hỗ trợ!');
               hasShownToast.current = true;
             }
           }
         } else {
-          console.log('Payment failed or missing booking ID');
+          const errorData = await response.json().catch(() => null);
+          console.log('Failed to fetch booking info:', response.status, response.statusText, errorData);
           setIsSuccess(false);
           if (!hasShownToast.current) {
-            showToast('error', 'Thanh toán thất bại!');
+            showToast('error', 'Thanh toán thất bại: ' + (errorData?.message || 'Vui lòng thử lại!'));
             hasShownToast.current = true;
           }
         }
@@ -136,9 +145,10 @@ const PaymentResult: React.FC = () => {
               <div 
                 className="relative min-h-[500px] flex"
                 style={{
-                  background: isSuccess 
-                    ? (paymentData ? `url('${paymentData.image}')` : 'var(--color-secondary)')
-                    : '#fca5a5', // red-300
+                  backgroundColor: isSuccess 
+                    ? (paymentData ? '#222' : 'var(--color-secondary)')
+                    : '#fca5a5',
+                  backgroundImage: isSuccess && paymentData ? `url('${paymentData.image}')` : 'none',
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
                   backgroundBlendMode: 'overlay'
@@ -179,11 +189,17 @@ const PaymentResult: React.FC = () => {
                         
                         {/* QR Code */}
                         <div className="rounded-lg shadow-lg inline-block">
-                          <img 
-                            src={paymentData?.qrcode}
-                            alt="QR Code"
-                            className="w-60 h-60 object-cover rounded-lg"
-                          />
+                          {paymentData?.qrcode ? (
+                            <img 
+                              src={paymentData.qrcode}
+                              alt="QR Code"
+                              className="w-60 h-60 object-cover rounded-lg"
+                            />
+                          ) : (
+                            <div className="w-60 h-60 bg-gray-300 rounded-lg flex items-center justify-center">
+                              <span className="text-gray-600">Không có QR Code</span>
+                            </div>
+                          )}
                         </div>
                       </>
                     ) : (

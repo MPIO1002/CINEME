@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { API_BASE_URL } from '../../../../../../components/api-config';
+import api from '../../../../../../lib/axios';
 import { XCircle } from 'lucide-react';
 
 interface BookingDetailProps {
@@ -30,15 +30,11 @@ const BookingDetailModal: React.FC<BookingDetailProps> = ({ bookingId, open, onC
 			setLoading(true);
 			setDetail(null);
 			try {
-				const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/info`, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+				const response = await api.get(`/bookings/${bookingId}/info`);
 				if (!mounted) return;
-				if (!res.ok) {
-					setDetail(null);
-					return;
-				}
-				const json = await res.json();
-				if (json && json.statusCode === 200 && json.data) {
-					setDetail(json.data as BookingDetail);
+				
+				if (response.data && response.data.statusCode === 200 && response.data.data) {
+					setDetail(response.data.data as BookingDetail);
 				} else {
 					setDetail(null);
 				}

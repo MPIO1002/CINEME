@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  cinema-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cinema-management-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - cinema-network
+    labels:
+      - "com.example.description=Cinema Management Frontend"
+
+networks:
+  cinema-network:
+    driver: bridge

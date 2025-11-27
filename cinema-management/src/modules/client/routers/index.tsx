@@ -25,6 +25,7 @@ import PaymentResult from "../pages/payment-result";
 import Profile from "../pages/profile";
 import ResultPayment from "@/modules/admin/pages/ResultPayment/ResultPayment";
 import ShowtimesPage from "../pages/showtimes";
+import OAuthRedirect from "../pages/oauth-redirect";
 
 const Routers = () => {
   const [lang, setLang] = useState<"vi" | "en">("vi");
@@ -32,6 +33,9 @@ const Routers = () => {
   return (
     <BrowserRouter>
       <Routes>
+        {/* OAuth Redirect */}
+        <Route path="/oauth2/redirect" element={<OAuthRedirect />} />
+        
         {/* Client routes */}
         <Route element={<Layout lang={lang} setLang={setLang}>
           <Outlet />

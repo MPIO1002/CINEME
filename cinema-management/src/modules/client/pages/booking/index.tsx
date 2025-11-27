@@ -5,6 +5,7 @@ import { faClock, faMapMarkerAlt, faCreditCard, faCalendarAlt, faStar, faTimes, 
 import { API_BASE_URL, WEBSOCKET_URL } from '../../../../components/api-config';
 import ProgressBar from '../../components/progress-bar';
 import { useToast } from '../../../../hooks/useToast';
+import userApiService from '../../../../services/userApi';
 import io from 'socket.io-client';
 
 interface MovieDetail {
@@ -375,26 +376,9 @@ const BookingPage: React.FC = () => {
 
       setRankLoading(true);
 
-      // The backend requires the refresh token to be provided - pass it in Authorization header as Bearer <refreshToken>
-      const response = await fetch(`${API_BASE_URL}/rank/${parsed.id}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${parsed.refreshToken}`
-        }
-      });
-
-      const data = await response.json();
-      if (response.ok && data && data.statusCode === 200) {
-        setRankInfo(data.data);
-        setRankDiscountPercent(data.data?.rank?.discountPercentage || 0);
-      } else {
-        // If not OK, clear rank info
-        setRankInfo(null);
-        setRankDiscountPercent(0);
-        // Optionally log message
-        console.warn('Failed to fetch rank:', data?.message || response.statusText);
-      }
+      const data = await userApiService.getUserRank(parsed.id);
+      setRankInfo(data);
+      setRankDiscountPercent(data?.rank?.discountPercentage || 0);
     } catch (error) {
       console.error('Error fetching rank:', error);
       setRankInfo(null);
@@ -484,7 +468,8 @@ const BookingPage: React.FC = () => {
       const bookingData: any = {
         userId: user.id,
         showtimeId: selectedShowtime.id,
-        listSeatId: selectedSeats.map(seat => seat.id)
+        listSeatId: selectedSeats.map(seat => seat.id),
+        paymentMethod: 'VNPAY'
       };
 
       // Add combos if any selected
@@ -497,11 +482,11 @@ const BookingPage: React.FC = () => {
 
       // Log booking data being sent to API
       console.log('=== BOOKING API DATA ===');
-      console.log('URL:', `${API_BASE_URL}/bookings`);
+      console.log('URL:', `${API_BASE_URL}/payments/client`);
       console.log('Booking Data:', JSON.stringify(bookingData, null, 2));
       console.log('========================');
 
-      const response = await fetch(`${API_BASE_URL}/bookings`, {
+      const response = await fetch(`${API_BASE_URL}/payments/client`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -512,7 +497,6 @@ const BookingPage: React.FC = () => {
       const data = await response.json();
 
       if (data.statusCode === 200 && data.data) {
-        // Booking request successful - got payment URL
         window.location.href = data.data;
 
       } else {

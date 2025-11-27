@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTimes, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { faFacebook, faGoogle } from "@fortawesome/free-brands-svg-icons";
-import { API_BASE_URL } from "../../../../components/api-config";
+import { API_BASE_URL, OAUTH_GOOGLE_URL } from "../../../../components/api-config";
 import { useToast } from "../../../../hooks/useToast";
 
 interface AuthModalProps {
@@ -65,83 +65,7 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
     otp: ''
   });
 
-  const processedStatesRef = useRef<Set<string> | null>(null);
-  useEffect(() => {
-    const handleOAuthCallback = async () => {
-      const urlParams = new URLSearchParams(location.search);
-      const state = urlParams.get('state');
-
-      if (!state) return;
-
-      if (processedStatesRef.current === null) {
-        try {
-          const raw = sessionStorage.getItem('oauth_processed_states');
-          processedStatesRef.current = raw ? new Set(JSON.parse(raw)) : new Set();
-        } catch (e) {
-          processedStatesRef.current = new Set();
-        }
-      }
-
-      if (processedStatesRef.current.has(state)) {
-        return;
-      }
-
-      processedStatesRef.current.add(state);
-      try {
-        sessionStorage.setItem('oauth_processed_states', JSON.stringify(Array.from(processedStatesRef.current)));
-      } catch (e) {
-        // ignore
-      }
-
-      setIsLoading(true);
-      try {
-        const response = await fetch(`${API_BASE_URL}/auth/extract?state=${state}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (response.ok) {
-          const result: { statusCode: number; message: string; data: UserData } = await response.json();
-          console.log('OAuth login successful:', result);
-
-          if (result.statusCode === 200 && result.data) {
-            // Save tokens and user data to localStorage
-            localStorage.setItem('accessToken', result.data.accessToken);
-            localStorage.setItem('refreshToken', result.data.refreshToken);
-            localStorage.setItem('userData', JSON.stringify(result.data));
-            onLoginSuccess?.(result.data);
-            showToast('success', 'Đăng nhập Google thành công!');
-            window.history.replaceState({}, document.title, window.location.pathname);
-            if (isOpen) onClose();
-            const returnUrl = localStorage.getItem('oauthReturnUrl') || '/';
-            localStorage.removeItem('oauthReturnUrl');
-            if (returnUrl !== '/' && returnUrl !== window.location.pathname) {
-              window.location.href = returnUrl;
-            }
-          }
-        } else {
-          let errorBody: any = null;
-          try {
-            errorBody = await response.json();
-          } catch (e) {
-            errorBody = { message: response.statusText };
-          }
-          console.error('OAuth extraction failed:', errorBody);
-          showToast('error', 'Đăng nhập Google thất bại: ' + (errorBody?.message || 'Lỗi không xác định'));
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }
-      } catch (error) {
-        console.error('OAuth extraction error:', error);
-        showToast('error', 'Lỗi kết nối. Vui lòng thử lại.');
-        window.history.replaceState({}, document.title, window.location.pathname);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    handleOAuthCallback();
-  }, [location.search]);
+  const processedTokensRef = useRef<Set<string> | null>(null);
 
   // Validation functions
   const validateEmail = (email: string): string => {
@@ -516,11 +440,9 @@ const AuthModal = ({ isOpen, onClose, onLoginSuccess }: AuthModalProps) => {
 
   // Handle Google login
   const handleGoogleLogin = () => {
-    // Lưu URL hiện tại để redirect về sau khi đăng nhập
-    localStorage.setItem('oauthReturnUrl', window.location.pathname + window.location.search);
-    
     // Redirect to backend Google OAuth endpoint
-    window.location.href = 'http://localhost:8080/oauth2/authorization/google';
+    // Backend will handle Google auth and redirect back to http://localhost:5173/oauth2/redirect?token=JWT_TOKEN
+    window.location.href = OAUTH_GOOGLE_URL;
   };
 
   if (!isOpen) return null;

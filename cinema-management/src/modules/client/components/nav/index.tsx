@@ -6,6 +6,7 @@ import { API_BASE_URL } from "../../../../components/api-config";
 import AuthModal from "../auth-modal";
 import { useToast } from "../../../../hooks/useToast";
 import { handleLogoutAPI } from "../../../../utils/auth";
+import userApiService from "../../../../services/userApi";
 
 const LANGUAGES = [
   { code: "vi", label: "VIE", flag: "/VN.webp" },
@@ -89,6 +90,8 @@ const Nav = ({
   useEffect(() => {
     const checkUserData = () => {
       const savedUserData = localStorage.getItem('userData');
+      const accessToken = localStorage.getItem('accessToken');
+      
       if (savedUserData) {
         try {
           const userData = JSON.parse(savedUserData);
@@ -97,8 +100,29 @@ const Nav = ({
           console.error('Error parsing saved user data:', error);
           localStorage.removeItem('userData');
         }
+      } else if (accessToken) {
+        // If we have accessToken but no userData, user just logged in via OAuth
+        // Fetch user profile data
+        fetchUserProfile(accessToken);
       } else {
         setUser(null);
+      }
+    };
+
+    const fetchUserProfile = async (token: string) => {
+      try {
+        const result = await userApiService.getUserProfile();
+        const userData: UserData = {
+          id: result.id,
+          email: result.email,
+          fullName: result.fullName,
+          accessToken: token,
+          refreshToken: token,
+        };
+        setUser(userData);
+        localStorage.setItem('userData', JSON.stringify(userData));
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
       }
     };
 
@@ -107,7 +131,7 @@ const Nav = ({
 
     // Listen for storage changes (including OAuth callbacks)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'userData') {
+      if (e.key === 'userData' || e.key === 'accessToken') {
         checkUserData();
       }
     };
