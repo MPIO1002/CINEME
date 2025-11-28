@@ -6,17 +6,23 @@ export interface User {
     fullName: string;
     email: string;
     phone?: string;
-    //   avatar?: string;
+    avatar?: string;
     provider: 'LOCAL' | 'GOOGLE' | 'FACEBOOK';
     createdAt: string;
     updatedAt: string;
     locked: boolean;
+    // Role properties
+    role?: 'ADMIN' | 'STAFF' | 'CUSTOMER';
+    roleId?: string;
+    roleName?: string;
     // Extended properties for frontend
     status?: 'ACTIVE' | 'INACTIVE' | 'BANNED';
     joinDate?: string;
     //   lastLogin?: string;
     totalBookings?: number;
     totalSpent?: number;
+    // Permissions for Admin/Staff
+    permissions?: string[];
 }
 
 // User API Service

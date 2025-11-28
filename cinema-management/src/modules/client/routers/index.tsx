@@ -12,7 +12,7 @@ import RankManagement from "@/modules/admin/pages/Rank/RankManagement";
 import RoomManagement from "@/modules/admin/pages/Room/RoomManagement";
 import SecurityManagement from "@/modules/admin/pages/SecurityManagement";
 import ShowtimeManagement from "@/modules/admin/pages/ShowTime/ShowtimeManagement";
-import TheaterManagement from "@/modules/admin/pages/Theater/TheaterManagement";
+import TheaterManagement from "@/modules/admin/pages/theater/TheaterManagement";
 import UserManagement from "@/modules/admin/pages/User/UserManagement";
 import { useState } from "react";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";

@@ -18,7 +18,7 @@ import {
     X
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { type User } from '../../../services/userApi';
+import { type User } from '../../../../../services/userApi';
 
 interface UserModalProps {
   open: boolean;
@@ -52,12 +52,13 @@ const UserModal: React.FC<UserModalProps> = ({
       email: "",
       fullName: "",
       phone: "",
-      roleId: "",
-      roleName: "Customer",
       provider: "LOCAL",
       createdAt: "",
       updatedAt: "",
+      locked: false,
       role: "CUSTOMER",
+      roleId: "",
+      roleName: "Customer",
       status: "ACTIVE",
       joinDate: "",
       permissions: [],
@@ -78,12 +79,13 @@ const UserModal: React.FC<UserModalProps> = ({
         email: "",
         fullName: "",
         phone: "",
-        roleId: "",
-        roleName: "Customer",
         provider: "LOCAL",
         createdAt: "",
         updatedAt: "",
+        locked: false,
         role: "CUSTOMER",
+        roleId: "",
+        roleName: "Customer",
         status: "ACTIVE",
         joinDate: "",
         permissions: [],
