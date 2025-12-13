@@ -19,6 +19,8 @@ export interface Theater {
     rooms?: Room[];
     utilization?: number;
     monthlyRevenue?: number;
+    latitude?: number;
+    longitude?: number;
 }
 
 // Theater API functions

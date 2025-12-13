@@ -940,7 +940,7 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
     <>
       <style dangerouslySetInnerHTML={{ __html: scrollbarStyles }} />
       <div className="fixed inset-0 bg-[#00000071] flex items-center justify-center mt-[-15px] z-50">
-      <div className="bg-white rounded-lg w-[98%] h-[95%] max-w-7xl flex flex-col">
+      <div className="bg-white rounded-lg w-[98%] h-[95%] max-w-[95%] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4">
           <h2 className="text-xl font-bold text-gray-800">TẠO SUẤT CHIẾU</h2>

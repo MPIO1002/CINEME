@@ -213,7 +213,25 @@ const BookingPage: React.FC = () => {
         const response = await fetch(`${API_BASE_URL}/showtimes?movieId=${id}&theaterId=${selectedTheater.id}&date=${selectedDate}`);
         const data = await response.json();
         if (data.statusCode === 200) {
-          setShowtimes(data.data);
+          // Sort showtimes by startTime and filter out past showtimes
+          const now = new Date();
+          const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+          const today = now.toISOString().split('T')[0];
+          
+          const filteredAndSorted = data.data
+            .filter((showtime: Showtime) => {
+              // If selected date is today, filter out past showtimes
+              if (selectedDate === today) {
+                return showtime.startTime >= currentTime;
+              }
+              // For future dates, show all showtimes
+              return true;
+            })
+            .sort((a: Showtime, b: Showtime) => {
+              return a.startTime.localeCompare(b.startTime);
+            });
+          
+          setShowtimes(filteredAndSorted);
           setSelectedShowtime(null);
           setSeats([]);
           setSelectedSeats([]);
@@ -333,11 +351,9 @@ const BookingPage: React.FC = () => {
 
   const getSeatWidth = (seatNumber: string) => {
     if (seatNumber.includes('+')) {
-      // Count how many seats are in the group based on seatNumber format
-      const seatCount = seatNumber.split('+').length;
-      // Each seat is 32px, gap between seats is 8px
-      // Formula: (seatCount * 32px) + ((seatCount - 1) * 8px)
-      return (seatCount * 32) + ((seatCount - 1) * 8);
+      // Couple seats should be roughly double width
+      // Each single seat is 32px (w-8), so couple seat should be around 72px (double + gap)
+      return 72;
     }
     return 32; // Default single seat width (32px = w-8)
   };
@@ -958,24 +974,22 @@ const BookingPage: React.FC = () => {
                         </span>
                         <div className="flex justify-center items-center" style={{ minWidth: '400px' }}>
                           {hasCoupleSeats ? (
-                            // Special layout for couple seats (Row G) - aligned to edges like seats 1-3 and 5-7
-                            <div className="flex justify-between items-center" style={{ width: '280px' }}>
+                            // Special layout for couple seats (Row G)
+                            <div className="flex justify-center items-center gap-3">
                               {seatRows[row].map((seat, index) => (
                                 <button
                                   key={seat.id}
                                   onClick={() => handleSeatClick(seat)}
                                   disabled={seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)}
-                                  className="rounded text-sm font-bold transition-all duration-200 hover:scale-110 h-8"
+                                  className="rounded text-sm font-bold transition-all duration-200 hover:scale-110 h-8 flex-shrink-0"
                                   style={{
                                     width: `${getSeatWidth(seat.seatNumber)}px`,
+                                    minWidth: `${getSeatWidth(seat.seatNumber)}px`,
                                     backgroundColor: getSeatColor(seat),
                                     color: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? '#999' : 'white',
                                     cursor: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? 'not-allowed' : 'pointer',
                                     opacity: (seat.status !== 'AVAILABLE' || lockedSeats.includes(seat.id)) ? 0.5 : 1,
-                                    fontSize: '10px',
-                                    // Position first seat at left edge, last seat at right edge, middle seat centered
-                                    marginLeft: index === 1 ? 'auto' : '0px',
-                                    marginRight: index === 1 ? 'auto' : '0px'
+                                    fontSize: '10px'
                                   }}
                                 >
                                   {seat.seatNumber.replace(/[A-Z]/g, '').replace('+', '-')}

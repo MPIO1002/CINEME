@@ -235,7 +235,7 @@ const Nav = ({
 
   return (
     <nav
-      className={`w-full flex items-center justify-between fixed top-0 left-0 z-90 px-6 py-3 transition-colors duration-300 ${scrolled ? "bg-[var(--color-background)] bg-opacity-95" : "bg-transparent"
+      className={`w-full flex items-center justify-between fixed top-0 left-0 z-[90] px-6 py-3 transition-colors duration-300 ${scrolled ? "bg-[var(--color-background)] bg-opacity-95" : "bg-transparent"
         }`}
       style={{
         color: "var(--color-text)",
@@ -310,6 +310,7 @@ const Nav = ({
         
         <li 
           className="hover:text-[var(--color-secondary)] cursor-pointer transition relative"
+          onClick={() => navigate('/theater')}
           onMouseEnter={() => {
             if (theaterHideTimer.current) { window.clearTimeout(theaterHideTimer.current); theaterHideTimer.current = null; }
             setShowTheaterPopup(true);
@@ -338,7 +339,15 @@ const Nav = ({
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
                     {theaters.slice(0, 8).map((theater) => (
-                      <div key={theater.id} className="p-2 hover:bg-[var(--color-secondary)] rounded-lg transition cursor-pointer">
+                      <div 
+                        key={theater.id} 
+                        className="p-2 hover:bg-[var(--color-secondary)] rounded-lg transition cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate('/theater');
+                          setShowTheaterPopup(false);
+                        }}
+                      >
                         <h4 className="font-medium text-white text-xs truncate">{theater.nameVn}</h4>
                         <p className="text-gray-400 text-xs truncate">{theater.nameEn}</p>
                       </div>

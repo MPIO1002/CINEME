@@ -109,7 +109,14 @@ const ShowtimesPage = () => {
             const result: ShowtimesResponse = await response.json();
 
             if (result.statusCode === 0) {
-                setMovies(result.data);
+                // Sort showtimes by startTime for each movie
+                const sortedMovies = result.data.map(movie => ({
+                    ...movie,
+                    showtimes: movie.showtimes.sort((a, b) => {
+                        return a.startTime.localeCompare(b.startTime);
+                    })
+                }));
+                setMovies(sortedMovies);
             } else {
                 console.error('Failed to fetch showtimes:', result.message);
                 setMovies([]);
@@ -269,7 +276,7 @@ const ShowtimesPage = () => {
                         ) : (
                             <div className="space-y-8">
                                 {movies.map((movie) => (
-                                    <div key={movie.movieId} className="flex gap-6 bg-gradient-to-r from-[var(--color-background)] via-black to-[var(--color-background)] p-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 border border-black">
+                                    <div key={movie.movieId} className="flex gap-6 rounded-lg hover:shadow-xl transition-all duration-300">
                                         {/* Movie Poster */}
                                         <div className="flex-shrink-0">
                                             <img

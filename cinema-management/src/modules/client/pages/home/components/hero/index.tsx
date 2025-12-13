@@ -75,39 +75,28 @@ const HeroCarousel: React.FC<{ lang: "vi" | "en" }> = ({ lang }) => {
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
 
-  // Fetch movies from API for both carousel and hot movies
+  // Fetch trending movies from API (top 7 with all details in one call)
   useEffect(() => {
-    fetch(`${API_BASE_URL}/movies`)
+    fetch(`${API_BASE_URL}/movies/trending`)
       .then((res) => res.json())
       .then((data) => {
         if (data.statusCode === 200 && Array.isArray(data.data)) {
-          const movieList = data.data.slice(0, 7);
+          const movieList = data.data.slice(0, 7).map((movie: any) => ({
+            id: movie.id,
+            nameVn: movie.nameVn,
+            nameEn: movie.nameEn,
+            image: movie.image,
+            ratings: movie.ratings.toString(),
+            briefVn: movie.briefVn,
+            briefEn: movie.briefEn,
+          }));
+          
           setHotMovies(movieList);
-
-          const carouselPromises = movieList.slice(0, 7).map((movie: Movie) =>
-            fetch(`${API_BASE_URL}/movies/${movie.id}/detail`)
-              .then(res => res.json())
-              .then(detailData => {
-                if (detailData.statusCode === 200) {
-                  return {
-                    ...movie,
-                    briefVn: detailData.data.briefVn,
-                    briefEn: detailData.data.briefEn
-                  };
-                }
-                return movie;
-              })
-              .catch(() => movie)
-          );
-
-          Promise.all(carouselPromises)
-            .then(detailedMovies => {
-              setCarouselMovies(detailedMovies);
-            });
+          setCarouselMovies(movieList);
         }
       })
       .catch((error) => {
-        console.error('Error fetching movies:', error);
+        console.error('Error fetching trending movies:', error);
       });
   }, []);
 

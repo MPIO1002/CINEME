@@ -26,6 +26,7 @@ import Profile from "../pages/profile";
 import ResultPayment from "@/modules/admin/pages/ResultPayment/ResultPayment";
 import ShowtimesPage from "../pages/showtimes";
 import OAuthRedirect from "../pages/oauth-redirect";
+import TheaterPage from "../pages/theater";
 
 const Routers = () => {
   const [lang, setLang] = useState<"vi" | "en">("vi");
@@ -47,6 +48,7 @@ const Routers = () => {
           <Route path="/result-payment" element={<ResultPayment />} />
           <Route path="/showtimes" element={<ShowtimesPage />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/theater" element={<TheaterPage />} />
         </Route>
 
         {/* Admin routes */}
