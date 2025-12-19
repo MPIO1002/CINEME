@@ -27,6 +27,7 @@ import ResultPayment from "@/modules/admin/pages/ResultPayment/ResultPayment";
 import ShowtimesPage from "../pages/showtimes";
 import OAuthRedirect from "../pages/oauth-redirect";
 import TheaterPage from "../pages/theater";
+import MoviesPage from "../pages/movies";
 
 const Routers = () => {
   const [lang, setLang] = useState<"vi" | "en">("vi");
@@ -42,6 +43,7 @@ const Routers = () => {
           <Outlet />
         </Layout>}>
           <Route path="/" element={<Home lang={lang} />} />
+          <Route path="/movies" element={<MoviesPage lang={lang} />} />
           <Route path="/film/:id" element={<FilmDetail />} />
           <Route path="/booking/:id" element={<BookingPage />} />
           <Route path="/payment-result" element={<PaymentResult />} />
