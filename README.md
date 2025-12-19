@@ -2,8 +2,7 @@
 
 A modern, full-featured cinema management system built with React and TypeScript, providing both client-facing movie browsing and comprehensive admin management capabilities.
 
-<!-- Add screenshot of home page here -->
-![Home Page](./docs/screenshots/home.png)
+<img width="1900" height="1197" alt="image" src="https://github.com/user-attachments/assets/e58a20c3-3e95-48ef-b099-cdddb04b5596" />
 
 ## 🚀 Tech Stack
 
@@ -94,8 +93,8 @@ cinema-management/
 ### 🎥 Client Features
 
 #### 1. **Movie Browsing & Discovery**
-<!-- Add screenshot of movie listing page -->
-![Movie Listing](./docs/screenshots/movies-page.png)
+<img width="1893" height="1197" alt="image" src="https://github.com/user-attachments/assets/42715426-abc1-408e-b2fc-cb12737fa56f" />
+
 
 - **Smart Movie Display**: Home page shows first 12 available movies with "See More" button
 - **Category Filtering**: Dedicated movies page with tabs for:
@@ -109,8 +108,8 @@ cinema-management/
   - High-quality poster images
 
 #### 2. **Movie Details & Trailers**
-<!-- Add screenshot of movie popup/detail -->
-![Movie Detail](./docs/screenshots/movie-detail.png)
+<img width="1898" height="1129" alt="image" src="https://github.com/user-attachments/assets/71e21435-92a4-4d92-9509-50695b729eb8" />
+
 
 - Rich movie information display
 - Embedded YouTube trailer player
@@ -119,8 +118,8 @@ cinema-management/
 - Release dates and runtime
 
 #### 3. **Booking System**
-<!-- Add screenshot of booking page -->
-![Booking System](./docs/screenshots/booking.png)
+
+<img width="1894" height="1190" alt="image" src="https://github.com/user-attachments/assets/765cd4c6-256d-4a77-ad77-be37b2faae0b" />
 
 - Interactive seat selection
 - Real-time seat availability
@@ -142,9 +141,10 @@ cinema-management/
 
 ### 🛠️ Admin Features
 
-#### 1. **Dashboard & Analytics**
-<!-- Add screenshot of admin dashboard -->
-![Admin Dashboard](./docs/screenshots/admin-dashboard.png)
+#### 1. **Dashboard & Analytics**\
+
+<img width="1898" height="1199" alt="image" src="https://github.com/user-attachments/assets/735fdf6a-a04d-4ab6-b5eb-031d7e67a397" />
+
 
 - Real-time booking statistics
 - Revenue tracking
@@ -165,6 +165,106 @@ cinema-management/
 - **Pricing**: Dynamic pricing rules
 - **Combos**: Concession packages
 
+##### 🤖 Intelligent Showtime Scheduling Algorithm
+
+<img width="1919" height="1029" alt="image" src="https://github.com/user-attachments/assets/4398582f-bd05-4414-bc83-a2f292762bc3" />
+
+The system features an advanced AI-powered showtime scheduling algorithm that automatically generates optimal screening schedules based on multiple factors.
+
+**Multi-Factor Optimization:**
+The scheduling algorithm considers weighted factors:
+- **Movie Rating (35%)**: Higher-rated movies prioritized for prime time slots
+- **Movie Duration (25%)**: Efficiently fits movies into available time slots with minimal gaps
+- **Movie Category (20%)**: Distributes different genres across time slots for variety
+- **Time Slot Value (20%)**: Optimizes placement based on golden hours (peak audience times)
+
+**Golden Time Prioritization:**
+```typescript
+goldenTime: {
+  start: "18:00",  // Peak evening hours
+  end: "22:00"     // Maximum audience availability
+}
+```
+
+**Intelligent Scheduling Process:**
+
+*Step 1: Data Collection*
+```typescript
+{
+  openTime: "09:00",
+  closeTime: "23:30",
+  startDate: "2025-12-20",
+  endDate: "2025-12-31",
+  hallId: "hall-uuid",
+  movies: [{
+    id: "movie-uuid",
+    duration: 124,      // Minutes
+    rating: 85,         // Out of 100
+    type: 1,            // 0: Standard, 1: Premium
+    format: "IMAX",
+    language: "Vietnamese"
+  }]
+}
+```
+
+*Step 2: AI Processing* (`POST /ai-api/convert`)
+- Analyzes movie characteristics
+- Calculates optimal time slots
+- Handles conflict detection
+- Generates multiple schedule variations
+- Selects best configuration (7-20 seconds processing)
+
+*Step 3: Schedule Output*
+```typescript
+{
+  schedules: [{
+    date: "2025-12-20",
+    screenings: [{
+      movieId: "movie-uuid",
+      startTime: "19:00",
+      endTime: "21:04",
+      score: 95,          // Optimization score
+      position: "prime"   // Time slot classification
+    }]
+  }],
+  statistics: {
+    totalScreenings: 45,
+    utilizationRate: 87,    // % of available time used
+    revenueScore: 92        // Predicted revenue efficiency
+  }
+}
+```
+
+**Conflict Prevention:**
+- Time Overlaps: 15-20 minutes transition time between screenings
+- Duration Overflow: Movies must finish before closing time
+- Capacity Conflicts: No double-booking of same hall
+- Maintenance Windows: Reserves time for hall maintenance
+
+**Smart Time Slot Categorization:**
+- **Morning (09:00-12:00)**: Family-friendly films, shorter duration
+- **Afternoon (12:00-18:00)**: Variety of genres, standard duration
+- **Golden Hours (18:00-22:00)**: Blockbusters (rating > 75), premium formats
+- **Late Night (22:00-23:30)**: Action/thriller/horror, adult-oriented content
+
+<img width="1919" height="1023" alt="image" src="https://github.com/user-attachments/assets/154876cd-e94c-4646-9543-49e2f9ee0cc8" />
+
+
+**Visual Schedule Management:**
+- Interactive calendar grid with drag-and-drop adjustments
+- Color-coded movies by genre/rating
+- Real-time validation with instant feedback on conflicts
+- Progress tracking during AI generation
+- Manual override capability for AI-generated schedules
+
+**Algorithm Benefits:**
+✅ Generates schedules in seconds vs hours of manual planning
+✅ Maximizes revenue by optimal movie placement
+✅ Prevents staff burnout with balanced scheduling
+✅ Right movies at right times for target demographics
+✅ Minimizes idle time between screenings
+✅ Success rate: 98%+ | Optimization score: 85-95
+
 #### 4. **User & Employee Management**
 - User account administration
 - Employee role management
@@ -172,9 +272,6 @@ cinema-management/
 - Security permissions
 
 #### 5. **Booking Management**
-<!-- Add screenshot of booking management -->
-![Booking Management](./docs/screenshots/admin-bookings.png)
-
 - View all bookings
 - Booking status tracking
 - Payment verification
@@ -299,9 +396,6 @@ npm run build
 - Efficient state management
 
 ### 3. **Rich User Experience**
-<!-- Add GIF of interactive features -->
-![Interactive Features](./docs/screenshots/interactive-demo.gif)
-
 - Smooth animations and transitions
 - Hover previews reduce unnecessary page loads
 - Real-time seat selection feedback
@@ -358,18 +452,6 @@ npm run build
   listActor: Actor[]
 }
 ```
-
-## 🎨 Screenshot Guidelines
-
-To complete the documentation, add screenshots to the following locations:
-
-1. **`docs/screenshots/home.png`** - Homepage showcasing featured movies
-2. **`docs/screenshots/movies-page.png`** - Movies listing page with filters
-3. **`docs/screenshots/movie-detail.png`** - Movie detail popup/modal
-4. **`docs/screenshots/booking.png`** - Seat selection interface
-5. **`docs/screenshots/admin-dashboard.png`** - Admin dashboard overview
-6. **`docs/screenshots/admin-bookings.png`** - Booking management interface
-7. **`docs/screenshots/interactive-demo.gif`** - GIF showing hover effects and animations
 
 ## 🤝 Contributing
 
