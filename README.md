@@ -422,37 +422,6 @@ npm run build
 - Screen reader friendly
 - Semantic HTML structure
 
-## 📊 API Response Structure
-
-### Movies List Response
-```typescript
-{
-  listContent: Movie[],
-  pageableData: {
-    pageNumber: number,
-    pageSize: number,
-    totalPage: number,
-    totalRecords: number
-  }
-}
-```
-
-### Movie Object
-```typescript
-{
-  id: string,
-  nameVn: string,
-  nameEn: string,
-  director: string,
-  releaseDate: string,
-  ratings: number,
-  image: string,
-  trailer: string,
-  listGenre: Genre[],
-  listActor: Actor[]
-}
-```
-
 ## 🤝 Contributing
 
 Contributions are welcome! Please follow these steps:
