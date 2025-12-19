@@ -96,91 +96,91 @@ const TheaterManagement: React.FC = () => {
     setLoading(false);
   };
 
-  const handleSaveTheater = async (theater: Theater) => {
-    setLoading(true);
+//   const handleSaveTheater = async (theater: Theater) => {
+//     setLoading(true);
     
-    try {
-      if (modalMode === "add") {
-        // Add new theater
-        const result = await theaterApi.createTheater({
-          nameEn: theater.nameEn,
-          nameVn: theater.nameVn,
-          address: theater.address,
-          phone: theater.phone,
-          email: theater.email,
-        });
+//     try {
+//       if (modalMode === "add") {
+//         // Add new theater
+//         const result = await theaterApi.createTheater({
+//           nameEn: theater.nameEn,
+//           nameVn: theater.nameVn,
+//           address: theater.address,
+//           phone: theater.phone,
+//           email: theater.email,
+//         });
         
-        if (result.statusCode === 200) {
-          alert('Thêm rạp chiếu phim thành công!');
-          fetchTheaters(); // Refresh list
-        } else {
-          throw new Error(result.message || 'Failed to add theater');
-        }
-      } else if (modalMode === "edit" && theater.id) {
-        // Update existing theater
-        const result = await theaterApi.updateTheater(theater.id, {
-          nameEn: theater.nameEn,
-          nameVn: theater.nameVn,
-          address: theater.address,
-          phone: theater.phone,
-          email: theater.email,
-        });
+//         if (result.statusCode === 200) {
+//           alert('Thêm rạp chiếu phim thành công!');
+//           fetchTheaters(); // Refresh list
+//         } else {
+//           throw new Error(result.message || 'Failed to add theater');
+//         }
+//       } else if (modalMode === "edit" && theater.id) {
+//         // Update existing theater
+//         const result = await theaterApi.updateTheater(theater.id, {
+//           nameEn: theater.nameEn,
+//           nameVn: theater.nameVn,
+//           address: theater.address,
+//           phone: theater.phone,
+//           email: theater.email,
+//         });
         
-        if (result.statusCode === 200) {
-          alert('Cập nhật rạp chiếu phim thành công!');
-          fetchTheaters(); // Refresh list
-        } else {
-          throw new Error(result.message || 'Failed to update theater');
-        }
-      }
-    } catch (error) {
-      console.error('Error saving theater:', error);
+//         if (result.statusCode === 200) {
+//           alert('Cập nhật rạp chiếu phim thành công!');
+//           fetchTheaters(); // Refresh list
+//         } else {
+//           throw new Error(result.message || 'Failed to update theater');
+//         }
+//       }
+//     } catch (error) {
+//       console.error('Error saving theater:', error);
       
-      // Fallback to local update for demo
-      if (modalMode === "add") {
-        const newTheater: Theater = {
-          ...theater,
-          id: Date.now().toString(),
-          totalRooms: 0,
-          status: 'ACTIVE',
-          utilization: 0,
-          monthlyRevenue: 0,
-        };
-        setTheaters(prev => [...prev, newTheater]);
-        alert('Thêm rạp chiếu phim thành công! (Demo mode)');
-      } else if (modalMode === "edit" && theater.id) {
-        setTheaters(prev => prev.map(t => 
-          t.id === theater.id ? { ...t, ...theater } : t
-        ));
-        alert('Cập nhật rạp chiếu phim thành công! (Demo mode)');
-      }
-    }
+//       // Fallback to local update for demo
+//       if (modalMode === "add") {
+//         const newTheater: Theater = {
+//           ...theater,
+//           id: Date.now().toString(),
+//           totalRooms: 0,
+//           status: 'ACTIVE',
+//           utilization: 0,
+//           monthlyRevenue: 0,
+//         };
+//         setTheaters(prev => [...prev, newTheater]);
+//         alert('Thêm rạp chiếu phim thành công! (Demo mode)');
+//       } else if (modalMode === "edit" && theater.id) {
+//         setTheaters(prev => prev.map(t => 
+//           t.id === theater.id ? { ...t, ...theater } : t
+//         ));
+//         alert('Cập nhật rạp chiếu phim thành công! (Demo mode)');
+//       }
+//     }
     
-    setModalOpen(false);
-    setLoading(false);
-  };
+//     setModalOpen(false);
+//     setLoading(false);
+//   };
 
-  const handleDeleteTheater = async (theaterId: string) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa rạp chiếu phim này? Tất cả phòng chiếu sẽ bị xóa.')) {
-      setLoading(true);
-      try {
-        const result = await theaterApi.deleteTheater(theaterId);
+//   const handleDeleteTheater = async (theaterId: string) => {
+//     if (window.confirm('Bạn có chắc chắn muốn xóa rạp chiếu phim này? Tất cả phòng chiếu sẽ bị xóa.')) {
+//       setLoading(true);
+//       try {
+//         const result = await theaterApi.deleteTheater(theaterId);
         
-        if (result.statusCode === 200) {
-          setTheaters(prev => prev.filter(t => t.id !== theaterId));
-          alert('Xóa rạp chiếu phim thành công!');
-        } else {
-          throw new Error(result.message || 'Failed to delete theater');
-        }
-      } catch (error) {
-        console.error('Error deleting theater:', error);
-        // Fallback to local delete for demo
-        setTheaters(prev => prev.filter(t => t.id !== theaterId));
-        alert('Xóa rạp chiếu phim thành công! (Demo mode)');
-      }
-      setLoading(false);
-    }
-  };
+//         if (result.statusCode === 200) {
+//           setTheaters(prev => prev.filter(t => t.id !== theaterId));
+//           alert('Xóa rạp chiếu phim thành công!');
+//         } else {
+//           throw new Error(result.message || 'Failed to delete theater');
+//         }
+//       } catch (error) {
+//         console.error('Error deleting theater:', error);
+//         // Fallback to local delete for demo
+//         setTheaters(prev => prev.filter(t => t.id !== theaterId));
+//         alert('Xóa rạp chiếu phim thành công! (Demo mode)');
+//       }
+//       setLoading(false);
+//     }
+//   };
 
   // Helper functions
   const getStatusLabel = (status?: string) => {
@@ -239,6 +239,10 @@ const TheaterManagement: React.FC = () => {
     setSelectedStatus('');
     setRoomCountRange('');
   };
+
+  useEffect(() => {
+    setCurrentPage(1);
+    }, [searchTerm, selectedStatus, roomCountRange]);
 
   // Table columns for list view
   const columns: Column<Theater>[] = [
@@ -336,7 +340,7 @@ const TheaterManagement: React.FC = () => {
               <Eye size={16} />
             </button>
           )}
-          {hasPermission("theater.update") && (
+          {/* {hasPermission("theater.update") && (
             <button
               onClick={() => {
                 setSelectedTheater(theater);
@@ -348,8 +352,8 @@ const TheaterManagement: React.FC = () => {
             >
               <Edit size={16} />
             </button>
-          )}
-          {hasPermission("theater.delete") && (
+          )} */}
+          {/* {hasPermission("theater.delete") && (
             <button
               onClick={() => theater.id && handleDeleteTheater(theater.id)}
               className="text-red-600 hover:text-red-900 transition-colors"
@@ -358,7 +362,7 @@ const TheaterManagement: React.FC = () => {
             >
               <Trash2 size={16} />
             </button>
-          )}
+          )} */}
         </div>
       )
     }
@@ -405,7 +409,7 @@ const TheaterManagement: React.FC = () => {
             </div>
 
             {/* Add Button */}
-            {hasPermission("theater.create") && (
+            {/* {hasPermission("theater.create") && (
               <button
                 className="text-blue-600 hover:text-blue-900 transition-colors flex items-center space-x-2 px-4 py-2 border border-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer"
                 onClick={() => {
@@ -417,7 +421,7 @@ const TheaterManagement: React.FC = () => {
                 <Plus size={16} />
                 <span>Thêm rạp mới</span>
               </button>
-            )}
+            )} */}
           </div>
         </div>
 
@@ -567,7 +571,7 @@ const TheaterManagement: React.FC = () => {
                                     {theater.nameEn}
                                     </span>
                                 <div className="flex space-x-1">
-                                    { hasPermission("theater.update") && (
+                                    {/* { hasPermission("theater.update") && (
                                         <button
                                             onClick={() => {
                                                 setSelectedTheater(theater);
@@ -579,9 +583,9 @@ const TheaterManagement: React.FC = () => {
                                             >
                                             <Edit size={14} />
                                         </button>
-                                    )}
+                                    )} */}
                                     
-                                    { hasPermission("theater.delete") && 
+                                    {/* { hasPermission("theater.delete") && 
                                         (<button
                                             onClick={() => theater.id && handleDeleteTheater(theater.id)}
                                             className="p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
@@ -589,7 +593,7 @@ const TheaterManagement: React.FC = () => {
                                         >
                                             <Trash2 size={14} />
                                         </button>
-                                    )}
+                                    )} */}
                                 </div>
                             </div>
                             <span className={`inline-flex mt-3 px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(theater.status)}`}>
@@ -710,7 +714,7 @@ const TheaterManagement: React.FC = () => {
           mode={modalMode}
           theater={selectedTheater}
           onClose={() => setModalOpen(false)}
-          onSubmit={handleSaveTheater}
+        //   onSubmit={handleSaveTheater}
         />
       </div>
   );

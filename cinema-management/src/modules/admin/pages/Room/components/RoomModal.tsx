@@ -12,7 +12,7 @@ import {
     X
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { type Room, roomApiService, type RoomLayout, type Seat } from '../../../../../services/roomApi';
+import { type Room, roomApiService, type RoomLayout, type Seat, type SeatType } from '../../../../../services/roomApi';
 import SeatLayoutDesigner from './SeatLayoutDesigner';
 
 interface RoomModalProps {
@@ -41,16 +41,17 @@ const RoomModal: React.FC<RoomModalProps> = ({
     const [testForm, setTestForm] = useState<RoomLayout>({
         col: 0,
         row: 0,
-        specialSeats: {},
         walkways: [],
-        coupleSeatQuantity: 0,
+        seatPlacements: [],
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [showSeatDesigner, setShowSeatDesigner] = useState(false);
     const [theaters, setTheaters] = useState<Theater[]>([]);
     const [formats, setFormats] = useState<Format[]>([]);
+    const [listSeatsType, setListSeatsType] = useState<SeatType[]>([]);
     const [loading, setLoading] = useState(false);
     const [loadingSeatData, setLoadingSeatData] = useState(false);
+    const [haveSeatApi, setHaveSeatApi] = useState(false);
 
     useEffect(() => {
         const loadRoomData = async () => {
@@ -62,35 +63,45 @@ const RoomModal: React.FC<RoomModalProps> = ({
                     try {
                         const seats = await roomApiService.getRoomSeats(room.id);
                         if (seats && seats.length > 0) {
-                        const mappedSeats = seats.map(seat => {
-                            const parsed = parseSeatNumberSimple(seat.seatNumber);
-                            return {
-                                id: seat.id || `${parsed.row}-${parsed.column}`,
-                                row: parsed.row,
-                                column: parsed.column,
-                                seatType: seat.seatType,
-                                seatNumber: seat.seatNumber,
-                                color: seat.color,
-                                isAvailable: true
-                            };
-                        });
+                            console.log("Loaded seat data:", seats);
+                            const mappedSeats = seats.map(seat => {
+                                const parsed = parseSeatNumberSimple(seat.seatNumber);
+                                return {
+                                    id: seat.id || `${parsed.row}-${parsed.column}`,
+                                    row: parsed.row,
+                                    column: parsed.column,
+                                    seatType: seat.seatType,
+                                    seatNumber: seat.seatNumber,
+                                    color: seat.color,
+                                    isAvailable: true
+                                };
+                            });
 
-                        const vipCount = mappedSeats.filter(s => s.seatType === 'VIP').length;
-                        const standardCount = mappedSeats.filter(s => s.seatType === 'Standard').length;
-                        const coupleCount = mappedSeats.filter(s => s.seatType === 'Couple').length / 2;
+                            const vipCount = mappedSeats.filter(s => s.seatType === 'VIP').length;
+                            const standardCount = mappedSeats.filter(s => s.seatType === 'Standard').length;
+                            const coupleCount = mappedSeats.filter(s => s.seatType === 'Couple').length / 2;
 
-                        setForm(prev => ({
-                            ...prev,
-                            seatLayout: mappedSeats,
-                            totalSeats: mappedSeats.length,
-                            vipSeats: vipCount,
-                            standardSeats: standardCount,
-                            coupleSeats: coupleCount
-                        }));
+                            setForm(prev => ({
+                                ...prev,
+                                seatLayout: mappedSeats,
+                                totalSeats: mappedSeats.length,
+                                vipSeats: vipCount,
+                                standardSeats: standardCount,
+                                coupleSeats: coupleCount
+                            }));
+                            setHaveSeatApi(true);
+                        } else {
+                            setForm(prev => ({ ...prev, seatLayout: [] }));
+                            console.log("No seat data loaded");
+                            setHaveSeatApi(false);
                         }
                     } catch (error) {
                         console.error('Error loading seat data:', error);
+                    } finally {
+                        setLoadingSeatData(false);
                     }
+                } else {
+                    setForm(getDefaultForm());
                     setLoadingSeatData(false);
                 }
             } else if (mode === "add") {
@@ -107,7 +118,6 @@ const RoomModal: React.FC<RoomModalProps> = ({
         }
     }, [room, mode, open]);
 
-  if (!open) return null;
 
   const fetchData = async () => {
     try {
@@ -117,13 +127,27 @@ const RoomModal: React.FC<RoomModalProps> = ({
         ]);
         setTheaters(theatersResponse.data);
         setFormats(formatsResponse);
-      return { theaters, formats };
+        return { theaters, formats };
     } catch (error) {
-      console.error('Error fetching theaters:', error);
+      console.error('Error fetching data:', error);
       return [];
     }
   };
 
+    const fetchSeatTypes = async () => {
+        try {
+            const seatTypesResponse = await roomApiService.getSeatTypes();
+            setListSeatsType(seatTypesResponse);
+        } catch (error) {
+            console.error('Error fetching seat types:', error);
+        }
+    };
+
+    useEffect(() => {
+        fetchSeatTypes();
+    }, [showSeatDesigner]);
+
+  if (!open) return null;
   const isView = mode === "view";
   const isAdd = mode === "add";
   const isEdit = mode === "edit";
@@ -152,7 +176,7 @@ const RoomModal: React.FC<RoomModalProps> = ({
         } else {
             onSubmit(form, testForm);
         }
-        onClose();
+        // onClose();
       } catch (error) {
         console.error('Error submitting form:', error);
       } finally {
@@ -160,7 +184,7 @@ const RoomModal: React.FC<RoomModalProps> = ({
       }
     }
 
-    // console.log("Form data to submit:", testForm);
+    console.log("Form data to submit:", testForm);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -185,7 +209,7 @@ const RoomModal: React.FC<RoomModalProps> = ({
   };
 
   const parseSeatNumber = (seatNumber: string) => {
-    if (!seatNumber) return { rowLetter: 'A', columnNumber: 1, isCouple: false };
+    if (!seatNumber) return { rowLetter: 'A', columnNumber: 1, isCouple: false, capacity: 1 };
 
     if (seatNumber.startsWith('W_')) {
       const rowLetter = seatNumber[2];
@@ -193,22 +217,23 @@ const RoomModal: React.FC<RoomModalProps> = ({
       return {
         rowLetter,
         columnNumber: parseInt(colStr),
-        isCouple: false
+        isCouple: false,
+        capacity: 1
       };
     }
 
     if (seatNumber.includes('+')) {
-      const parts = seatNumber.split('+');
-      if (parts.length === 2) {
+        const parts = seatNumber.split('+');
+    //   if (parts.length === 2) {
         const match = parts[0].match(/^([A-Z]+)(\d+)$/);
         if (match) {
           return {
             rowLetter: match[1],
             columnNumber: parseInt(match[2]),
-            isCouple: true
+            isCouple: true,
+            capacity: parts.length
           };
         }
-      }
     }
 
     const match = seatNumber.match(/^([A-Z]+)(\d+)$/);
@@ -216,10 +241,11 @@ const RoomModal: React.FC<RoomModalProps> = ({
       return {
         rowLetter: match[1],
         columnNumber: parseInt(match[2]),
-        isCouple: false
+        isCouple: false,
+        capacity: 1
       };
     }
-    return { rowLetter: 'A', columnNumber: 1, isCouple: false };
+    return { rowLetter: 'A', columnNumber: 1, isCouple: false, capacity: 1 };
   };
 
   const parseSeatNumberSimple = (seatNumber: string): { row: number, column: number } => {
@@ -307,39 +333,58 @@ const RoomModal: React.FC<RoomModalProps> = ({
     }));
   };
 
-    const testSave = (seats: Seat[], columnCount: number, rowCount: number, coupleSeatQuantity: number) => {
+    const testSave = (seats: Seat[]) => {
+        console.log(seats);
+        const rows = Math.max(...seats.map(seat => seat.row ?? 0)) + 1;
+        const columns = Math.max(...seats.map(seat => {
+                          const type = listSeatsType.find(t => t.name === seat.seatType);
+                          const cap = type?.capacity || 1;
+                          return (Number(seat.column ?? 0) + Number(cap) - 1);
+                        })) + 1;
         setForm(prev => ({ ...prev, seatLayout: seats }));
         setShowSeatDesigner(false);
 
-        const specialSeats: { [key: string]: string } = {};
-        const rowsWithSpecialSeats = new Set<number>();
-
-        // Tìm các dãy có ghế đặc biệt (VIP hoặc Disabled)
+        // Tạo seatPlacements từ seats
+        const seatTypeMap = new Map<string, Set<number>>();
+        
+        // Nhóm các hàng theo seatTypeId
         seats.forEach(seat => {
-        if (seat.seatType === 'VIP' || seat.seatType === 'Disabled') {
-            rowsWithSpecialSeats.add(seat.row ?? 0);
-        }
+            if (seat.seatType !== 'Empty' && seat.seatType !== 'Blocked' && seat.id && seat.row !== undefined) {
+                if (!seatTypeMap.has(seat.id)) {
+                    seatTypeMap.set(seat.id, new Set());
+                }
+                seatTypeMap.get(seat.id)?.add(seat.row);
+            }
         });
 
-        // Gán specialSeats cho mỗi dãy có ghế đặc biệt
-        rowsWithSpecialSeats.forEach(row => {
-            const rowLetter = String.fromCharCode(65 + row);
-            console.log("Row with special seat:", rowLetter);
-            // Tìm ghế VIP/Disabled trong row này để lấy id
-            const specialSeatInRow = seats.find(seat => 
-                (seat.seatType === 'VIP' || seat.seatType === 'Disabled') && 
-                seat.row === row && 
-                seat.id
-            );
+        // Tạo seatPlacements từ seatTypeMap
+        const seatPlacements: { seatTypeId: string; startRow: string; endRow: string }[] = [];
+        
+        seatTypeMap.forEach((rows, seatTypeId) => {
+            const sortedRows = Array.from(rows).sort((a, b) => a - b);
             
-            // Nếu có ghế với id sẵn thì dùng id đó, nếu không thì tạo UUID
-            const seatId = specialSeatInRow?.id || `row-${row}-${crypto.randomUUID()}`;
+            // Nhóm các hàng liên tiếp
+            let startRow = sortedRows[0];
+            let prevRow = sortedRows[0];
             
-            // Khởi tạo giá trị nếu chưa tồn tại, sau đó cộng chuỗi
-            if (!specialSeats[seatId]) {
-                specialSeats[seatId] = '';
+            for (let i = 1; i <= sortedRows.length; i++) {
+                const currentRow = sortedRows[i];
+                
+                // Nếu hàng hiện tại không liên tiếp hoặc đã hết mảng
+                if (currentRow !== prevRow + 1 || i === sortedRows.length) {
+                    seatPlacements.push({
+                        seatTypeId: seatTypeId,
+                        startRow: String.fromCharCode(65 + startRow),
+                        endRow: String.fromCharCode(65 + prevRow)
+                    });
+                    
+                    if (i < sortedRows.length) {
+                        startRow = currentRow;
+                    }
+                }
+                
+                prevRow = currentRow;
             }
-            specialSeats[seatId] += rowLetter;
         });
 
         const walkways = seats
@@ -347,11 +392,10 @@ const RoomModal: React.FC<RoomModalProps> = ({
             .map(seat => ({ columnIndex: seat.column ?? -1, rowIndex: seat.row ?? -1 }));
 
         setTestForm({
-            col: columnCount,
-            row: rowCount,
-            specialSeats,
+            col: columns,
+            row: rows,
             walkways,
-            coupleSeatQuantity
+            seatPlacements
         });
     };
 
@@ -425,11 +469,12 @@ const RoomModal: React.FC<RoomModalProps> = ({
                     }
 
                     const seat = rowSeats.find(s => s.column === columnNumber);
-                    // console.log("Seat:",seat);
+                    // console.log("Seat:",seat, rowSeats);
 
                     if (seat) {
                       const parsed = parseSeatNumber(seat.seatNumber || '');
-                      const isCouple = parsed.isCouple;
+                    //   const isCouple = parsed.isCouple;
+                    // console.log("Rendering seat:", seat.seatNumber, "with capacity:", parsed.capacity);
 
                       if (!seat.seatType || seat.seatType === 'Empty') {
                         // Render as empty space for walkways or undefined seatType
@@ -440,9 +485,10 @@ const RoomModal: React.FC<RoomModalProps> = ({
                         );
                       }
 
-                      if (isCouple) {
-                        renderedColumns.add(columnNumber);
-                        renderedColumns.add(columnNumber + 1);
+                      if (parsed.capacity > 1) {
+                        for (let i = 0; i < parsed.capacity; i++) {
+                          renderedColumns.add(columnNumber + i);
+                        }
                       } else {
                         renderedColumns.add(columnNumber);
                       }
@@ -450,8 +496,8 @@ const RoomModal: React.FC<RoomModalProps> = ({
                       return (
                         <div
                           key={`${rowLetter}${columnNumber}`}
-                          className={`h-7 rounded-lg border-2 text-xs flex items-center justify-center font-semibold text-white ${isCouple ? 'w-15' : 'w-7'}`}
-                          style={{ backgroundColor: seat.color || '#722ed1' }}
+                          className={`h-7 rounded-lg border-2 text-xs flex items-center justify-center font-semibold text-white`}
+                          style={{ backgroundColor: seat.color || '#722ed1', width: `calc(${parsed.capacity * 1.75}rem + (0.25rem * ${parsed.capacity - 1}))`, borderColor: seat.color || '#722ed1' }}
                           title={`${seat.seatNumber}`}
                         >
                           {seat.seatNumber}
@@ -565,7 +611,7 @@ const RoomModal: React.FC<RoomModalProps> = ({
                   </label>
                   {isView ? (
                     <div className="w-full h-13 border rounded-lg px-4 py-3 bg-white border-slate-200 text-slate-600">
-                      {form.theaterId}
+                      {form.theaterName}
                     </div>
                   ) : (
                     <select
@@ -599,7 +645,7 @@ const RoomModal: React.FC<RoomModalProps> = ({
                       onChange={handleChange}
                       className="w-full h-13 px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                     >
-                      <option value="">Hãy chọn loại phòng</option>
+                      <option value="" >Hãy chọn loại phòng</option>
                         {formats.map(format => (
                             <option key={format.id} value={format.id}>{format.nameVn}</option>
                         ))}
@@ -634,66 +680,63 @@ const RoomModal: React.FC<RoomModalProps> = ({
             </div>
             {!isAdd && (
                 <div className="bg-blue-50 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                    <Users className="w-5 h-5" />
-                    Cấu hình ghế ngồi
-                </h3>
-                <div className="mt-4 p-4 bg-white rounded-lg border border-slate-200">
                     <div className="flex justify-between items-center mb-3">
-                    <h4 className="text-sm font-semibold text-slate-700">Bố cục ghế</h4>
-                    {!isView && (
-                        <button
-                        type="button"
-                        onClick={() => setShowSeatDesigner(true)}
-                        className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm flex items-center gap-2"
-                        >
-                        <Grid className="w-4 h-4" />
-                        Thiết kế bố cục
-                        </button>
-                    )}
+                        <h3 className="text-lg font-semibold text-slate-700 flex items-center gap-2">
+                            <Users className="w-5 h-5" />
+                            Cấu hình ghế ngồi
+                        </h3>
+                        {!isView && !haveSeatApi && (
+                            <button
+                            type="button"
+                            onClick={() => setShowSeatDesigner(true)}
+                            className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm flex items-center gap-2"
+                            >
+                            <Grid className="w-4 h-4" />
+                            Thiết kế bố cục
+                            </button>
+                        )}
+                        {!isView && haveSeatApi && (
+                            <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                                Đã có bố cục từ hệ thống
+                            </div>
+                        )}
                     </div>
-                    {form.seatLayout && form.seatLayout.length > 0 ? (
-                    <div className="text-center">
-                        <div className="bg-gray-800 text-white py-2 px-4 rounded-lg mb-4 inline-block">
-                        🎬 MÀN HÌNH
-                        </div>
-                        <div className="text-sm text-slate-600 mb-2">
-                        Đã thiết kế: {form.seatLayout.filter(s => s.seatType !== undefined && s.seatType !== 'Blocked').length} ghế
-                        </div>
-                        {renderSeatLayoutFromAPI()}
-                        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                        <div className="text-xs font-semibold text-gray-700 mb-2">Chú thích:</div>
-                        <div className="flex justify-center flex-wrap gap-4 text-xs">
-                            <div className="flex items-center space-x-1">
-                            <div className="w-5 h-5 bg-gray-300 border-gray-400 border-2 rounded flex items-center justify-center">💺</div>
-                            <span>Thường ({form.seatLayout.filter(s => s.seatType === 'Standard').length})</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                            <div className="w-5 h-5 bg-yellow-300 border-yellow-400 border-2 rounded flex items-center justify-center">👑</div>
-                            <span>VIP ({form.seatLayout.filter(s => s.seatType === 'VIP').length})</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                            <div className="w-10 h-5 bg-pink-300 border-pink-400 border-2 rounded flex items-center justify-center">❤️</div>
-                            <span>Đôi ({form.seatLayout.filter(s => s.seatType === 'Couple').length} cặp)</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                            <div className="w-5 h-5 bg-blue-300 border-blue-400 border-2 rounded flex items-center justify-center">♿</div>
-                            <span>Khuyết tật ({form.seatLayout.filter(s => s.seatType === 'Disabled').length})</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                            <div className="w-5 h-5 bg-white border-gray-300 border-2 border-dashed rounded"></div>
-                            <span>Lối đi ({form.seatLayout.filter(s => s.seatType === undefined).length})</span>
-                            </div>
-                        </div>
-                        </div>
-                    </div>
-                    ) : loadingSeatData ? (
+                <div className="mt-4 p-4 bg-white rounded-lg border border-slate-200">
+                    {loadingSeatData ? (
                     <div className="text-center py-8">
                         <svg className="animate-spin h-8 w-8 text-gray-400 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                         <div className="text-sm text-gray-500">Đang tải dữ liệu ghế...</div>
+                    </div>
+                    ) : form.seatLayout && form.seatLayout.length > 0 ? (
+                    <div className="text-center">
+                        <div className="bg-gray-800 text-white py-2 px-4 rounded-lg mb-4 inline-block">
+                        🎬 MÀN HÌNH
+                        </div>
+                        <div className="text-sm text-slate-600 mb-2">
+                        Đã thiết kế: {form.seatLayout.filter(s => s.seatType !== undefined && s.seatType !== 'Empty' && s.seatType !== 'Blocked').length} ghế
+                        </div>
+                        {renderSeatLayoutFromAPI()}
+                        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                        <div className="text-xs font-semibold text-gray-700 mb-2">Chú thích:</div>
+                        <div className="flex mx-auto max-w-2xl flex-wrap gap-4 text-xs">
+                            {listSeatsType.map(seatType => (
+                            <div key={seatType.name} className="flex items-center space-x-1">
+                                <div className="w-5 h-5 rounded-lg border-2" style={{ backgroundColor: seatType.color, borderColor: seatType.color }}></div>
+                                <span>{seatType.name} ({form.seatLayout?.filter(s => s.seatType === seatType.name).length})</span>
+                            </div>
+                            ))}
+                            <div className="flex items-center space-x-1">
+                            <div className="w-5 h-5 bg-white border-gray-300 border-2 border-dashed rounded"></div>
+                            <span>Lối đi ({form.seatLayout.filter(s => s.seatType === undefined || s.seatType === 'Empty').length})</span>
+                            </div>
+                        </div>
+                        </div>
                     </div>
                     ) : (
                     <div className="text-center">
@@ -746,9 +789,9 @@ const RoomModal: React.FC<RoomModalProps> = ({
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  disabled={loading}
+                  disabled={loading || (isEdit && (!form.seatLayout || form.seatLayout.length === 0)) || (isAdd && (!form.name || !form.theaterId || !form.type))}
                   className={`flex-1 px-6 py-3 text-white rounded-lg font-semibold transition-colors duration-200 ${
-                    loading
+                    loading || (isEdit && (!form.seatLayout || form.seatLayout.length === 0)) || (isAdd && (!form.name || !form.theaterId || !form.type))
                       ? 'bg-gray-400 cursor-not-allowed'
                       : isAdd 
                       ? 'bg-green-600 hover:bg-green-700' 
@@ -773,19 +816,18 @@ const RoomModal: React.FC<RoomModalProps> = ({
         </div>
       </div>
       {/* Seat Layout Designer */}
-      <SeatLayoutDesigner
+      {showSeatDesigner && (<SeatLayoutDesigner
         open={showSeatDesigner}
         roomName={form.name || "Phòng chiếu"}
+        row={testForm.row || 10}
+        col={testForm.col || 10}
         initialSeats={
           loadingSeatData 
-            ? [] 
-            : mode === "add" 
-            ? [] // Always start with empty layout for new rooms
-            : (form.seatLayout || [])
+            ? [] : (form.seatLayout || [])
         }
         onSave={testSave}
         onClose={() => setShowSeatDesigner(false)}
-      />
+      />)}
     </div>
   );
 };

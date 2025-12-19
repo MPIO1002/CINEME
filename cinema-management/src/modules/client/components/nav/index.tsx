@@ -6,6 +6,7 @@ import { API_BASE_URL } from "../../../../components/api-config";
 import AuthModal from "../auth-modal";
 import { useToast } from "../../../../hooks/useToast";
 import { handleLogoutAPI } from "../../../../utils/auth";
+import userApiService from "../../../../services/userApi";
 
 const LANGUAGES = [
   { code: "vi", label: "VIE", flag: "/VN.webp" },
@@ -89,6 +90,8 @@ const Nav = ({
   useEffect(() => {
     const checkUserData = () => {
       const savedUserData = localStorage.getItem('userData');
+      const accessToken = localStorage.getItem('accessToken');
+      
       if (savedUserData) {
         try {
           const userData = JSON.parse(savedUserData);
@@ -97,8 +100,29 @@ const Nav = ({
           console.error('Error parsing saved user data:', error);
           localStorage.removeItem('userData');
         }
+      } else if (accessToken) {
+        // If we have accessToken but no userData, user just logged in via OAuth
+        // Fetch user profile data
+        fetchUserProfile(accessToken);
       } else {
         setUser(null);
+      }
+    };
+
+    const fetchUserProfile = async (token: string) => {
+      try {
+        const result = await userApiService.getUserProfile();
+        const userData: UserData = {
+          id: result.id,
+          email: result.email,
+          fullName: result.fullName,
+          accessToken: token,
+          refreshToken: token,
+        };
+        setUser(userData);
+        localStorage.setItem('userData', JSON.stringify(userData));
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
       }
     };
 
@@ -107,7 +131,7 @@ const Nav = ({
 
     // Listen for storage changes (including OAuth callbacks)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'userData') {
+      if (e.key === 'userData' || e.key === 'accessToken') {
         checkUserData();
       }
     };
@@ -211,7 +235,7 @@ const Nav = ({
 
   return (
     <nav
-      className={`w-full flex items-center justify-between fixed top-0 left-0 z-90 px-6 py-3 transition-colors duration-300 ${scrolled ? "bg-[var(--color-background)] bg-opacity-95" : "bg-transparent"
+      className={`w-full flex items-center justify-between fixed top-0 left-0 z-[90] px-6 py-3 transition-colors duration-300 ${scrolled ? "bg-[var(--color-background)] bg-opacity-95" : "bg-transparent"
         }`}
       style={{
         color: "var(--color-text)",
@@ -286,6 +310,7 @@ const Nav = ({
         
         <li 
           className="hover:text-[var(--color-secondary)] cursor-pointer transition relative"
+          onClick={() => navigate('/theater')}
           onMouseEnter={() => {
             if (theaterHideTimer.current) { window.clearTimeout(theaterHideTimer.current); theaterHideTimer.current = null; }
             setShowTheaterPopup(true);
@@ -314,7 +339,15 @@ const Nav = ({
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
                     {theaters.slice(0, 8).map((theater) => (
-                      <div key={theater.id} className="p-2 hover:bg-[var(--color-secondary)] rounded-lg transition cursor-pointer">
+                      <div 
+                        key={theater.id} 
+                        className="p-2 hover:bg-[var(--color-secondary)] rounded-lg transition cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate('/theater');
+                          setShowTheaterPopup(false);
+                        }}
+                      >
                         <h4 className="font-medium text-white text-xs truncate">{theater.nameVn}</h4>
                         <p className="text-gray-400 text-xs truncate">{theater.nameEn}</p>
                       </div>

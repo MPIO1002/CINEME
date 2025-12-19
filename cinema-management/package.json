@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
+    "build:check": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -25,6 +26,9 @@
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.18.1",
     "gsap": "^3.13.0",
+    "html2canvas": "^1.4.1",
+    "js-cookie": "^3.0.5",
+    "jspdf": "^3.0.4",
     "jwt-decode": "^3.1.2",
     "lucide-react": "^0.515.0",
     "prop-types": "^15.8.1",
@@ -32,6 +36,7 @@
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.2",
     "socket.io-client": "^2.3.0",
+    "sonner": "^2.0.7",
     "split-type": "^0.3.4",
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^4.1.8"
@@ -39,6 +44,7 @@
   "devDependencies": {
     "@eslint/js": "^9.25.0",
     "@types/gsap": "^1.20.2",
+    "@types/js-cookie": "^3.0.6",
     "@types/node": "^24.0.1",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",

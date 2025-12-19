@@ -3,29 +3,23 @@ import {
     Ban,
     Calendar,
     CheckCircle,
-    Clock,
-    Crown,
     DollarSign,
-    Edit,
     Eye,
     EyeOffIcon,
     Filter,
     Phone,
     Search,
-    Settings,
-    Shield,
     ShoppingBag,
     User as UserIcon,
-    UserPlus,
     Users,
     XCircle
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { userApiService, type User } from '../../../../services/userApi';
 import { Pagination } from "../../components/pagination";
+import { hasPermission } from "../../utils/authUtils";
 import RolePermissionManager from './components/RolePermissionManager';
 import UserModal from './components/UserModal';
-import { hasPermission } from "../../utils/authUtils";
 
 const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -46,7 +40,7 @@ const UserManagement: React.FC = () => {
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 12;
+  const itemsPerPage = 8;
   
   // Phone visibility state - track which phones are visible (default: all hidden)
   const [visiblePhones, setVisiblePhones] = useState<Set<string>>(new Set());
@@ -81,10 +75,9 @@ const UserManagement: React.FC = () => {
       const matchesSearch = user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            (user.phone?.includes(searchTerm) || false);
-      const matchesRole = !selectedRole || user.role === selectedRole;
       const matchesStatus = !selectedStatus || user.status === selectedStatus;
       
-      return matchesSearch && matchesRole && matchesStatus;
+      return matchesSearch  && matchesStatus;
     });
     
     setFilteredUsers(filtered);
@@ -97,17 +90,17 @@ const UserManagement: React.FC = () => {
     setShowOnlineOnly(false);
   };
 
-  const handleAddUser = () => {
-    setSelectedUser(undefined);
-    setModalMode("add");
-    setModalOpen(true);
-  };
+//   const handleAddUser = () => {
+//     setSelectedUser(undefined);
+//     setModalMode("add");
+//     setModalOpen(true);
+//   };
 
-  const handleEditUser = (user: User) => {
-    setSelectedUser(user);
-    setModalMode("edit");
-    setModalOpen(true);
-  };
+//   const handleEditUser = (user: User) => {
+//     setSelectedUser(user);
+//     setModalMode("edit");
+//     setModalOpen(true);
+//   };
 
   const handleViewUser = (user: User) => {
     setSelectedUser(user);
@@ -116,18 +109,24 @@ const UserManagement: React.FC = () => {
   };
 
   const handleBanUser = async (userId: string) => {
+    if (!window.confirm('Bạn có chắc chắn muốn thay đổi trạng thái khóa của người dùng này không?')) return;
     try {
       setLoading(true);
-      // Update user status locally for now
+      const user = users.find(u => u.id === userId);
+      if (!user) return;
+      
+      const newLocked = !user.locked;
+      await userApiService.lockUser(userId, newLocked);
+      
+      // Update local state
       setUsers(prev => prev.map(user => 
         user.id === userId 
-          ? { ...user, status: user.status === 'BANNED' ? 'ACTIVE' : 'BANNED' as const }
+          ? { ...user, locked: newLocked, status: newLocked ? 'BANNED' : 'ACTIVE' }
           : user
       ));
-      // TODO: Call API to update user status
-      // await userApiService.updateUserStatus(userId, newStatus);
+      alert(newLocked ? 'Đã khóa người dùng!' : 'Đã mở khóa người dùng!');
     } catch (error) {
-      console.error('Error updating user status:', error);
+      console.error('Error updating user lock status:', error);
       alert('Có lỗi xảy ra khi cập nhật trạng thái người dùng!');
     }
     setLoading(false);
@@ -153,37 +152,35 @@ const UserManagement: React.FC = () => {
     setLoading(false);
   };
 
-  const getRoleIcon = (role?: string) => {
-    switch (role) {
-      case 'ADMIN': return <Crown className="w-4 h-4 text-red-500" />;
-      case 'STAFF': return <Shield className="w-4 h-4 text-blue-500" />;
-      case 'CUSTOMER': return <UserIcon className="w-4 h-4 text-green-500" />;
-      default: return <UserIcon className="w-4 h-4 text-gray-500" />;
-    }
-  };
+//   const getRoleIcon = (role?: string) => {
+//     switch (role) {
+//       case 'ADMIN': return <Crown className="w-4 h-4 text-red-500" />;
+//       case 'STAFF': return <Shield className="w-4 h-4 text-blue-500" />;
+//       case 'CUSTOMER': return <UserIcon className="w-4 h-4 text-green-500" />;
+//       default: return <UserIcon className="w-4 h-4 text-gray-500" />;
+//     }
+//   };
 
   const getStatusIcon = (status?: string) => {
     switch (status) {
       case 'ACTIVE': return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'INACTIVE': return <AlertCircle className="w-4 h-4 text-yellow-500" />;
       case 'BANNED': return <XCircle className="w-4 h-4 text-red-500" />;
       default: return <AlertCircle className="w-4 h-4 text-gray-500" />;
     }
   };
 
-  const getRoleBadgeColor = (role?: string) => {
-    switch (role) {
-      case 'ADMIN': return 'bg-red-100 text-red-800 border-red-200';
-      case 'STAFF': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'CUSTOMER': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
+//   const getRoleBadgeColor = (role?: string) => {
+//     switch (role) {
+//       case 'ADMIN': return 'bg-red-100 text-red-800 border-red-200';
+//       case 'STAFF': return 'bg-blue-100 text-blue-800 border-blue-200';
+//       case 'CUSTOMER': return 'bg-green-100 text-green-800 border-green-200';
+//       default: return 'bg-gray-100 text-gray-800 border-gray-200';
+//     }
+//   };
 
   const getStatusBadgeColor = (status?: string) => {
     switch (status) {
       case 'ACTIVE': return 'bg-green-100 text-green-800 border-green-200';
-      case 'INACTIVE': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'BANNED': return 'bg-red-100 text-red-800 border-red-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
@@ -220,17 +217,17 @@ const UserManagement: React.FC = () => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  const getStats = () => {
-    const totalUsers = users.length;
-    const adminUsers = users.filter(u => u.role === 'ADMIN').length;
-    const topSpender = users.reduce((max, user) => 
-      (user.totalSpent || 0) > (max.totalSpent || 0) ? user : max
-    , users[0]);
+//   const getStats = () => {
+//     const totalUsers = users.length;
+//     const adminUsers = users.filter(u => u.role === 'ADMIN').length;
+//     const topSpender = users.reduce((max, user) => 
+//       (user.totalSpent || 0) > (max.totalSpent || 0) ? user : max
+//     , users[0]);
 
-    return { totalUsers, adminUsers, topSpender };
-  };
+//     return { totalUsers, adminUsers, topSpender };
+//   };
 
-  const stats = getStats();
+//   const stats = getStats();
 
   // Pagination
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -275,7 +272,7 @@ const UserManagement: React.FC = () => {
                         <p className="text-slate-600">Quản lý tài khoản và phân quyền người dùng trong hệ thống</p>
                     </div>
                 </div>
-              <div className="flex gap-3">
+              {/* <div className="flex gap-3">
                 {hasPermission("user.editPermission") && (
                   <button
                     onClick={() => setRolePermissionOpen(true)}
@@ -294,7 +291,7 @@ const UserManagement: React.FC = () => {
                     Thêm người dùng
                   </button>
                 )}
-              </div>
+              </div> */}
             </div>
 
             {/* Statistics */}
@@ -358,7 +355,7 @@ const UserManagement: React.FC = () => {
 
               {/* Filters */}
               {/* <div className="flex flex-wrap gap-3"> */}
-              <div>
+              {/* <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Vai trò</label>
                 <select
                   value={selectedRole}
@@ -370,7 +367,7 @@ const UserManagement: React.FC = () => {
                   <option value="STAFF">Nhân viên</option>
                   <option value="CUSTOMER">Khách hàng</option>
                 </select>
-              </div>
+              </div> */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Trạng thái</label>
                 <select
@@ -380,7 +377,6 @@ const UserManagement: React.FC = () => {
                 >
                   <option value="">Tất cả trạng thái</option>
                   <option value="ACTIVE">Hoạt động</option>
-                  <option value="INACTIVE">Không hoạt động</option>
                   <option value="BANNED">Bị khóa</option>
                 </select>
                 </div>
@@ -461,11 +457,7 @@ const UserManagement: React.FC = () => {
                         <div className="flex items-center gap-3 mb-4">
                             <div className="relative">
                             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                                {user.avatar ? (
-                                <img src={user.avatar} alt="" className="w-full h-full rounded-full object-cover" />
-                                ) : (
-                                getUserInitials(user.fullName)
-                                )}
+                                {getUserInitials(user.fullName)}
                             </div>
                             </div>
                             <div className="flex-1 min-w-0">
@@ -493,17 +485,13 @@ const UserManagement: React.FC = () => {
                         {/* Role and Status */}
                         <div className="flex items-center gap-2 mb-3">
                             <div className="flex items-center gap-1">
-                            {getRoleIcon(user.role)}
-                            <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getRoleBadgeColor(user.role)}`}>
-                                {user.role === 'ADMIN' ? 'Quản trị' : 
-                                user.role === 'STAFF' ? 'Nhân viên' : 'Khách hàng'}
-                            </span>
+                            <UserIcon className="w-4 h-4 text-blue-500" />
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full border bg-blue-100 text-blue-800 border-blue-200`}>Khách hàng</span>
                             </div>
                             <div className="flex items-center gap-1">
                             {getStatusIcon(user.status)}
                             <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusBadgeColor(user.status)}`}>
-                                {user.status === 'ACTIVE' ? 'Hoạt động' : 
-                                user.status === 'INACTIVE' ? 'Tạm dừng' : 'Bị khóa'}
+                                {user.status === 'ACTIVE' ? 'Hoạt động' : 'Bị khóa'}
                             </span>
                             </div>
                         </div>
@@ -535,16 +523,9 @@ const UserManagement: React.FC = () => {
                             <Calendar className="w-4 h-4" />
                             <span>Tham gia: {formatDate(user.joinDate)}</span>
                             </div>
-                            {user.lastLogin && (
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                                <Clock className="w-4 h-4" />
-                                <span>Online: {getTimeAgo(user.lastLogin)}</span>
-                            </div>
-                            )}
                         </div>
 
                         {/* Stats for Customers */}
-                        {user.role === 'CUSTOMER' && (
                             <div className="flex justify-between items-center mb-4 p-3 bg-gray-50 rounded-lg">
                             <div className="text-center">
                                 <div className="flex items-center justify-center gap-1 text-sm font-medium text-gray-900">
@@ -561,36 +542,35 @@ const UserManagement: React.FC = () => {
                                 <div className="text-xs text-gray-500">Tổng chi tiêu</div>
                             </div>
                             </div>
-                        )}
                     </div>
                   {/* Actions */}
                   <div className="flex items-center gap-2 h-1/12">
                     {hasPermission("user.view") && (
                       <button
                         onClick={() => handleViewUser(user)}
-                        className="flex-1 py-2 px-3 text-purple-600 border border-purple-600 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors text-sm font-medium cursor-pointer"
+                        className="flex flex-1 justify-center gap-2 py-2 px-3 text-purple-600 border border-purple-600 rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors text-sm font-medium cursor-pointer"
                       >
-                        <Eye className="w-4 h-4 mx-auto" />
+                        <Eye className="w-4 h-4" /> Xem
                       </button>
                     )}
-                    {hasPermission("user.update") && (
+                    {/* {hasPermission("user.update") && (
                       <button
                         onClick={() => handleEditUser(user)}
                         className="flex-1 py-2 px-3 text-blue-600 border border-blue-600 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors text-sm font-medium cursor-pointer"
                       >
                         <Edit className="w-4 h-4 mx-auto" />
                       </button>
-                    )}
+                    )} */}
                     {hasPermission("user.delete") && (
                       <button
                         onClick={() => handleBanUser(user.id)}
-                        className={`flex-1 py-2 px-3 border rounded-lg transition-colors text-sm font-medium cursor-pointer ${
+                        className={`flex-1 inline-flex items-center justify-center gap-2 py-2 px-3 border rounded-lg transition-colors text-sm font-medium cursor-pointer ${
                           user.status === 'BANNED' 
                             ? 'text-green-600 border-green-600 bg-green-50 hover:bg-green-100' 
                             : 'text-red-600 border-red-600 bg-red-50 hover:bg-red-100'
                         }`}
                       >
-                        <Ban className="w-4 h-4 mx-auto" />
+                        <Ban className="w-4 h-4" /> {user.status === 'BANNED' ? 'Mở khóa' : 'Khóa'}
                       </button>
                     )}
                   </div>

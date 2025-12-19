@@ -102,3 +102,89 @@ export const getCurrentUser = (userType: 'client' | 'admin' = 'client') => {
     return null;
   }
 };
+
+/**
+ * Refresh access token using refresh token
+ * @returns new access token or null if refresh fails
+ */
+export const refreshAccessToken = async (): Promise<string | null> => {
+  try {
+    const refreshToken = localStorage.getItem('refreshToken');
+    
+    if (!refreshToken) {
+      console.warn('No refresh token available');
+      return null;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refreshToken })
+    });
+
+    if (!response.ok) {
+      console.warn('Token refresh failed:', response.status);
+      // If refresh fails, clear tokens and redirect to login
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('userData');
+      window.location.href = '/';
+      return null;
+    }
+
+    const data = await response.json();
+    
+    if (data.statusCode === 200 && data.data) {
+      const newAccessToken = data.data.accessToken || data.data;
+      localStorage.setItem('accessToken', newAccessToken);
+      console.log('Token refreshed successfully');
+      return newAccessToken;
+    }
+
+    console.warn('Invalid refresh token response:', data);
+    return null;
+  } catch (error) {
+    console.error('Error refreshing access token:', error);
+    return null;
+  }
+};
+
+/**
+ * Fetch wrapper that automatically refreshes token if needed
+ * @param url - API endpoint
+ * @param options - Fetch options
+ * @returns Fetch response
+ */
+export const fetchWithTokenRefresh = async (
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> => {
+  const accessToken = localStorage.getItem('accessToken');
+  
+  // Initialize headers if not provided
+  if (!options.headers) {
+    options.headers = {};
+  }
+  
+  // Add authorization header if token exists
+  if (accessToken) {
+    (options.headers as Record<string, string>)['Authorization'] = `Bearer ${accessToken}`;
+  }
+
+  let response = await fetch(url, options);
+
+  // If 401 Unauthorized, try refreshing token and retry
+  if (response.status === 401) {
+    console.log('Token expired, attempting to refresh...');
+    const newAccessToken = await refreshAccessToken();
+    
+    if (newAccessToken) {
+      (options.headers as Record<string, string>)['Authorization'] = `Bearer ${newAccessToken}`;
+      response = await fetch(url, options);
+    }
+  }
+
+  return response;
+};

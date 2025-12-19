@@ -1,6 +1,7 @@
-import { Calendar, Edit3, Eye, FileText, Film, Plus, Star, User, X } from "lucide-react";
+import { Calendar, Edit3, Eye, FileText, Film, Loader2, Plus, Star, User, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { actorApiService, type Actor } from '../../../../../services/actorApi';
+import { toast } from "sonner";
 
 interface ActorModalProps {
   open: boolean;
@@ -20,15 +21,16 @@ const ActorModal: React.FC<ActorModalProps> = ({
   const [form, setForm] = useState<Actor>({
     name: "",
     img: "",
-    dateOfBirth: "",
-    nationality: "",
-    biography: "",
+    // dateOfBirth: "",
+    // nationality: "",
+    // biography: "",
     listMovie: [],
   });
 
   const [avatarError, setAvatarError] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [loadingSubmit, setLoadingSubmit] = useState(false);
 
   // Fetch actor detail when actorId is provided
   useEffect(() => {
@@ -47,9 +49,9 @@ const ActorModal: React.FC<ActorModalProps> = ({
         setForm({
           name: "",
           img: "",
-          dateOfBirth: "",
-          nationality: "",
-          biography: "",
+        //   dateOfBirth: "",
+        //   nationality: "",
+        //   biography: "",
           listMovie: [],
         });
       }
@@ -106,23 +108,44 @@ const ActorModal: React.FC<ActorModalProps> = ({
     }
 
     // Validate date of birth
-    if (form.dateOfBirth) {
-      const birthDate = new Date(form.dateOfBirth);
-      const today = new Date();
-      if (birthDate > today) {
-        newErrors.dateOfBirth = "Ngày sinh không thể là tương lai";
-      }
-    }
+    // if (form.dateOfBirth) {
+    //   const birthDate = new Date(form.dateOfBirth);
+    //   const today = new Date();
+    //   if (birthDate > today) {
+    //     newErrors.dateOfBirth = "Ngày sinh không thể là tương lai";
+    //   }
+    // }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
-    if (validateForm() && onSubmit) {
-      onSubmit(form);
-    }
-  };
+    const handleSubmit = async () => {
+        if (validateForm() && onSubmit) {
+            try {
+                let response;
+                setLoadingSubmit(true);
+
+                console.log('Submitting actor:', form);
+                console.log('Img type:', typeof form.img, form.img instanceof File ? 'File' : 'String');
+
+                if (mode === "add") {
+                    response = await actorApiService.createActor(form);
+                    toast.success("Thêm diễn viên thành công!");
+                } else if (mode === "edit" && actor) {
+                    response = await actorApiService.updateActor(actor, form);
+                    toast.success("Cập nhật diễn viên thành công!");
+                }
+                console.log('Actor saved:', response);
+                onSubmit(response);
+            } catch (error) {
+                console.error('Error saving actor:', error);
+                toast.error("Có lỗi xảy ra khi lưu diễn viên!");
+            } finally {
+                setLoadingSubmit(false);
+            }
+        }
+    };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -166,7 +189,7 @@ const ActorModal: React.FC<ActorModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={loadingSubmit ? undefined : onClose} />
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden z-20">
         {/* Header */}
         <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
@@ -187,7 +210,7 @@ const ActorModal: React.FC<ActorModalProps> = ({
               </div>
             </div>
             <button
-              onClick={onClose}
+              onClick={loadingSubmit ? undefined : onClose}
               className="p-2 hover:bg-slate-200 rounded-full transition-colors duration-200"
             >
               <X className="w-5 h-5 text-slate-500" />
@@ -210,6 +233,7 @@ const ActorModal: React.FC<ActorModalProps> = ({
                   <input
                     type="file"
                     accept="image/*"
+                    disabled={loadingSubmit}
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
@@ -266,7 +290,7 @@ const ActorModal: React.FC<ActorModalProps> = ({
                     name="name"
                     value={form.name}
                     onChange={handleChange}
-                    disabled={isView}
+                    disabled={isView || loadingSubmit}
                     className={`w-full border rounded-lg px-4 py-3 transition-all duration-200 ${
                       isView 
                         ? 'bg-slate-50 border-slate-200 text-slate-600' 
@@ -284,7 +308,7 @@ const ActorModal: React.FC<ActorModalProps> = ({
               </div>
 
               {/* Date of Birth and Nationality */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
@@ -328,10 +352,10 @@ const ActorModal: React.FC<ActorModalProps> = ({
                     placeholder={!isView ? "Nhập quốc tịch..." : ""}
                   />
                 </div>
-              </div>
+              </div> */}
 
               {/* Biography */}
-              <div>
+              {/* <div>
                 <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                   <FileText className="w-4 h-4" />
                   Tiểu sử
@@ -349,7 +373,7 @@ const ActorModal: React.FC<ActorModalProps> = ({
                   }`}
                   placeholder={!isView ? "Nhập tiểu sử diễn viên..." : ""}
                 />
-              </div>
+              </div> */}
 
               {/* Movies List - Only show in view mode and if there are movies */}
               {isView && form.listMovie && form.listMovie.length > 0 && (
@@ -373,11 +397,11 @@ const ActorModal: React.FC<ActorModalProps> = ({
                           />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-semibold text-slate-800 truncate">{movie.nameVn}</h4>
+                          <h4 className="text-sm font-semibold text-slate-800 truncate">Tên: {movie.nameVn}</h4>
                           {movie.nameEn && (
                             <p className="text-xs text-slate-500 truncate mt-1">{movie.nameEn}</p>
                           )}
-                          <p className="text-xs text-slate-400 mt-1">ID: {movie.id}</p>
+                          <p className="text-xs text-slate-400 mt-1">Đánh giá: {movie.ratings} <Star className="inline-block w-4 h-4 text-yellow-500" /></p>
                         </div>
                       </div>
                     ))}
@@ -391,6 +415,7 @@ const ActorModal: React.FC<ActorModalProps> = ({
                   <button
                     type="button"
                     onClick={onClose}
+                    disabled={loadingSubmit}
                     className="flex-1 px-6 py-3 border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-50 transition-colors duration-200"
                   >
                     Hủy
@@ -402,9 +427,17 @@ const ActorModal: React.FC<ActorModalProps> = ({
                       isAdd 
                         ? 'bg-green-600 hover:bg-green-700' 
                         : 'bg-blue-600 hover:bg-blue-700'
-                    }`}
+                    }
+                        ${loadingSubmit ? 'cursor-not-allowed opacity-70' : ''}`}
+                    disabled={loadingSubmit}
                   >
-                    {isAdd ? "Thêm diễn viên" : "Lưu thay đổi"}
+                    {loadingSubmit ? (
+                        <div className="flex items-center justify-center space-x-2">
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <span>Đang lưu...</span>
+                        </div>
+                    ) : (
+                        isAdd ? "Thêm diễn viên" : "Lưu thay đổi")}
                   </button>
                 </div>
               )}

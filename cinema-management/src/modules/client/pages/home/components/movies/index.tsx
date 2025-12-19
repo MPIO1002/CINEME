@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
+import { useNavigate } from "react-router-dom";
 import MoviePopup from "../movie-popup";
 import { API_BASE_URL } from "../../../../../../components/api-config";
 import ProgressBar from "../../../../components/progress-bar";
@@ -9,7 +10,19 @@ type Movie = {
     nameVn: string;
     nameEn?: string;
     image: string;
-    ratings: string;
+    ratings: number;
+};
+
+type PageableData = {
+    pageNumber: number;
+    pageSize: number;
+    totalPage: number;
+    totalRecords: number;
+};
+
+type ApiResponse = {
+    listContent: Movie[];
+    pageableData: PageableData;
 };
 
 const MovieList: React.FC<{ lang: "vi" | "en" }> = ({ lang }) => {
@@ -36,13 +49,12 @@ const MovieList: React.FC<{ lang: "vi" | "en" }> = ({ lang }) => {
     }, []);
 
     useEffect(() => {
-        fetch(`${API_BASE_URL}/movies`)
+        fetch(`${API_BASE_URL}/movies/available?page=1&size=12`)
             .then((res) => res.json())
-            .then((data) => {
-                if (data.statusCode === 200 && Array.isArray(data.data)) {
-                    setMovies(data.data);
-                }
-            });
+            .then((data: ApiResponse) => {
+                setMovies(data.listContent);
+            })
+            .catch((error) => console.error('Error fetching movies:', error));
     }, []);
 
     // Xử lý lấy id video từ url youtube
@@ -96,30 +108,12 @@ const MovieList: React.FC<{ lang: "vi" | "en" }> = ({ lang }) => {
     return (
         <div className="w-full min-h-screen flex justify-center items-start p-10">
             <div className="rounded-2xl p-8">
-                {/* Movie Category Tabs */}
+                {/* Movie Title */}
                 <div className="mb-8">
                     <div className="flex items-center gap-8" style={{ borderBottom: '1px solid var(--color-primary)' }}>
                         <div className="flex items-center gap-8 pb-3">
                             <span className="text-2xl font-bold" style={{ color: 'var(--color-text)' }}>PHIM</span>
-                            <span className="text-xl font-semibold pb-1" style={{ 
-                                color: 'var(--color-secondary)', 
-                                borderBottom: '2px solid var(--color-secondary)' 
-                            }}>
-                                Đang chiếu
-                            </span>
                         </div>
-                        <button 
-                            className="text-xl font-medium transition-colors pb-3 hover:opacity-80"
-                            style={{ color: 'var(--color-primary)' }}
-                        >
-                            Sắp chiếu
-                        </button>
-                        <button 
-                            className="text-xl font-medium transition-colors pb-3 hover:opacity-80"
-                            style={{ color: 'var(--color-primary)' }}
-                        >
-                            Phim IMAX
-                        </button>
                     </div>
                 </div>
 
@@ -150,6 +144,21 @@ const MovieList: React.FC<{ lang: "vi" | "en" }> = ({ lang }) => {
                             </div>
                         </div>
                     ))}
+                </div>
+
+                {/* See More Button */}
+                <div className="flex justify-center mt-8">
+                    <button
+                        onClick={() => window.location.href = '/movies'}
+                        className="px-8 py-3 rounded-lg text-lg font-semibold transition-all hover:opacity-80 cursor-pointer"
+                        style={{
+                            backgroundColor: 'var(--color-background)',
+                            color: 'var(--color-text)',
+                            border: '1px solid var(--color-primary)'
+                        }}
+                    >
+                        Xem thêm
+                    </button>
                 </div>
             </div>
             {/* Popup movie nằm ngoài grid, định vị tuyệt đối */}

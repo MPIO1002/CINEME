@@ -15,8 +15,8 @@ export const Pagination: React.FC<PaginationProps> = ({
   totalItems,
   itemsPerPage = 10,
   onPageChange,
-  showSizeChanger = false,
-  showQuickJumper = false,
+//   showSizeChanger = false,
+//   showQuickJumper = false,
   className = ""
 }) => {
   const totalPages = Math.ceil(totalItems / itemsPerPage);
@@ -34,7 +34,7 @@ export const Pagination: React.FC<PaginationProps> = ({
     const maxVisiblePages = 5;
     
     let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
     
     if (endPage - startPage + 1 < maxVisiblePages) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1);
@@ -79,7 +79,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         <button
           key={totalPages}
           onClick={() => handlePageChange(totalPages)}
-          className="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
+          className="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer"
         >
           {totalPages}
         </button>
@@ -90,9 +90,9 @@ export const Pagination: React.FC<PaginationProps> = ({
   };
 
   return (
-    <div className={`bg-white px-6 py-3 border-t border-gray-200 mt-6 ${className}`}>
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-700">
+    <div className={`bg-white px-6 py-3 border-t border-gray-200 mt-6 ${className} ${totalPages <= 1 ? 'hidden' : ''}`}>
+      <div className="flex items-center justify-center md:justify-between">
+        <div className="text-sm text-gray-700 hidden md:block">
           Hiển thị {startItem}-{endItem} trong tổng số {totalItems} kết quả
         </div>
         <div className="flex items-center space-x-2">

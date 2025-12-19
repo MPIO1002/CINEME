@@ -106,7 +106,25 @@ const FilmDetail: React.FC = () => {
     const fetchRecommended = async () => {
       if (!id) return;
       try {
-        const res = await fetch(`${API_BASE_URL}/movies/recommend?movieId=${encodeURIComponent(id)}&topN=10`);
+        // Get userId from localStorage
+        const userData = localStorage.getItem('userData');
+        let userId = '';
+        if (userData) {
+          try {
+            const parsed = JSON.parse(userData);
+            userId = parsed.id || parsed.userId || '';
+          } catch (e) {
+            console.warn('Failed to parse userData:', e);
+          }
+        }
+
+        // Build URL with movieId, topN, and userId (if available)
+        let url = `${API_BASE_URL}/movies/recommend?movieId=${encodeURIComponent(id)}&topN=6`;
+        if (userId) {
+          url += `&userId=${encodeURIComponent(userId)}`;
+        }
+
+        const res = await fetch(url);
         const json = await res.json();
         if (json && json.statusCode === 200 && Array.isArray(json.data)) {
           setRecommended(json.data);
@@ -273,10 +291,7 @@ const FilmDetail: React.FC = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center w-full">
                 {/* Movie Info */}
                 <div className="space-y-6">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="px-2 py-1 rounded font-bold" style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-background)' }}>
-                      {movie.format}
-                    </span>
+                  <div className="flex items-center gap-2 text-sm">                   
                     <span className="px-2 py-1 rounded" style={{ backgroundColor: 'var(--color-secondary)', color: 'var(--color-text)' }}>
                       {movie.limitageNameVn}
                     </span>
@@ -294,10 +309,6 @@ const FilmDetail: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4" />
                       <span>{formatTime(movie.time)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Globe className="w-4 h-4" />
-                      <span>{movie.languageNameVn}</span>
                     </div>
                   </div>
 

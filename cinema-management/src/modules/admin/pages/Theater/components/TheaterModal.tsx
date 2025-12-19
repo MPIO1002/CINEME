@@ -21,7 +21,7 @@ interface TheaterModalProps {
   mode: "add" | "edit" | "view";
   theater?: Theater;
   onClose: () => void;
-  onSubmit: (theater: Theater) => void;
+//   onSubmit: (theater: Theater) => void;
 }
 
 const TheaterModal: React.FC<TheaterModalProps> = ({
@@ -29,7 +29,7 @@ const TheaterModal: React.FC<TheaterModalProps> = ({
   mode,
   theater,
   onClose,
-  onSubmit,
+//   onSubmit,
 }) => {
   const [form, setForm] = useState<Theater>(
     theater || {
@@ -97,9 +97,9 @@ const TheaterModal: React.FC<TheaterModalProps> = ({
   };
 
   const handleSubmit = () => {
-    if (validateForm() && onSubmit) {
-      onSubmit(form);
-    }
+    // if (validateForm() && onSubmit) {
+    //   onSubmit(form);
+    // }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {

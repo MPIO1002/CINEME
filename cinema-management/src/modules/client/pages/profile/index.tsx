@@ -5,19 +5,14 @@ import { Star, Eye, MessageSquare, Badge } from 'lucide-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTicket } from '@fortawesome/free-solid-svg-icons';
 import { useToast } from '../../../../hooks/useToast';
-import { API_BASE_URL } from '../../../../components/api-config';
+import userApiService from '../../../../services/userApi';
+import api from '../../../../lib/axios';
 
 interface UserProfile {
   id: string;
   email: string;
   fullName: string;
   phone?: string;
-}
-
-interface UserProfileResponse {
-  statusCode: number;
-  message: string;
-  data: UserProfile;
 }
 
 interface BookingHistory {
@@ -31,12 +26,6 @@ interface BookingHistory {
   roomName: string;
   listSeats: string[];
   status: string;
-}
-
-interface BookingHistoryResponse {
-  statusCode: number;
-  message: string;
-  data: BookingHistory[];
 }
 
 const Profile: React.FC = () => {
@@ -60,48 +49,13 @@ const Profile: React.FC = () => {
           return;
         }
 
-        const user = JSON.parse(userData);
-        const { id, refreshToken } = user;
-
-        if (!id || !refreshToken) {
-          showToast('error', 'Thông tin đăng nhập không hợp lệ!');
-          navigate('/');
-          return;
-        }
-
         // Fetch user profile
-        const response = await fetch(
-          `${API_BASE_URL}/users/${id}/info`,
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${refreshToken}`
-            },
-          }
-        );
-
-        if (response.ok) {
-          const result: UserProfileResponse = await response.json();
-          if (result.statusCode === 200 && result.data) {
-            setUserProfile(result.data);
-          } else {
-            showToast('error', result.message || 'Không thể lấy thông tin hồ sơ!');
-          }
-        } else {
-          if (response.status === 401) {
-            showToast('error', 'Phiên đăng nhập đã hết hạn!');
-            localStorage.removeItem('userData');
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
-            navigate('/');
-          } else {
-            showToast('error', 'Không thể kết nối đến máy chủ!');
-          }
-        }
+        const result = await userApiService.getUserProfile();
+        setUserProfile(result);
       } catch (error) {
         console.error('Error fetching user profile:', error);
         showToast('error', 'Đã xảy ra lỗi không mong muốn!');
+        navigate('/');
       } finally {
         setIsLoading(false);
       }
@@ -113,24 +67,12 @@ const Profile: React.FC = () => {
         if (!userData) return;
 
         const user = JSON.parse(userData);
-        const { id, refreshToken } = user;
+        const { id } = user;
 
-        const response = await fetch(
-          `${API_BASE_URL}/bookings/${id}/history`,
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${refreshToken}`
-            },
-          }
-        );
+        const response = await api.get(`/bookings/${id}/history`);
 
-        if (response.ok) {
-          const result: BookingHistoryResponse = await response.json();
-          if (result.statusCode === 200 && result.data) {
-            setBookingHistory(result.data);
-          }
+        if (response.data.statusCode === 200 && response.data.data) {
+          setBookingHistory(response.data.data);
         }
       } catch (error) {
         console.error('Error fetching booking history:', error);
@@ -145,24 +87,10 @@ const Profile: React.FC = () => {
         if (!userData) return;
 
         const user = JSON.parse(userData);
-        const { id, refreshToken } = user;
-        if (!id || !refreshToken) return;
+        const { id } = user;
+        if (!id) return;
 
-        const res = await fetch(`${API_BASE_URL}/rank/${encodeURIComponent(id)}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${refreshToken}`
-          }
-        });
-
-        if (!res.ok) {
-          console.warn('Rank API returned non-OK status', res.status);
-          return;
-        }
-
-        const json = await res.json();
-        const data = json?.data || json;
+        const data = await userApiService.getUserRank(id);
 
         const rankName =
           typeof data.rank === 'object'

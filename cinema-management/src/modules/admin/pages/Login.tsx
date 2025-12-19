@@ -1,4 +1,5 @@
 import { authApiService, type UserData } from "@/services/authApi";
+import Cookies from "js-cookie";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -36,10 +37,18 @@ const Login = () => {
 
         if (response.data.statusCode === 200) {
           const userData: UserData = response.data.data;
-          // Lưu tokens vào localStorage
-          localStorage.setItem("accessToken", userData.accessToken);
-          localStorage.setItem("refreshToken", userData.refreshToken);
-          localStorage.setItem("fullName", userData.fullName);
+          // Lưu tokens vào localStorage với prefix 'admin_' để phân biệt với client
+          localStorage.setItem("admin_accessToken", userData.accessToken);
+          localStorage.setItem("admin_employeeId", userData.id);
+          localStorage.setItem("admin_fullName", userData.fullName);
+          localStorage.setItem("admin_userType", "admin"); // Đánh dấu là admin
+          
+          // Lưu refreshToken vào cookie
+          Cookies.set('refreshToken', userData.refreshToken, {
+            expires: 30,  // 30 days
+            secure: window.location.protocol === 'https:',  // Chỉ bật secure trên HTTPS
+            sameSite: window.location.protocol === 'https:' ? 'None' : 'Lax'  // None cần HTTPS
+          });
           
           setErrors({});
           navigate("/admin");

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ChevronDown, Search } from 'lucide-react';
-import { useDebounce } from '../../../../../hooks/exports';
-import { API_BASE_URL } from '../../../../../components/api-config';
+import { useDebounce, useToast } from '../../../../../hooks/exports';
+import { API_BASE_URL, AI_API_URL } from '../../../../../components/api-config';
 
 // Custom scrollbar styles
 const scrollbarStyles = `
@@ -156,6 +156,36 @@ interface TheaterApiResponse {
   data: Theater[];
 }
 
+interface Format {
+  id: string;
+  nameVn: string;
+  nameEn: string;
+}
+
+interface FormatsApiResponse {
+  statusCode: number;
+  message: string;
+  data: Format[];
+}
+
+interface Language {
+  id: string;
+  nameVn: string;
+  nameEn: string;
+}
+
+interface LanguagesApiResponse {
+  statusCode: number;
+  message: string;
+  data: Language[];
+}
+
+interface MovieSelection {
+  movieId: string;
+  formatId: string;
+  languageId: string;
+}
+
 // New interfaces for API request and response
 interface CreateShowtimeRequest {
   openTime: string;
@@ -170,6 +200,8 @@ interface CreateShowtimeRequest {
     rating: number;
     type: number;
     title: string;
+    format: string;
+    language: string;
   }>;
 }
 
@@ -211,6 +243,7 @@ interface CreateShowtimeModalProps {
 }
 
 const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClose }) => {
+  const { showToast } = useToast();
   const [selectedDate, setSelectedDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedTheater, setSelectedTheater] = useState('');
@@ -224,8 +257,20 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
   const [theatersError, setTheatersError] = useState<string | null>(null);
   const [startTime, setStartTime] = useState('08:00');
   const [endTime, setEndTime] = useState('22:00');
-  // const [showtimes, setShowtimes] = useState<Showtime[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // New states for formats and languages
+  const [formats, setFormats] = useState<Format[]>([]);
+  const [languages, setLanguages] = useState<Language[]>([]);
+  
+  // Movie selections with format and language
+  const [movieSelections, setMovieSelections] = useState<Map<string, MovieSelection>>(new Map());
+  
+  // Format/Language selection modal state
+  const [formatLanguageModalOpen, setFormatLanguageModalOpen] = useState(false);
+  const [currentMovieForModal, setCurrentMovieForModal] = useState<Movie | null>(null);
+  const [selectedFormatId, setSelectedFormatId] = useState<string>('');
+  const [selectedLanguageId, setSelectedLanguageId] = useState<string>('');
   
   // New states for creation process
   const [isCreating, setIsCreating] = useState(false);
@@ -233,6 +278,9 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
   const [createdShowtimes, setCreatedShowtimes] = useState<CreateShowtimeResponse>([]);
   const [creationError, setCreationError] = useState<string | null>(null);
   const [goldenTime, setGoldenTime] = useState('19:00');
+  
+  // States for saving schedules
+  const [isSaving, setIsSaving] = useState(false);
   
   // Use debounce hook với delay 300ms
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -501,6 +549,60 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
     }
   };
 
+  // Fetch formats from API
+  const fetchFormats = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/formats`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result: FormatsApiResponse = await response.json();
+      
+      if (result.statusCode === 200) {
+        setFormats(result.data);
+      } else {
+        throw new Error(result.message || 'Failed to fetch formats');
+      }
+    } catch (error) {
+      console.error('Error fetching formats:', error);
+    }
+  };
+
+  // Fetch languages from API
+  const fetchLanguages = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/languages`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result: LanguagesApiResponse = await response.json();
+      
+      if (result.statusCode === 200) {
+        setLanguages(result.data);
+      } else {
+        throw new Error(result.message || 'Failed to fetch languages');
+      }
+    } catch (error) {
+      console.error('Error fetching languages:', error);
+    }
+  };
+
   // Fetch movies from API
   const fetchMovies = async () => {
     try {
@@ -549,15 +651,60 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
 
   // Handle movie checkbox change
   const handleMovieSelect = (movieId: string, isSelected: boolean) => {
+    if (isSelected) {
+      // Find the movie object
+      const movie = movies.find(m => m.id === movieId);
+      if (movie) {
+        // Open format/language selection modal
+        setCurrentMovieForModal(movie);
+        setSelectedFormatId('');
+        setSelectedLanguageId('');
+        setFormatLanguageModalOpen(true);
+      }
+    } else {
+      // Remove movie
+      setSelectedMovies((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(movieId);
+        return newSet;
+      });
+      
+      // Remove from movie selections
+      setMovieSelections((prev) => {
+        const newMap = new Map(prev);
+        newMap.delete(movieId);
+        return newMap;
+      });
+    }
+  };
+
+  // Handle format and language selection
+  const handleConfirmFormatLanguage = () => {
+    if (!currentMovieForModal || !selectedFormatId || !selectedLanguageId) {
+      showToast('warning', 'Vui lòng chọn định dạng và ngôn ngữ');
+      return;
+    }
+
+    // Add to selected movies
     setSelectedMovies((prev) => {
       const newSet = new Set(prev);
-      if (isSelected) {
-        newSet.add(movieId);
-      } else {
-        newSet.delete(movieId);
-      }
+      newSet.add(currentMovieForModal.id);
       return newSet;
     });
+
+    // Store format and language selection
+    setMovieSelections((prev) => {
+      const newMap = new Map(prev);
+      newMap.set(currentMovieForModal.id, {
+        movieId: currentMovieForModal.id,
+        formatId: selectedFormatId,
+        languageId: selectedLanguageId
+      });
+      return newMap;
+    });
+
+    setFormatLanguageModalOpen(false);
+    setCurrentMovieForModal(null);
   };
 
   // Handle select all movies
@@ -597,7 +744,7 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
   const handleCreateShowtimes = async () => {
     // Validation
     if (!selectedDate || !selectedTheater || selectedMovies.size === 0) {
-      alert('Vui lòng chọn đầy đủ thông tin: ngày, rạp chiếu và ít nhất một phim');
+      showToast('warning', 'Vui lòng chọn đầy đủ thông tin: ngày, rạp chiếu và ít nhất một phim');
       return;
     }
 
@@ -615,17 +762,22 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
         startDate: selectedDate,
         endDate: endDate || selectedDate,
         hallId: selectedTheater,
-        movies: selectedMoviesList.map(movie => ({
-          id: movie.id,
-          duration: movie.time,
-          rating: movie.ratings ? parseFloat(movie.ratings) : (Math.random() * 25 + 1), // Use actual rating or random between 1-26
-          type: Math.floor(Math.random() * 2), // Random 0 or 1
-          title: movie.nameVn
-        }))
+        movies: selectedMoviesList.map(movie => {
+          const selection = movieSelections.get(movie.id);
+          return {
+            id: movie.id,
+            duration: movie.time,
+            rating: movie.ratings ? parseFloat(movie.ratings) : (Math.random() * 25 + 1),
+            type: Math.floor(Math.random() * 2),
+            title: movie.nameVn,
+            format: selection?.formatId || '',
+            language: selection?.languageId || ''
+          };
+        })
       };
 
       console.log('=== DỮ LIỆU TRUYỀN VÀO API /convert ===');
-      console.log('Request URL:', 'http://127.0.0.1:8000/convert');
+      console.log('Request URL:', `${AI_API_URL}/convert`);
       console.log('Request Method:', 'POST');
       console.log('Request Headers:', {
         'Content-Type': 'application/json'
@@ -633,6 +785,7 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
       console.log('Request Body:', JSON.stringify(requestData, null, 2));
       console.log('Raw Request Data Object:', requestData);
       console.log('Selected Movies Details:', selectedMoviesList);
+      console.log('Movie Selections:', movieSelections);
       console.log('Selected Theater ID:', selectedTheater);
       console.log('Date Range:', `${selectedDate} → ${endDate || selectedDate}`);
       console.log('Time Range:', `${startTime} → ${endTime}`);
@@ -652,7 +805,7 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
       }, 800);
 
       // Make API call
-      const response = await fetch('http://127.0.0.1:8000/convert', {
+      const response = await fetch(`${AI_API_URL}/convert`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -707,11 +860,77 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
     }
   }, [createdShowtimes]);
 
+  // Function to save schedules to database
+  const handleSaveSchedules = async () => {
+    if (createdShowtimes.length === 0) {
+      showToast('warning', 'Vui lòng tạo suất chiếu trước khi lưu');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      console.log('=== DỮ LIỆU TRUYỀN LÊN API /schedules/create ===');
+      console.log('Request URL:', `${API_BASE_URL}/schedules/create`);
+      console.log('Request Method:', 'POST');
+      console.log('Request Headers:', {
+        'Content-Type': 'application/json',
+      });
+      console.log('Request Body:', JSON.stringify(createdShowtimes, null, 2));
+      console.log('=====================================');
+
+      const response = await fetch(`${API_BASE_URL}/schedules/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(createdShowtimes),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Schedules saved successfully:', result);
+
+      showToast('success', 'Lưu suất chiếu thành công!');
+      
+      // Reset states after successful save
+      setCreatedShowtimes([]);
+      setSelectedMovies(new Set());
+      setMovieSelections(new Map());
+      setSelectedDate('');
+      setEndDate('');
+      setCreationProgress(0);
+
+    } catch (error) {
+      let errorMessage = 'Có lỗi xảy ra khi lưu suất chiếu';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to fetch')) {
+          errorMessage = 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      console.error('Error saving schedules:', error);
+      showToast('error', errorMessage);
+
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // Fetch movies and theaters when modal opens
   useEffect(() => {
     if (isOpen) {
       fetchMovies();
       fetchTheaters();
+      
+      // Fetch formats and languages
+      Promise.all([fetchFormats(), fetchLanguages()]);
     }
   }, [isOpen]);
 
@@ -721,7 +940,7 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
     <>
       <style dangerouslySetInnerHTML={{ __html: scrollbarStyles }} />
       <div className="fixed inset-0 bg-[#00000071] flex items-center justify-center mt-[-15px] z-50">
-      <div className="bg-white rounded-lg w-[98%] h-[95%] max-w-7xl flex flex-col">
+      <div className="bg-white rounded-lg w-[98%] h-[95%] max-w-[95%] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4">
           <h2 className="text-xl font-bold text-gray-800">TẠO SUẤT CHIẾU</h2>
@@ -860,8 +1079,19 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
                     'Tạo'
                   )}
                 </button>
-                <button className="px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all duration-300 font-medium">
-                  Lưu
+                <button 
+                  onClick={handleSaveSchedules}
+                  disabled={isSaving || createdShowtimes.length === 0}
+                  className="px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all duration-300 font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isSaving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Đang lưu...
+                    </>
+                  ) : (
+                    'Lưu'
+                  )}
                 </button>
               </div>
             </div>
@@ -1192,6 +1422,92 @@ const CreateShowtimeModal: React.FC<CreateShowtimeModalProps> = ({ isOpen, onClo
         </div>
       </div>
       </div>
+
+      {/* Format/Language Selection Modal */}
+      {formatLanguageModalOpen && currentMovieForModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-96 p-6 shadow-xl">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">
+              Chọn định dạng và ngôn ngữ cho
+            </h2>
+            <p className="text-sm font-medium text-indigo-600 mb-6">
+              {currentMovieForModal.nameVn}
+            </p>
+
+            {/* Format Selection */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Định dạng
+              </label>
+              {formats.length === 0 ? (
+                <div className="text-sm text-gray-500 py-2">Đang tải...</div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {formats.map((format) => (
+                    <button
+                      key={format.id}
+                      onClick={() => setSelectedFormatId(format.id)}
+                      className={`p-3 border-2 rounded-lg text-sm font-medium transition-all ${
+                        selectedFormatId === format.id
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
+                          : 'border-gray-200 bg-white text-gray-700 hover:border-indigo-300'
+                      }`}
+                    >
+                      {format.nameVn}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Language Selection */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Ngôn ngữ
+              </label>
+              {languages.length === 0 ? (
+                <div className="text-sm text-gray-500 py-2">Đang tải...</div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {languages.map((language) => (
+                    <button
+                      key={language.id}
+                      onClick={() => setSelectedLanguageId(language.id)}
+                      className={`p-3 border-2 rounded-lg text-sm font-medium transition-all ${
+                        selectedLanguageId === language.id
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
+                          : 'border-gray-200 bg-white text-gray-700 hover:border-indigo-300'
+                      }`}
+                    >
+                      {language.nameVn}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setFormatLanguageModalOpen(false);
+                  setCurrentMovieForModal(null);
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleConfirmFormatLanguage}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!selectedFormatId || !selectedLanguageId}
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

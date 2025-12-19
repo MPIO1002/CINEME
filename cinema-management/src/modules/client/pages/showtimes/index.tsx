@@ -16,6 +16,7 @@ interface Showtime {
     roomId: string;
     theaterId: string;
     roomName: string;
+    isAvailable?: boolean;
 }
 
 interface Movie {
@@ -108,7 +109,14 @@ const ShowtimesPage = () => {
             const result: ShowtimesResponse = await response.json();
 
             if (result.statusCode === 0) {
-                setMovies(result.data);
+                // Sort showtimes by startTime for each movie
+                const sortedMovies = result.data.map(movie => ({
+                    ...movie,
+                    showtimes: movie.showtimes.sort((a, b) => {
+                        return a.startTime.localeCompare(b.startTime);
+                    })
+                }));
+                setMovies(sortedMovies);
             } else {
                 console.error('Failed to fetch showtimes:', result.message);
                 setMovies([]);
@@ -135,7 +143,10 @@ const ShowtimesPage = () => {
         return timeString.slice(0, 5); // HH:mm
     };
 
-    const handleShowtimeClick = (_showtime: Showtime, movie: Movie) => {
+    const handleShowtimeClick = (showtime: Showtime, movie: Movie) => {
+        // Don't navigate if showtime is not available
+        if (showtime.isAvailable === false) return;
+        
         // Navigate to booking page with movieId in path
         // The booking page will handle date, theater, and showtime selection
         navigate(`/booking/${movie.movieId}`);
@@ -265,7 +276,7 @@ const ShowtimesPage = () => {
                         ) : (
                             <div className="space-y-8">
                                 {movies.map((movie) => (
-                                    <div key={movie.movieId} className="flex gap-6 bg-gradient-to-r from-[var(--color-background)] via-black to-[var(--color-background)] p-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 border border-black">
+                                    <div key={movie.movieId} className="flex gap-6 rounded-lg hover:shadow-xl transition-all duration-300">
                                         {/* Movie Poster */}
                                         <div className="flex-shrink-0">
                                             <img
@@ -300,7 +311,12 @@ const ShowtimesPage = () => {
                                                         <button
                                                             key={showtime.id}
                                                             onClick={() => handleShowtimeClick(showtime, movie)}
-                                                            className="px-4 py-2 bg-transparent border-2 border-[var(--color-accent)] text-[var(--color-accent)] rounded-lg hover:bg-[var(--color-accent)] hover:text-white transition font-medium cursor-pointer"
+                                                            disabled={showtime.isAvailable === false}
+                                                            className={`px-4 py-2 rounded-lg transition font-medium ${
+                                                                showtime.isAvailable === false
+                                                                    ? 'bg-gray-600 border-2 border-gray-500 text-gray-400 cursor-not-allowed'
+                                                                    : 'bg-transparent border-2 border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[var(--color-accent)] hover:text-white cursor-pointer'
+                                                            }`}
                                                         >
                                                             {formatTime(showtime.startTime)} - {formatTime(showtime.endTime)}
                                                         </button>
@@ -317,7 +333,12 @@ const ShowtimesPage = () => {
                                                             <button
                                                                 key={`imax-${showtime.id}`}
                                                                 onClick={() => handleShowtimeClick(showtime, movie)}
-                                                                className="px-4 py-2 bg-transparent border-2 border-[var(--color-accent)] text-[var(--color-accent)] rounded-lg hover:bg-[var(--color-accent)] hover:text-white transition font-medium cursor-pointer"
+                                                                disabled={showtime.isAvailable === false}
+                                                                className={`px-4 py-2 rounded-lg transition font-medium ${
+                                                                    showtime.isAvailable === false
+                                                                        ? 'bg-gray-600 border-2 border-gray-500 text-gray-400 cursor-not-allowed'
+                                                                        : 'bg-transparent border-2 border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[var(--color-accent)] hover:text-white cursor-pointer'
+                                                                }`}
                                                             >
                                                                 {formatTime(showtime.startTime)} - {formatTime(showtime.endTime)}
                                                             </button>
